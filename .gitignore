@@ -1,0 +1,52 @@
+# Python environments
+.venv/
+venv*/
+.venv*/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and local config
+.env
+.env.*
+
+# IDEs: keep shared project config, ignore per-user state
+.idea/workspace.xml
+.idea/usage.statistics.xml
+.idea/shelf/
+.idea/dataSources*
+.idea/httpRequests/
+
+# Training artifacts: large, belong in Drive backups, not git
+runs/
+checkpoints/
+logs/
+wandb/
+tensorboard/
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.h5
+
+# Celeste game files and mods: copyrighted, never commit or redistribute
+game/
+game-probe/
+Content/
+Mods/
+Saves/
+*.xnb
+*.exe
+*.dll
+*.pdb
+
+# Scratch and measurement output
+scratch/
+*.log
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
