@@ -28,48 +28,73 @@ from pathlib import Path
 
 DEFAULT_PORT = 32279
 
-# One letter per game button, as written in TAS files. These are the inputs a player can bind
-# in the game's controls menu. Syntax that needs extra arguments (feather angle 'F', dash-only
-# 'A' and move-only 'M' directions) or that only exists in TAS tooling ('P') is not accepted,
+# One letter per TAS button, with the game bindings CelesteTAS presses for it (BindingHelper in
+# CelesteTAS 3.47.1). Together with dash-only and move-only directions, these cover the bindings in
+# the game's controls menu. Two limits come from CelesteTAS, not the bridge: Talk and Cancel cannot be
+# pressed without also pressing Dash (or Journal), matching the default bindings, and analog stick
+# angles (TAS 'F') are not keybinds and are not accepted. TAS-only syntax ('P') is not accepted either,
 # so the bridge can never write a TAS command such as Set, Invoke or console into the file.
 BUTTON_LETTERS = {
-    "L": "left",
-    "R": "right",
-    "U": "up",
-    "D": "down",
-    "J": "jump",
+    "L": "left (also menu left)",
+    "R": "right (also menu right)",
+    "U": "up (also menu up)",
+    "D": "down (also menu down)",
+    "J": "jump and confirm",
     "K": "jump (second binding)",
-    "X": "dash",
-    "C": "dash (second binding)",
+    "X": "dash, talk and cancel",
+    "C": "dash (second binding) and cancel",
     "Z": "crouch dash",
     "V": "crouch dash (second binding)",
     "G": "grab",
     "H": "grab (second binding)",
     "S": "pause",
     "Q": "quick restart",
-    "N": "journal",
-    "O": "confirm",
+    "N": "journal and talk",
+    "O": "confirm (second binding)",
 }
 _LETTER_ORDER = {letter: i for i, letter in enumerate(BUTTON_LETTERS)}
+
+# Directions for the "dash only" and "move only" bindings. A dash-only direction aims a dash without
+# moving; a move-only direction moves without aiming a dash.
+DIRECTIONS = "LRUD"
 
 
 class BridgeError(RuntimeError):
     """The game did not behave the way the bridge requires."""
 
 
-def format_input_line(buttons: str | set[str] | frozenset[str]) -> str:
-    """Turn a set of held buttons into one TAS input line lasting exactly one frame.
+def _checked_letters(value: str | set[str] | frozenset[str], allowed, what: str) -> set[str]:
+    letters = set(value)
+    unknown = letters - set(allowed)
+    if unknown:
+        raise ValueError(f"Not a {what}: {sorted(unknown)}. Allowed: {''.join(allowed)}")
+    return letters
+
+
+def format_input_line(
+    buttons: str | set[str] | frozenset[str],
+    dash_only: str | set[str] | frozenset[str] = "",
+    move_only: str | set[str] | frozenset[str] = "",
+) -> str:
+    """Turn held buttons and dash-only / move-only directions into one TAS input line for one frame.
 
     >>> format_input_line({"R", "J"})
     '1,R,J'
-    >>> format_input_line("")
-    '1'
+    >>> format_input_line("RX", dash_only="U")
+    '1,R,X,AU'
+    >>> format_input_line("", move_only="RU")
+    '1,MRU'
     """
-    letters = set(buttons)
-    unknown = letters - BUTTON_LETTERS.keys()
-    if unknown:
-        raise ValueError(f"Not a game button: {sorted(unknown)}. Allowed: {''.join(BUTTON_LETTERS)}")
-    return ",".join(["1", *sorted(letters, key=_LETTER_ORDER.__getitem__)])
+    letters = _checked_letters(buttons, BUTTON_LETTERS, "game button")
+    dash = _checked_letters(dash_only, DIRECTIONS, "dash-only direction")
+    move = _checked_letters(move_only, DIRECTIONS, "move-only direction")
+
+    tokens = ["1", *sorted(letters, key=_LETTER_ORDER.__getitem__)]
+    if dash:
+        tokens.append("A" + "".join(d for d in DIRECTIONS if d in dash))
+    if move:
+        tokens.append("M" + "".join(d for d in DIRECTIONS if d in move))
+    return ",".join(tokens)
 
 
 @dataclass(frozen=True)
@@ -375,11 +400,11 @@ class CelesteBridge:
             if time.perf_counter() > deadline:
                 raise BridgeError(f"Timed out waiting for {description} after {requests} requests; last info: {info}")
 
-    def step(self, buttons: str | set[str] | frozenset[str]) -> Observation:
-        """Hold `buttons` for exactly one frame and return the state after that frame."""
+    def step(self, buttons: str | set[str] | frozenset[str], dash_only: str = "", move_only: str = "") -> Observation:
+        """Hold the inputs for exactly one frame and return the state after that frame."""
         if not self._started:
             raise BridgeError("Call reset() before step()")
-        line = format_input_line(buttons)
+        line = format_input_line(buttons, dash_only, move_only)
 
         start = time.perf_counter()
         frame = self.expected_frame

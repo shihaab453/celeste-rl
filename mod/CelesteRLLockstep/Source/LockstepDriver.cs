@@ -37,9 +37,10 @@ internal static class LockstepDriver {
     private const string LogTag = "CelesteRLLockstep";
     private const int DefaultPort = 32280;
 
-    // One frame, and only buttons a player can bind in the controls menu. The Python bridge
-    // enforces the same rule; checking again here means the socket can never inject TAS commands.
-    private static readonly Regex InputLine = new("^1(,[LRUDJKXCZVGHSQNO])*$", RegexOptions.Compiled);
+    // One frame: buttons a player can bind in the controls menu, then optional dash-only (A) and
+    // move-only (M) directions, in the canonical order the Python bridge writes. Checking again here
+    // means the socket can never inject TAS commands.
+    private static readonly Regex InputLine = new(@"^1(,[LRUDJKXCZVGHSQNO])*(,A(?=[LRUD])L?R?U?D?)?(,M(?=[LRUD])L?R?U?D?)?\z", RegexOptions.Compiled);
 
     private static readonly JsonSerializerOptions JsonOptions = new() { IncludeFields = true };
     private static readonly PropertyInfo PlaybackSpeedProperty =
@@ -278,6 +279,7 @@ internal static class LockstepDriver {
             ["loading"] = Manager.IsLoading(),
             ["freeze_timer"] = Engine.FreezeTimer,
             ["scene"] = Engine.Scene?.GetType().FullName,
+            ["level_paused"] = (Engine.Scene as Level)?.Paused,
             ["reset_updates"] = pendingCommand == "reset" ? resetUpdates : null,
         });
 

@@ -127,9 +127,9 @@ class LockstepBridge:
         return Observation(self.episode_id, 0, observation.tas_frame, observation.room, observation.state,
                            observation.diagnostics)
 
-    def step(self, buttons: str | set[str] | frozenset[str]) -> Observation:
-        # Invalid buttons are rejected before anything is sent, so they do not end the session.
-        line = format_input_line(buttons)
+    def step(self, buttons: str | set[str] | frozenset[str], dash_only: str = "", move_only: str = "") -> Observation:
+        # Invalid inputs are rejected before anything is sent, so they do not end the session.
+        line = format_input_line(buttons, dash_only, move_only)
         start = time.perf_counter()
         reply = self._request({"cmd": "step", "line": line})
         self.step_id += 1
