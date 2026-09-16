@@ -165,7 +165,8 @@ def memory_mb(pid: int) -> float:
     return int(fields[-1].rstrip(' K"').replace(",", "")) / 1024 if len(fields) >= 5 else float("nan")
 
 
-def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: bool = True) -> subprocess.Popen:
+def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: bool = True,
+           extra_args: list[str] | None = None) -> subprocess.Popen:
     """Start the game and wait until DebugRC answers.
 
     `focus=False` leaves the window unfocused during startup, to check whether startup needs focus.
@@ -178,7 +179,7 @@ def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: boo
     profile = check_game_dir(game_dir)
     env = dict(os.environ, EVEREST_SAVEPATH=str(profile))
     process = subprocess.Popen(
-        [str(game_dir / "Celeste.exe"), "--debug", "--disable-splash"],
+        [str(game_dir / "Celeste.exe"), "--debug", "--disable-splash", *(extra_args or [])],
         cwd=game_dir,
         env=env,
     )

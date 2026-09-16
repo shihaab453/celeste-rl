@@ -53,6 +53,14 @@ internal static class LockstepDriver {
         typeof(InputController).GetField("FastForwards", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
     private static string? incompatibility;
 
+    // Everest's TrailManager patch gives each dash-trail snapshot its own 512x512 render target and frees
+    // them only in Dispose(), which runs when the entity is removed or the scene ends. A Speedrun Tool
+    // savestate load replaces the level's TrailManager without that, so every episode with a drawn dash
+    // trail leaked several render targets (native/GPU memory, ~2-6 MB per reset). Disposing the outgoing
+    // TrailManager before restoring only frees trail images of the episode being discarded.
+    private static readonly MethodInfo? TrailManagerDispose =
+        typeof(TrailManager).GetMethod("Dispose", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, Type.EmptyTypes);
+
     private const float SteppingSpeed = 100_000f;
     private static readonly TimeSpan CommandWait = TimeSpan.FromMilliseconds(20);
     // One deadline for a whole pending command: restoring the savestate, the final advance of a reset,
@@ -90,6 +98,9 @@ internal static class LockstepDriver {
         }
         if (incompatibility != null) {
             Logger.Log(LogLevel.Error, LogTag, $"Incompatible CelesteTAS version: {incompatibility}. Commands will be refused.");
+        }
+        if (TrailManagerDispose == null) {
+            Logger.Log(LogLevel.Warn, LogTag, "TrailManager.Dispose not found; dash trail render targets will leak on every reset.");
         }
 
         var update = typeof(Manager).GetMethod(nameof(Manager.Update), BindingFlags.Public | BindingFlags.Static)!;
@@ -255,6 +266,8 @@ internal static class LockstepDriver {
                         return;
                     }
 
+                    ReleaseTrailRenderTargets();
+
                     // Disabling and re-enabling the run is what CelesteTAS's Restart hotkey does:
                     // EnableRun, at the start of Manager.Update, restores the breakpoint savestate, or
                     // replays the prefix to create it if no valid savestate exists.
@@ -337,6 +350,10 @@ internal static class LockstepDriver {
             ["scene"] = Engine.Scene?.GetType().FullName,
             ["level_paused"] = (Engine.Scene as Level)?.Paused,
             ["reset_updates"] = pendingCommand == "reset" ? resetUpdates : null,
+            // Memory investigation: live managed heap after the most recent collection, on resets only.
+            ["managed_heap_mb"] = pendingCommand == "reset" ? GC.GetGCMemoryInfo().HeapSizeBytes / 1048576.0 : null,
+            ["gc_count_gen2"] = pendingCommand == "reset" ? GC.CollectionCount(2) : null,
+            ["virtual_assets"] = pendingCommand == "reset" ? CountVirtualAssets() : null,
             // Engine updates run while loading after this input was consumed, before this reply.
             ["loading_updates"] = pendingId != null ? loadingUpdates : null,
         });
@@ -344,6 +361,31 @@ internal static class LockstepDriver {
         Debug($"reply {id} frame={Manager.Controller.CurrentFrameInTas}");
         server!.Send(sessionGeneration,
             $"{{\"id\":{id},\"frame\":{Manager.Controller.CurrentFrameInTas},\"state\":{state},\"diagnostics\":{diagnostics}}}");
+    }
+
+    private static void ReleaseTrailRenderTargets() {
+        if (TrailManagerDispose == null || Engine.Scene is not Level level) {
+            return;
+        }
+        foreach (Entity entity in level.Entities) {
+            if (entity is TrailManager trailManager) {
+                TrailManagerDispose.Invoke(trailManager, null);
+            }
+        }
+    }
+
+    /// Memory investigation: live Monocle VirtualContent assets by name (render targets and textures that
+    /// have been created and not disposed).
+    private static Dictionary<string, int>? CountVirtualAssets() {
+        if (typeof(VirtualContent).GetField("assets", BindingFlags.NonPublic | BindingFlags.Static)?.GetValue(null) is not IEnumerable assets) {
+            return null;
+        }
+        var counts = new Dictionary<string, int>();
+        foreach (object asset in assets) {
+            string name = (asset as VirtualAsset)?.Name ?? "?";
+            counts[name] = counts.GetValueOrDefault(name) + 1;
+        }
+        return counts;
     }
 
     private static void SendError(string id, string error) {
