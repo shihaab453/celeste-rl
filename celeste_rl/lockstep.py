@@ -89,8 +89,21 @@ class LockstepBridge:
             raise self._end_session(f"expected reply to request {request_id}, got {str(reply)[:200]}")
         if "error" in reply:
             raise self._end_session(f"game rejected {message['cmd']}: {reply['error']}")
-        if "frame" not in reply or "state" not in reply:
-            raise self._end_session(f"reply to {message['cmd']} is missing frame or state")
+        # Validate the shape before any local state changes, so a malformed reply (for example from a
+        # mismatched mod version) ends the session like any other protocol failure.
+        problem = None
+        if not isinstance(reply.get("frame"), int) or isinstance(reply.get("frame"), bool):
+            problem = "frame is missing or not an integer"
+        elif "state" not in reply or not (reply["state"] is None or isinstance(reply["state"], dict)):
+            problem = "state is missing or not an object or null"
+        elif isinstance(reply["state"], dict) and not isinstance(reply["state"].get("RoomName", ""), str):
+            problem = "state.RoomName is not a string"
+        elif isinstance(reply["state"], dict) and not (reply["state"].get("Player") is None or isinstance(reply["state"]["Player"], dict)):
+            problem = "state.Player is not an object or null"
+        elif not (reply.get("diagnostics") is None or isinstance(reply["diagnostics"], dict)):
+            problem = "diagnostics is not an object or null"
+        if problem:
+            raise self._end_session(f"malformed reply to {message['cmd']}: {problem}")
         return reply
 
     def _observation(self, reply: dict, expected_frame: int) -> Observation:

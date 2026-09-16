@@ -164,6 +164,30 @@ class LockstepFailureTests(unittest.TestCase):
         with self.assertRaisesRegex(BridgeError, "call reset"):
             bridge.step("R")
 
+    def test_malformed_reply_shapes_end_session_without_advancing(self):
+        malformed = [
+            {"frame": 301, "state": ["bad-shape"]},
+            {"frame": "301", "state": START_STATE},
+            {"frame": True, "state": START_STATE},
+            {"frame": 301, "state": {"RoomName": 1, "Player": {}}},
+            {"frame": 301, "state": {"RoomName": "1", "Player": [1, 2]}},
+            {"frame": 301, "state": START_STATE, "diagnostics": "loading"},
+            {"frame": 301},
+        ]
+        for body in malformed:
+            with self.subTest(body=body):
+                def respond(request, _, body=body):
+                    if request["cmd"] == "reset":
+                        return reply(request, 300)
+                    return (json.dumps({"id": request["id"], **body}) + "\n").encode()
+
+                _, _, bridge = self.make(respond)
+                bridge.reset()
+                with self.assertRaisesRegex(BridgeError, "malformed reply"):
+                    bridge.step("R")
+                self.assertIsNotNone(bridge.failure)
+                self.assertEqual(bridge._frame, 300, "local frame advanced on a malformed reply")
+
     def test_wrong_frame_ends_session(self):
         def respond(request, _):
             return reply(request, 300 if request["cmd"] == "reset" else 305)

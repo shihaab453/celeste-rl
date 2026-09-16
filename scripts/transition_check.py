@@ -18,7 +18,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import struct
 import subprocess
 import sys
 import time
@@ -30,6 +29,7 @@ sys.path.insert(0, str(REPO))
 
 from celeste_rl import game_process  # noqa: E402
 from celeste_rl.bridge import CelesteBridge, format_input_line  # noqa: E402
+from celeste_rl.export_compare import compare_files  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 
 
@@ -94,71 +94,6 @@ def play_plain_tas(client, tas_path: Path, export_path: Path, actions: list[str]
         time.sleep(0.01)
 
 
-def parse_export(path: Path) -> dict[int, dict]:
-    """ExportGameInfo rows keyed by TAS frame: time, position, speed, state name and room."""
-    rows = {}
-    lines = path.read_text(encoding="utf-8").splitlines()
-    for line in lines[1:]:
-        cells = line.split("\t")
-        if len(cells) < 7:
-            continue
-        room = re.search(r"\[([^\]]+)\]", "\t".join(cells[7:]))
-        rows[int(cells[2])] = {
-            "time": cells[3],
-            "position": [float(v) for v in cells[4].split(",")],
-            "speed": [float(v) for v in cells[5].split(",")],
-            "decimals": len(cells[4].split(",")[0].split(".")[1]) if "." in cells[4] else 0,
-            "state": cells[6],
-            "room": room[1] if room else None,
-        }
-    return rows
-
-
-def f32(value: float) -> float:
-    """The 32-bit float Celeste stores. The export prints it with 12 decimals, the JSON with the shortest
-    round-trip digits; both describe the same float32, so compare after converting back to float32."""
-    return struct.unpack("f", struct.pack("f", value))[0]
-
-
-def compare_with_export(trace: list[dict], export: dict[int, dict]) -> dict:
-    """Match HTTP frames to exported rows, trying offsets -1..1 between the two frame counters."""
-    best = None
-    for offset in (-1, 0, 1):
-        matched = mismatched = 0
-        first_mismatch = None
-        for entry in trace:
-            row = export.get(entry["frame"] + offset)
-            state = entry["state"]
-            if row is None or state is None:
-                continue
-            player = state["Player"]
-            # The export adds Position and the float32 PositionRemainder in double precision before printing
-            # 12 decimals. The tolerance is far below one float32 step at these magnitudes (~1e-6), so it
-            # cannot hide a real difference in game state.
-            exact = [player["Position"][axis] + f32(player["PositionRemainder"][axis]) for axis in "XY"]
-            speed = [f32(player["Speed"][axis]) for axis in "XY"]
-            same = (
-                row["time"] == state["ChapterTime"]
-                and row["state"] == state["PlayerStateName"]
-                and row["room"] == state["RoomName"]
-                and all(abs(a - b) < 1e-9 for a, b in zip(row["position"], exact))
-                and [f32(v) for v in row["speed"]] == speed
-            )
-            if same:
-                matched += 1
-            else:
-                mismatched += 1
-                if first_mismatch is None:
-                    first_mismatch = {"frame": entry["frame"], "export": row,
-                                      "http": {"time": state["ChapterTime"], "position": exact,
-                                               "speed": player["Speed"], "state": state["PlayerStateName"],
-                                               "room": state["RoomName"]}}
-        result = {"offset": offset, "matched": matched, "mismatched": mismatched, "first_mismatch": first_mismatch}
-        if best is None or matched > best["matched"]:
-            best = result
-    return best
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--route", type=Path, required=True)
@@ -217,11 +152,14 @@ def main() -> int:
         print("3. Plain TAS playback at normal speed, no savestate")
         export_path = output_dir / "plain-export.txt"
         play_plain_tas(http.client, output_dir / "plain.tas", export_path, actions, http.warmup_frames)
-        results["plain_vs_http"] = compare_with_export(traces["http"], parse_export(export_path))
-        print(f"   {results['plain_vs_http']['matched']} frames match, {results['plain_vs_http']['mismatched']} differ "
-              f"(frame offset {results['plain_vs_http']['offset']})")
-        if results["plain_vs_http"]["first_mismatch"]:
-            print(f"   first difference: {results['plain_vs_http']['first_mismatch']}")
+        comparison = compare_files(traces["http"], export_path)
+        results["plain_vs_http"] = comparison.summary()
+        print(f"   {comparison.matched}/{comparison.expected_frames} expected player frames match; "
+              f"{len(comparison.mismatched)} differ, {len(comparison.missing_frames)} missing, "
+              f"{len(comparison.unexpected_frames)} unexpected; excluded {len(comparison.excluded_no_player_frames)} "
+              f"no-player frames and start frame {comparison.excluded_start_frame}")
+        if comparison.mismatched:
+            print(f"   first difference: {comparison.mismatched[0]}")
     finally:
         http.close()
         (output_dir / "traces.json").write_text(json.dumps(traces), encoding="utf-8")
@@ -230,7 +168,7 @@ def main() -> int:
         game_process.stop(process)
 
     passed = all(v is None for v in results.get("comparisons", {"x": 1}).values()) and \
-        results.get("plain_vs_http", {}).get("mismatched", 1) == 0
+        results.get("plain_vs_http", {}).get("passed", False)
     print("All traces agree." if passed else "TRACES DISAGREE.")
     return 0 if passed else 1
 
