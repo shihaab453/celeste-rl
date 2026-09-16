@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from celeste_rl.bridge import BridgeError, CelesteBridge, TasInfo, format_input_line, parse_info
+from celeste_rl.bridge import BridgeError, CelesteBridge, Observation, TasInfo, format_input_line, parse_info
 
 # Body of a real /tas/info response captured at the title screen (styles and header trimmed).
 TITLE_SCREEN_INFO_HTML = (
@@ -73,6 +73,15 @@ class TasFileTests(unittest.TestCase):
             bridge = CelesteBridge(Path(directory) / "episode.tas")
             with self.assertRaises(BridgeError):
                 bridge.step("R")
+
+
+class ObservationTests(unittest.TestCase):
+    def test_transitional_flag(self):
+        level = {"loading": False, "freeze_timer": 0, "scene": "Celeste.Level"}
+        self.assertFalse(Observation(1, 0, 300, "1", {}, level).transitional)
+        self.assertTrue(Observation(1, 0, 300, "1", None, {**level, "loading": True}).transitional)
+        self.assertTrue(Observation(1, 0, 300, "", None, {**level, "scene": "Celeste.LevelExit"}).transitional)
+        self.assertIsNone(Observation(1, 0, 300, "1", {}).transitional)
 
 
 if __name__ == "__main__":

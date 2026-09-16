@@ -183,6 +183,20 @@ class Observation:
     # policy input. The HTTP bridge does not provide them.
     diagnostics: dict | None = None
 
+    @property
+    def transitional(self) -> bool | None:
+        """True if this frame is part of a scene change (CelesteTAS reports loading, or the scene is not a
+        Level), so it is not a normal controllable gameplay frame. None if unknown (HTTP bridge).
+
+        While loading, CelesteTAS does not consume inputs, so the bridge only replies after an input has
+        been consumed. A client delay after such a reply did not change any later frame in
+        tests/fixtures/room1_pause_levelexit_loading_route.json, but the environment must still not treat
+        a transitional frame as an ordinary step: death, loading and transport failure all have null state.
+        """
+        if self.diagnostics is None:
+            return None
+        return bool(self.diagnostics.get("loading")) or self.diagnostics.get("scene") != "Celeste.Level"
+
 
 def check_episode_start(observation: Observation, reference: dict | None) -> dict:
     """Validate an episode start and return the reference to compare later starts against.
