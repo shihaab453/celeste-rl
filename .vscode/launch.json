@@ -2,13 +2,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File (.venv)",
+            "name": "Python: Current File (.venv-rl)",
             "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+            "python": "${workspaceFolder}\\.venv-rl\\Scripts\\python.exe"
         }
     ]
 }
