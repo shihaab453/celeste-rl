@@ -27,6 +27,7 @@ if _user32 is not None:
     _user32.SetForegroundWindow.argtypes = [ctypes.c_void_p]
     _user32.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
     _user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+    _user32.IsIconic.argtypes = [ctypes.c_void_p]
     _user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
 
 
@@ -106,6 +107,13 @@ def window_is_focused(pid: int) -> bool:
     if _user32 is None:
         return True
     return _user32.GetForegroundWindow() == _game_window(pid)
+
+
+def window_is_minimized(pid: int) -> bool:
+    if _user32 is None:
+        return False
+    hwnd = _game_window(pid)
+    return hwnd is not None and bool(_user32.IsIconic(hwnd))
 
 
 def memory_mb(pid: int) -> float:

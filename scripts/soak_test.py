@@ -94,47 +94,59 @@ def main() -> int:
         print(f"Window mode: {args.window}, game focused: {game_process.window_is_focused(process.pid)}")
 
         deadline = time.perf_counter() + args.minutes * 60
-        minute_end = time.perf_counter() + 60
-        minute = {"steps": 0, "resets": 0, "no_player_frames": 0, "step_ms": []}
+
+        def new_window():
+            return {"started": time.perf_counter(), "random_steps": 0, "drift_trace_steps": 0, "resets": 0,
+                    "no_player_frames": 0, "step_ms": []}
+
+        window = new_window()
         episodes = total_steps = 0
 
         while time.perf_counter() < deadline:
             bridge.reset()
             episodes += 1
-            minute["resets"] += 1
+            window["resets"] += 1
             for _ in range(args.episode_length):
                 observation = bridge.step(random_buttons(rng))
-                minute["step_ms"].append(bridge.last_timing.total_ms)
-                minute["steps"] += 1
-                minute["no_player_frames"] += observation.state is None
+                window["step_ms"].append(bridge.last_timing.total_ms)
+                window["random_steps"] += 1
+                window["no_player_frames"] += observation.state is None
             total_steps += args.episode_length
 
             if episodes % args.check_every == 0:
                 matches = play_trace(bridge, trace_actions) == reference
+                window["resets"] += 1
+                window["drift_trace_steps"] += args.trace_length
                 results["drift_checks"].append({"episode": episodes, "matches_first_replay": matches})
                 if not matches:
                     raise RuntimeError(f"Fixed trace diverged from its first replay at episode {episodes}")
 
-            if time.perf_counter() >= minute_end:
-                ordered = sorted(minute.pop("step_ms"))
+            elapsed = time.perf_counter() - window["started"]
+            if elapsed >= 60:
+                ordered = sorted(window.pop("step_ms"))
+                window.pop("started")
+                all_steps = window["random_steps"] + window["drift_trace_steps"]
                 summary = {
-                    "minute": len(results["minutes"]) + 1,
-                    **minute,
-                    "steps_per_second": minute["steps"] / 60,
-                    "step_p50_ms": percentile(ordered, 0.5),
-                    "step_p99_ms": percentile(ordered, 0.99),
-                    "step_max_ms": ordered[-1],
+                    "window": len(results["minutes"]) + 1,
+                    "seconds": elapsed,
+                    **window,
+                    # All steps, including drift-check replays, over the measured window length.
+                    "steps_per_second": all_steps / elapsed,
+                    "random_step_p50_ms": percentile(ordered, 0.5),
+                    "random_step_p99_ms": percentile(ordered, 0.99),
+                    "random_step_max_ms": ordered[-1],
                     "game_memory_mb": game_process.memory_mb(process.pid),
                     "game_focused": game_process.window_is_focused(process.pid),
+                    "game_minimized": game_process.window_is_minimized(process.pid),
                 }
                 results["minutes"].append(summary)
                 save()
-                print(f"min {summary['minute']:3d}: {summary['steps_per_second']:6.0f} steps/s  "
-                      f"p50 {summary['step_p50_ms']:.2f} p99 {summary['step_p99_ms']:.2f} max {summary['step_max_ms']:.1f} ms  "
-                      f"mem {summary['game_memory_mb']:.0f} MB  focused {summary['game_focused']}  "
+                print(f"#{summary['window']:3d} ({elapsed:.0f} s): {summary['steps_per_second']:6.0f} steps/s  "
+                      f"p50 {summary['random_step_p50_ms']:.2f} p99 {summary['random_step_p99_ms']:.2f} "
+                      f"max {summary['random_step_max_ms']:.1f} ms  mem {summary['game_memory_mb']:.0f} MB  "
+                      f"focused {summary['game_focused']} minimized {summary['game_minimized']}  "
                       f"drift checks OK {sum(c['matches_first_replay'] for c in results['drift_checks'])}")
-                minute_end += 60
-                minute = {"steps": 0, "resets": 0, "no_player_frames": 0, "step_ms": []}
+                window = new_window()
 
         results["total"] = {"episodes": episodes, "steps": total_steps}
         exit_code = 0

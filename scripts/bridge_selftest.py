@@ -135,7 +135,7 @@ def check_throughput(bridge: CelesteBridge, steps: int, episode_length: int, see
     s, r = result["step"], result["reset"]
     print(f"  step  mean {s['mean_ms']:.1f} / p50 {s['p50_ms']:.1f} / p99 {s['p99_ms']:.1f} / max {s['max_ms']:.1f} ms")
     print(f"  reset mean {r['mean_ms']:.1f} / p50 {r['p50_ms']:.1f} / p99 {r['p99_ms']:.1f} / max {r['max_ms']:.1f} ms")
-    print(f"  steps where the first advance was refused: {result['steps_needing_resend']}")
+    print(f"  steps that needed a FrameAdvance request resent: {result['steps_needing_resend']}")
     return result
 
 

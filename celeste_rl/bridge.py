@@ -114,9 +114,10 @@ class DebugRcClient:
         self.timeout = timeout
         self._connection: http.client.HTTPConnection | None = None
 
-    def get(self, path: str) -> str:
-        # Retry once on a dropped keep-alive connection; a second failure is a real error.
-        for attempt in range(2):
+    def get(self, path: str, retry: bool = True) -> str:
+        """GET `path`. Only requests that merely read may retry: if a hotkey request fails after being
+        sent, the game may already have acted on it, so resending could press it twice."""
+        for attempt in range(2 if retry else 1):
             if self._connection is None:
                 self._connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.timeout)
             try:
@@ -125,7 +126,7 @@ class DebugRcClient:
                 body = response.read().decode("utf-8")
             except (ConnectionError, http.client.HTTPException, OSError):
                 self.close()
-                if attempt == 1:
+                if not retry or attempt == 1:
                     raise
                 continue
             if response.status != 200:
@@ -151,10 +152,10 @@ class DebugRcClient:
         return json.loads(text) if text.strip() else None
 
     def send_hotkey(self, hotkey_id: str) -> None:
-        self.get(f"/tas/sendhotkey?id={urllib.parse.quote(hotkey_id)}")
+        self.get(f"/tas/sendhotkey?id={urllib.parse.quote(hotkey_id)}", retry=False)
 
     def play_tas(self, path: Path) -> None:
-        self.get("/tas/playtas?filePath=" + urllib.parse.quote(str(path)))
+        self.get("/tas/playtas?filePath=" + urllib.parse.quote(str(path)), retry=False)
 
     def is_available(self) -> bool:
         try:
@@ -180,9 +181,28 @@ class Observation:
     state: dict | None
 
 
+def check_episode_start(observation: Observation, reference: dict | None) -> dict:
+    """Validate an episode start and return the reference to compare later starts against.
+
+    Every start must have a player in a named room, and must match the first episode's start exactly.
+    Without the first two checks, a failed reset that returns no state would become the reference,
+    and every later failed reset would then "match" it.
+    """
+    state = observation.state
+    if state is None or state.get("Player") is None:
+        raise BridgeError(f"No player at the episode start (frame {observation.tas_frame})")
+    if not observation.room:
+        raise BridgeError(f"No room name at the episode start (frame {observation.tas_frame})")
+    start = {"room": observation.room, "player": state["Player"]}
+    if reference is not None and start != reference:
+        raise BridgeError(f"Episode start differs from the first episode: {start} != {reference}")
+    return start
+
+
 @dataclass
 class StepTiming:
-    """How long one step took and how often CelesteTAS refused an early frame advance."""
+    """How long one step took and how many FrameAdvance requests it sent. More than one means no
+    frame appeared within the resend interval, typically because CelesteTAS had not re-read the file yet."""
 
     total_ms: float
     advance_requests: int
@@ -319,18 +339,8 @@ class CelesteBridge:
         self.episode_id += 1
         self.step_id = 0
         observation = self._read_observation(self.start_frame)
-        self._check_start(observation)
+        self.reference_start = check_episode_start(observation, self.reference_start)
         return observation
-
-    def _check_start(self, observation: Observation) -> None:
-        """Every episode must start from exactly the same player state and room."""
-        if observation.state is None:
-            raise BridgeError("No game state at the episode start")
-        start = {"room": observation.room, "player": observation.state.get("Player")}
-        if self.reference_start is None:
-            self.reference_start = start
-        elif start != self.reference_start:
-            raise BridgeError(f"Episode start differs from the first episode: {start} != {self.reference_start}")
 
     def _request_until(self, done, description: str) -> tuple[TasInfo, int]:
         """Send FrameAdvance until `done` holds, resending if CelesteTAS refused an earlier one."""

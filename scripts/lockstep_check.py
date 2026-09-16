@@ -103,6 +103,15 @@ def main() -> int:
         trace(lockstep, other)
         fast_after_other = trace(lockstep, actions)
 
+        # Keep the actual inputs and per-frame states, not just a summary of the first difference.
+        (output_dir / "traces.json").write_text(json.dumps({
+            "actions": actions,
+            "other_actions": other,
+            "http": reference,
+            "lockstep": fast,
+            "lockstep_after_other_episode": fast_after_other,
+        }), encoding="utf-8")
+
         differences = {
             "lockstep_vs_http": first_difference(reference, fast),
             "lockstep_replay_after_other_episode": first_difference(reference, fast_after_other),
