@@ -20,6 +20,14 @@ from pathlib import Path
 from celeste_rl.bridge import DebugRcClient
 
 _user32 = ctypes.windll.user32 if os.name == "nt" else None
+if _user32 is not None:
+    # Window handles are pointer-sized; ctypes would otherwise truncate them to 32-bit ints.
+    _user32.GetForegroundWindow.restype = ctypes.c_void_p
+    _user32.GetShellWindow.restype = ctypes.c_void_p
+    _user32.SetForegroundWindow.argtypes = [ctypes.c_void_p]
+    _user32.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    _user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
+    _user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
 
 
 def check_game_dir(game_dir: Path) -> Path:
@@ -42,10 +50,9 @@ def check_game_dir(game_dir: Path) -> Path:
     return profile
 
 
-def _focus_window(pid: int) -> bool:
-    """Bring the game's window to the front. Returns False if it has no window yet."""
+def _game_window(pid: int) -> int | None:
     if _user32 is None:
-        return True
+        return None
     found = []
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
@@ -57,17 +64,65 @@ def _focus_window(pid: int) -> bool:
         return True
 
     _user32.EnumWindows(visit, 0)
-    if not found:
-        return False
-    # Windows only lets a process take focus right after a key event; a lone Alt tap satisfies that.
+    return found[0] if found else None
+
+
+def _take_focus(hwnd: int) -> bool:
+    # Windows only lets a process move focus right after a key event; a lone Alt tap satisfies that.
     alt = 0x12
     _user32.keybd_event(alt, 0, 0, 0)
     _user32.keybd_event(alt, 0, 2, 0)
-    return bool(_user32.SetForegroundWindow(found[0]))
+    return bool(_user32.SetForegroundWindow(hwnd))
 
 
-def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0) -> subprocess.Popen:
-    """Start the game and wait until DebugRC answers."""
+def _focus_window(pid: int) -> bool:
+    """Bring the game's window to the front. Returns False if it has no window yet."""
+    if _user32 is None:
+        return True
+    hwnd = _game_window(pid)
+    return hwnd is not None and _take_focus(hwnd)
+
+
+def set_window_mode(pid: int, mode: str) -> None:
+    """Put the game window in the front ("focused"), behind the desktop ("background") or minimized."""
+    if _user32 is None:
+        return
+    hwnd = _game_window(pid)
+    if hwnd is None:
+        raise RuntimeError("Game window not found")
+    if mode == "focused":
+        _user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        _take_focus(hwnd)
+    elif mode == "background":
+        _user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        _take_focus(_user32.GetShellWindow())  # hand focus to the desktop
+    elif mode == "minimized":
+        _user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
+    else:
+        raise ValueError(f"Unknown window mode {mode!r}")
+
+
+def window_is_focused(pid: int) -> bool:
+    if _user32 is None:
+        return True
+    return _user32.GetForegroundWindow() == _game_window(pid)
+
+
+def memory_mb(pid: int) -> float:
+    """Working set of the game process in MB, read from tasklist."""
+    output = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True, text=True
+    ).stdout
+    # e.g. "Celeste.exe","1234","Console","1","542,236 K"
+    fields = [field.strip('"') for field in output.strip().split('","')]
+    return int(fields[-1].rstrip(' K"').replace(",", "")) / 1024 if len(fields) >= 5 else float("nan")
+
+
+def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: bool = True) -> subprocess.Popen:
+    """Start the game and wait until DebugRC answers.
+
+    `focus=False` leaves the window unfocused during startup, to check whether startup needs focus.
+    """
     client = DebugRcClient(port)
     if client.is_available():
         raise RuntimeError(f"Something is already answering on port {port}; close that game first")
@@ -82,7 +137,7 @@ def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0) -> subproc
     )
 
     deadline = time.perf_counter() + timeout
-    focused = False
+    focused = not focus
     while time.perf_counter() < deadline:
         if process.poll() is not None:
             raise RuntimeError(f"Celeste exited during startup with code {process.returncode}")

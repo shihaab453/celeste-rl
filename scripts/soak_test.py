@@ -1,0 +1,155 @@
+"""Run the lockstep bridge for a long time and watch for slowdowns, leaks, crashes and drift.
+
+Run from the repo root with the RL interpreter:
+    .venv-rl/Scripts/python.exe scripts/soak_test.py --minutes 30 --window background
+
+Every minute it records throughput, step latency, resets, deaths, game memory and whether the
+window is still in the requested state. Every --check-every episodes it replays one fixed input
+sequence and compares it with the first replay, to catch state corruption that builds up over time.
+
+Results are written to runs/soak/<timestamp>/results.json, including after a failure.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import random
+import subprocess
+import sys
+import time
+import traceback
+from datetime import datetime
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
+from celeste_rl import game_process  # noqa: E402
+from celeste_rl.bridge import CelesteBridge  # noqa: E402
+from celeste_rl.lockstep import LockstepBridge  # noqa: E402
+
+RANDOM_BUTTONS = "LRUDJXZG"
+
+
+def random_buttons(rng: random.Random) -> str:
+    return "".join(b for b in RANDOM_BUTTONS if rng.random() < 0.3)
+
+
+def play_trace(bridge: LockstepBridge, actions: list[str]) -> list:
+    frames = [bridge.reset().state]
+    frames += [bridge.step(buttons).state for buttons in actions]
+    return frames
+
+
+def percentile(ordered: list[float], q: float) -> float:
+    return ordered[int(q * (len(ordered) - 1))]
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
+    parser.add_argument("--minutes", type=float, default=30.0)
+    parser.add_argument("--window", choices=["focused", "background", "minimized"], default="background")
+    parser.add_argument("--no-launch-focus", action="store_true", help="do not focus the window while the game starts")
+    parser.add_argument("--episode-length", type=int, default=300)
+    parser.add_argument("--check-every", type=int, default=20, help="episodes between drift checks")
+    parser.add_argument("--trace-length", type=int, default=300)
+    parser.add_argument("--seed", type=int, default=0)
+    args = parser.parse_args()
+
+    output_dir = REPO / "runs" / "soak" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_dir.mkdir(parents=True)
+    git = lambda *a: subprocess.run(["git", *a], cwd=REPO, capture_output=True, text=True).stdout.strip()
+    results = {
+        "commit": git("rev-parse", "HEAD"),
+        "uncommitted_changes": bool(git("status", "--porcelain")),
+        "args": {**vars(args), "game_dir": str(args.game_dir)},
+        "minutes": [],
+        "drift_checks": [],
+    }
+
+    def save():
+        (output_dir / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+
+    rng = random.Random(args.seed)
+    trace_actions = [random_buttons(rng) for _ in range(args.trace_length)]
+
+    launch_start = time.perf_counter()
+    try:
+        process = game_process.launch(args.game_dir, focus=not args.no_launch_focus)
+    except Exception as error:
+        results["launch"] = {"ok": False, "error": str(error), "seconds": time.perf_counter() - launch_start}
+        save()
+        print(f"Launch failed: {error}")
+        return 1
+    results["launch"] = {"ok": True, "seconds": time.perf_counter() - launch_start, "focused_during_launch": not args.no_launch_focus}
+    print(f"Game up in {results['launch']['seconds']:.1f} s (focus during launch: {not args.no_launch_focus})")
+
+    bridge = LockstepBridge(CelesteBridge(output_dir / "episode.tas"))
+    exit_code = 1
+    try:
+        reference = play_trace(bridge, trace_actions)
+        game_process.set_window_mode(process.pid, args.window)
+        time.sleep(0.5)
+        print(f"Window mode: {args.window}, game focused: {game_process.window_is_focused(process.pid)}")
+
+        deadline = time.perf_counter() + args.minutes * 60
+        minute_end = time.perf_counter() + 60
+        minute = {"steps": 0, "resets": 0, "no_player_frames": 0, "step_ms": []}
+        episodes = total_steps = 0
+
+        while time.perf_counter() < deadline:
+            bridge.reset()
+            episodes += 1
+            minute["resets"] += 1
+            for _ in range(args.episode_length):
+                observation = bridge.step(random_buttons(rng))
+                minute["step_ms"].append(bridge.last_timing.total_ms)
+                minute["steps"] += 1
+                minute["no_player_frames"] += observation.state is None
+            total_steps += args.episode_length
+
+            if episodes % args.check_every == 0:
+                matches = play_trace(bridge, trace_actions) == reference
+                results["drift_checks"].append({"episode": episodes, "matches_first_replay": matches})
+                if not matches:
+                    raise RuntimeError(f"Fixed trace diverged from its first replay at episode {episodes}")
+
+            if time.perf_counter() >= minute_end:
+                ordered = sorted(minute.pop("step_ms"))
+                summary = {
+                    "minute": len(results["minutes"]) + 1,
+                    **minute,
+                    "steps_per_second": minute["steps"] / 60,
+                    "step_p50_ms": percentile(ordered, 0.5),
+                    "step_p99_ms": percentile(ordered, 0.99),
+                    "step_max_ms": ordered[-1],
+                    "game_memory_mb": game_process.memory_mb(process.pid),
+                    "game_focused": game_process.window_is_focused(process.pid),
+                }
+                results["minutes"].append(summary)
+                save()
+                print(f"min {summary['minute']:3d}: {summary['steps_per_second']:6.0f} steps/s  "
+                      f"p50 {summary['step_p50_ms']:.2f} p99 {summary['step_p99_ms']:.2f} max {summary['step_max_ms']:.1f} ms  "
+                      f"mem {summary['game_memory_mb']:.0f} MB  focused {summary['game_focused']}  "
+                      f"drift checks OK {sum(c['matches_first_replay'] for c in results['drift_checks'])}")
+                minute_end += 60
+                minute = {"steps": 0, "resets": 0, "no_player_frames": 0, "step_ms": []}
+
+        results["total"] = {"episodes": episodes, "steps": total_steps}
+        exit_code = 0
+        print(f"Completed {total_steps:,} steps in {episodes} episodes without errors.")
+    except Exception as error:
+        results["failure"] = {"error": f"{type(error).__name__}: {error}", "traceback": traceback.format_exc(),
+                              "after_minutes": len(results["minutes"])}
+        print(f"FAILED: {type(error).__name__}: {error}")
+    finally:
+        bridge.close()
+        save()
+        print(f"Results: {output_dir / 'results.json'}")
+        game_process.stop(process)
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())
