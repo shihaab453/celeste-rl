@@ -18,7 +18,7 @@ Two separate virtual environments live in this repo, both ignored by git:
 
 | Environment | Python | Used for |
 |---|---|---|
-| `.venv-rl` | 3.12.13 | The RL project. RL dependencies are not installed yet; exact versions will be pinned in a lock file. |
+| `.venv-rl` | 3.12.13 | The RL project: PyTorch 2.14.0 (CUDA 13.0), Gymnasium 1.3.0, Stable-Baselines3 2.9.0, pinned in `requirements-rl.lock`. |
 | `.venv` | 3.14.6 | The PyTorch exercises in `experiments/` (torch 2.14.0+cu130). Left as-is. |
 
 Create the RL environment with [uv](https://docs.astral.sh/uv/):
@@ -26,7 +26,19 @@ Create the RL environment with [uv](https://docs.astral.sh/uv/):
 ```bash
 uv python install 3.12.13
 uv venv .venv-rl --python 3.12.13 --seed
+uv pip sync requirements-rl.lock --python .venv-rl/Scripts/python.exe --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match
+.venv-rl/Scripts/python.exe scripts/check_env.py
 ```
+
+`check_env.py` prints versions, runs a real calculation on the GPU, and trains PPO on CartPole briefly as a smoke test.
+
+To change dependencies, edit `requirements-rl.in`, delete `requirements-rl.lock` (an existing lock file makes uv keep old versions), then regenerate it:
+
+```bash
+uv pip compile requirements-rl.in -o requirements-rl.lock --python-version 3.12 --python-platform windows --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match --generate-hashes --emit-index-annotation
+```
+
+Do not use `uv sync` or `uv run` here: uv's project mode manages a venv named `.venv` and would rebuild the Python 3.14 exercise environment.
 
 Python 3.12 is used rather than 3.14 because the RL libraries (Gymnasium, Stable-Baselines3) only list support through 3.13. See the roadmap, section 1.4.
 
