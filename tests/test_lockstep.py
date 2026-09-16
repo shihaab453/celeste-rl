@@ -99,6 +99,7 @@ class LockstepFailureTests(unittest.TestCase):
         self.assertEqual(bridge.step("RJ").tas_frame, 302)
         self.assertEqual(http.resets, 1)
         self.assertEqual([r["cmd"] for _, r in game.requests], ["reset", "step", "step"])
+        self.assertEqual(game.requests[0][1]["start_frame"], 300)
 
     def test_reset_with_no_player_is_rejected_and_not_used_as_reference(self):
         game, _, bridge = self.make(lambda request, _: reply(request, 300, state=None))

@@ -98,7 +98,8 @@ class LockstepBridge:
             raise self._end_session(f"expected frame {expected_frame}, game reported {reply['frame']}")
         state = reply["state"]
         self._frame = expected_frame
-        return Observation(self.episode_id, self.step_id, expected_frame, (state or {}).get("RoomName", ""), state)
+        return Observation(self.episode_id, self.step_id, expected_frame, (state or {}).get("RoomName", ""), state,
+                           reply.get("diagnostics"))
 
     # Episodes
 
@@ -111,7 +112,9 @@ class LockstepBridge:
             except OSError as error:
                 raise self._end_session(f"could not connect to port {self.port}: {error}") from error
 
-        reply = self._request({"cmd": "reset"})
+        # The mod checks the TAS file really has this prefix length and a savestate breakpoint one frame
+        # before it, and refuses to step on a connection until a reset has succeeded.
+        reply = self._request({"cmd": "reset", "start_frame": self.http.start_frame})
         self.step_id = 0
         observation = self._observation(reply, self.http.start_frame)
         try:
@@ -121,7 +124,8 @@ class LockstepBridge:
 
         self.episode_id += 1
         self.failure = None
-        return Observation(self.episode_id, 0, observation.tas_frame, observation.room, observation.state)
+        return Observation(self.episode_id, 0, observation.tas_frame, observation.room, observation.state,
+                           observation.diagnostics)
 
     def step(self, buttons: str | set[str] | frozenset[str]) -> Observation:
         # Invalid buttons are rejected before anything is sent, so they do not end the session.

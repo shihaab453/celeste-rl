@@ -179,6 +179,9 @@ class Observation:
     tas_frame: int
     room: str
     state: dict | None
+    # Bridge-level facts such as loading or freeze status, for tests and diagnostics only. Never a
+    # policy input. The HTTP bridge does not provide them.
+    diagnostics: dict | None = None
 
 
 def check_episode_start(observation: Observation, reference: dict | None) -> dict:
