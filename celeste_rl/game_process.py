@@ -116,6 +116,45 @@ def window_is_minimized(pid: int) -> bool:
     return hwnd is not None and bool(_user32.IsIconic(hwnd))
 
 
+class _ProcessMemoryCountersEx(ctypes.Structure):
+    """PROCESS_MEMORY_COUNTERS_EX. ctypes inserts the same alignment padding as the C compiler."""
+
+    _fields_ = [
+        ("cb", ctypes.c_uint32),
+        ("PageFaultCount", ctypes.c_uint32),
+        ("PeakWorkingSetSize", ctypes.c_size_t),
+        ("WorkingSetSize", ctypes.c_size_t),
+        ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+        ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+        ("PagefileUsage", ctypes.c_size_t),
+        ("PeakPagefileUsage", ctypes.c_size_t),
+        ("PrivateUsage", ctypes.c_size_t),
+    ]
+
+
+def process_memory(pid: int) -> dict[str, float]:
+    """Working set and private bytes of a process in MB, read with GetProcessMemoryInfo."""
+    if os.name != "nt":
+        return {"working_set_mb": float("nan"), "private_mb": float("nan")}
+    kernel32 = ctypes.windll.kernel32
+    kernel32.OpenProcess.restype = ctypes.c_void_p
+    kernel32.K32GetProcessMemoryInfo.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32]
+    kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        raise OSError(f"OpenProcess failed for pid {pid}")
+    try:
+        counters = _ProcessMemoryCountersEx()
+        counters.cb = ctypes.sizeof(counters)
+        if not kernel32.K32GetProcessMemoryInfo(handle, ctypes.byref(counters), counters.cb):
+            raise OSError(f"GetProcessMemoryInfo failed for pid {pid}")
+        return {"working_set_mb": counters.WorkingSetSize / 2**20, "private_mb": counters.PrivateUsage / 2**20}
+    finally:
+        kernel32.CloseHandle(handle)
+
+
 def memory_mb(pid: int) -> float:
     """Working set of the game process in MB, read from tasklist."""
     output = subprocess.run(

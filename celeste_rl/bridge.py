@@ -210,13 +210,13 @@ class Observation:
 
     @property
     def transitional(self) -> bool | None:
-        """True if this frame is part of a scene change (CelesteTAS reports loading, or the scene is not a
-        Level), so it is not a normal controllable gameplay frame. None if unknown (HTTP bridge).
+        """True if this frame is not an ordinary controllable gameplay frame: CelesteTAS reports loading, or
+        the scene is not a Level. None if unknown (the HTTP bridge has no diagnostics).
 
-        While loading, CelesteTAS does not consume inputs, so the bridge only replies after an input has
-        been consumed. A client delay after such a reply did not change any later frame in
-        tests/fixtures/room1_pause_levelexit_loading_route.json, but the environment must still not treat
-        a transitional frame as an ordinary step: death, loading and transport failure all have null state.
+        The lockstep mod waits for loading to finish before replying, so replies should not normally be
+        mid-loading; a non-Level scene (for example after returning to the map) can still be transitional.
+        The environment must not treat such frames as ordinary steps. Null state alone does not say why:
+        deaths, loading and non-Level scenes all have no player.
         """
         if self.diagnostics is None:
             return None

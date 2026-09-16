@@ -57,8 +57,10 @@ def strip_diagnostics(trace: list[dict]) -> list[dict]:
     return [{"frame": entry["frame"], "state": entry["state"]} for entry in trace]
 
 
-def first_difference(expected: list[dict], actual: list[dict]) -> dict | None:
+def first_difference(expected: list[dict], actual: list[dict], skip: set[int] = frozenset()) -> dict | None:
     for index, (a, b) in enumerate(zip(expected, actual)):
+        if index in skip:
+            continue
         if a != b:
             fields = sorted(k for k in set(a["state"] or {}) | set(b["state"] or {})
                             if (a["state"] or {}).get(k) != (b["state"] or {}).get(k))
@@ -130,7 +132,11 @@ def main() -> int:
             traces[f"lockstep_delay_{int(delay * 1000)}ms"] = lockstep_trace(lockstep, actions, transition, delay)
         lockstep.close()
 
-        comparisons = {"lockstep_vs_http": first_difference(traces["http"], strip_diagnostics(traces["lockstep"]))}
+        # Where lockstep waited for loading to finish before replying, its frame shows the post-loading state
+        # while the HTTP bridge shows the mid-loading frame. Those frames are reported, not compared.
+        waited = {i for i, entry in enumerate(traces["lockstep"]) if ((entry["diagnostics"] or {}).get("loading_updates") or 0) > 0}
+        results["lockstep_waited_for_loading_at"] = sorted(waited)
+        comparisons = {"lockstep_vs_http": first_difference(traces["http"], strip_diagnostics(traces["lockstep"]), waited)}
         for key in traces:
             if key.startswith("lockstep_delay"):
                 comparisons[f"{key}_vs_lockstep"] = first_difference(strip_diagnostics(traces["lockstep"]), strip_diagnostics(traces[key]))
@@ -142,6 +148,7 @@ def main() -> int:
         rooms = [(entry["state"] or {}).get("RoomName") for entry in traces["http"]]
         results["diagnostics"] = {
             "loading_frames": [i for i, d in enumerate(diagnostics) if d.get("loading")],
+            "loading_updates": {i: d["loading_updates"] for i, d in enumerate(diagnostics) if d.get("loading_updates")},
             "freeze_frames": [i for i, d in enumerate(diagnostics) if (d.get("freeze_timer") or 0) > 0],
             "scenes": sorted({d.get("scene") for d in diagnostics if d.get("scene")}),
             "no_player_frames": [i for i, e in enumerate(traces["http"]) if e["state"] is None],

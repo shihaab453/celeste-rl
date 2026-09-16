@@ -43,19 +43,26 @@ internal static class LockstepDriver {
     private static readonly Regex InputLine = new(@"^1(,[LRUDJKXCZVGHSQNO])*(,A(?=[LRUD])L?R?U?D?)?(,M(?=[LRUD])L?R?U?D?)?\z", RegexOptions.Compiled);
 
     private static readonly JsonSerializerOptions JsonOptions = new() { IncludeFields = true };
-    private static readonly PropertyInfo PlaybackSpeedProperty =
-        typeof(Manager).GetProperty(nameof(Manager.PlaybackSpeed), BindingFlags.Public | BindingFlags.Static)!;
-    private static readonly FieldInfo FastForwardsField =
-        typeof(InputController).GetField("FastForwards", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
+
+    // CelesteTAS internals reached through reflection. Checked at load; if any is missing (a different
+    // CelesteTAS version), every command is answered with an incompatibility error instead of failing
+    // inside a game update.
+    private static readonly PropertyInfo? PlaybackSpeedProperty =
+        typeof(Manager).GetProperty(nameof(Manager.PlaybackSpeed), BindingFlags.Public | BindingFlags.Static);
+    private static readonly FieldInfo? FastForwardsField =
+        typeof(InputController).GetField("FastForwards", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+    private static string? incompatibility;
 
     private const float SteppingSpeed = 100_000f;
     private static readonly TimeSpan CommandWait = TimeSpan.FromMilliseconds(20);
-    private static readonly TimeSpan ResetTimeout = TimeSpan.FromSeconds(10);
+    // One deadline for a whole pending command: restoring the savestate, the final advance of a reset,
+    // and any loading before the reply. The Python client's timeout must exceed this with a margin.
+    private static readonly TimeSpan OperationTimeout = TimeSpan.FromSeconds(10);
 
     private enum Phase {
         Idle,                 // nothing owed to Python
         WaitingForBreakpoint, // reset requested; waiting for the savestate to restore
-        Advancing,            // an input is being played; its result is owed to Python
+        Advancing,            // an input is being played (or loading after it); its result is owed to Python
     }
 
     private static Hook? managerUpdateHook;
@@ -67,13 +74,23 @@ internal static class LockstepDriver {
     private static Phase phase = Phase.Idle;
     private static string? pendingId;
     private static string? pendingCommand;
-    private static readonly Stopwatch resetTimer = new();
+    private static readonly Stopwatch operationTimer = new();
     private static int resetUpdates;
+    private static int loadingUpdates;
 
     public static void Load() {
         int port = int.TryParse(Environment.GetEnvironmentVariable("CELESTE_RL_LOCKSTEP_PORT"), out int parsed)
             ? parsed
             : DefaultPort;
+
+        if (PlaybackSpeedProperty?.GetSetMethod(nonPublic: true) == null) {
+            incompatibility = "CelesteTAS Manager.PlaybackSpeed setter not found";
+        } else if (FastForwardsField == null || !typeof(IDictionary).IsAssignableFrom(FastForwardsField.FieldType)) {
+            incompatibility = "CelesteTAS InputController.FastForwards dictionary not found";
+        }
+        if (incompatibility != null) {
+            Logger.Log(LogLevel.Error, LogTag, $"Incompatible CelesteTAS version: {incompatibility}. Commands will be refused.");
+        }
 
         var update = typeof(Manager).GetMethod(nameof(Manager.Update), BindingFlags.Public | BindingFlags.Static)!;
         managerUpdateHook = new Hook(update, (Action<Action>) OnManagerUpdate);
@@ -118,8 +135,13 @@ internal static class LockstepDriver {
         }
 
         var controller = Manager.Controller;
+        bool atEnd = controller.CurrentFrameInTas >= controller.Inputs.Count;
 
-        if (phase == Phase.WaitingForBreakpoint) {
+        if (phase != Phase.Idle && operationTimer.Elapsed > OperationTimeout) {
+            Fail($"{pendingCommand} did not complete within {OperationTimeout.TotalSeconds:F0} s " +
+                 $"(phase {phase}, frame {controller.CurrentFrameInTas}/{controller.Inputs.Count}, " +
+                 $"state {Manager.CurrState}, loading {Manager.IsLoading()})");
+        } else if (phase == Phase.WaitingForBreakpoint) {
             SetPlaybackSpeed(SteppingSpeed);
             resetUpdates += 1;
             // The restored savestate pauses on the breakpoint, one frame before the episode start.
@@ -127,26 +149,50 @@ internal static class LockstepDriver {
                 Debug("breakpoint reached, advancing to episode start");
                 Manager.NextState = Manager.State.Running;
                 phase = Phase.Advancing;
-            } else if (resetTimer.Elapsed > ResetTimeout) {
-                Fail($"reset did not reach the savestate breakpoint within {ResetTimeout.TotalSeconds:F0} s " +
-                     $"(frame {controller.CurrentFrameInTas}/{controller.Inputs.Count}, state {Manager.CurrState})");
             }
-        } else if (controller.CurrentFrameInTas >= controller.Inputs.Count) {
-            // Every input so far has been played and simulated.
+        } else if (atEnd && Manager.IsLoading()) {
+            // The input was consumed but the game is loading. CelesteTAS does not consume inputs while
+            // loading, and the engine keeps updating while the TAS is paused, so let it finish and reply
+            // at the first non-loading update instead of handing Python a mid-loading frame to act on.
+            // Commands from Python also wait until loading ends.
+            if (phase == Phase.Advancing) {
+                loadingUpdates += 1;
+                SetPlaybackSpeed(SteppingSpeed);
+            }
+        } else if (atEnd) {
+            // Every input so far has been played and simulated, and nothing is loading.
             if (phase == Phase.Advancing && pendingId != null) {
-                if (pendingCommand == "reset") {
-                    sessionReady = true;
-                }
-                SendObservation(pendingId);
+                CompletePending(controller);
             }
-            ClearPending();
-            HandleNextCommand(controller);
+            if (phase == Phase.Idle) {
+                HandleNextCommand(controller, atEnd: true);
+            }
+        } else if (phase == Phase.Idle && Manager.CurrState == Manager.State.Paused && !Manager.IsLoading()) {
+            // Paused before the end of the inputs with nothing pending. This happens when a connection is
+            // replaced while its reset is paused on the savestate breakpoint. The new owner must still be
+            // able to reset; stepping is refused here.
+            HandleNextCommand(controller, atEnd: false);
         }
 
         orig();
     }
 
-    private static void HandleNextCommand(InputController controller) {
+    /// Send the result of the pending command, which has finished playing its input.
+    private static void CompletePending(InputController controller) {
+        string id = pendingId!;
+        if (pendingCommand == "reset") {
+            if (Engine.Scene is not Level level || level.Tracker.GetEntity<Player>() == null) {
+                Fail($"reset reached frame {controller.CurrentFrameInTas} without a player in a level " +
+                     $"(scene {Engine.Scene?.GetType().Name})");
+                return;
+            }
+            sessionReady = true;
+        }
+        SendObservation(id);
+        ClearPending();
+    }
+
+    private static void HandleNextCommand(InputController controller, bool atEnd) {
         if (!server!.TryTake(sessionGeneration, out string message, CommandWait)) {
             // Python has not answered yet: let CelesteTAS end this game tick so the window keeps drawing.
             SetPlaybackSpeed(1.0f);
@@ -159,11 +205,20 @@ internal static class LockstepDriver {
             var root = document.RootElement;
             id = root.GetProperty("id").GetRawText();
             Debug($"command {message}");
+            if (incompatibility != null) {
+                SendError(id, $"Incompatible CelesteTAS version: {incompatibility}");
+                return;
+            }
 
             switch (root.GetProperty("cmd").GetString()) {
                 case "step": {
                     if (!sessionReady) {
                         SendError(id, "This connection has not completed a reset; send reset before step");
+                        return;
+                    }
+                    if (!atEnd) {
+                        SendError(id, "Inputs remain unplayed; send reset before step");
+                        sessionReady = false;
                         return;
                     }
                     string line = root.GetProperty("line").GetString() ?? "";
@@ -206,8 +261,6 @@ internal static class LockstepDriver {
                     Manager.DisableRun();
                     Manager.NextState = Manager.State.Running;
                     SetPlaybackSpeed(SteppingSpeed);
-                    resetTimer.Restart();
-                    resetUpdates = 0;
                     Begin(id, "reset", Phase.WaitingForBreakpoint);
                     return;
                 }
@@ -227,7 +280,7 @@ internal static class LockstepDriver {
 
     private static bool HasSavestateBreakpoint(InputController controller, int frame) {
         // FastForwards is internal to CelesteTAS: frame -> FastForward record with a SaveState flag.
-        if (FastForwardsField.GetValue(controller) is not IDictionary breakpoints || !breakpoints.Contains(frame)) {
+        if (FastForwardsField?.GetValue(controller) is not IDictionary breakpoints || !breakpoints.Contains(frame)) {
             return false;
         }
         object? breakpoint = breakpoints[frame];
@@ -238,13 +291,16 @@ internal static class LockstepDriver {
         pendingId = id;
         pendingCommand = command;
         phase = next;
+        resetUpdates = 0;
+        loadingUpdates = 0;
+        operationTimer.Restart();
     }
 
     private static void ClearPending() {
         phase = Phase.Idle;
         pendingId = null;
         pendingCommand = null;
-        resetTimer.Reset();
+        operationTimer.Reset();
     }
 
     /// Report that the pending command failed, and require a new reset before stepping.
@@ -281,6 +337,8 @@ internal static class LockstepDriver {
             ["scene"] = Engine.Scene?.GetType().FullName,
             ["level_paused"] = (Engine.Scene as Level)?.Paused,
             ["reset_updates"] = pendingCommand == "reset" ? resetUpdates : null,
+            // Engine updates run while loading after this input was consumed, before this reply.
+            ["loading_updates"] = pendingId != null ? loadingUpdates : null,
         });
 
         Debug($"reply {id} frame={Manager.Controller.CurrentFrameInTas}");
@@ -305,5 +363,9 @@ internal static class LockstepDriver {
         }
     }
 
-    private static void SetPlaybackSpeed(float speed) => PlaybackSpeedProperty.SetValue(null, speed);
+    private static void SetPlaybackSpeed(float speed) {
+        if (incompatibility == null) {
+            PlaybackSpeedProperty!.SetValue(null, speed);
+        }
+    }
 }

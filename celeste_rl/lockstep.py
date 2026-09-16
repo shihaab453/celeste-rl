@@ -11,6 +11,10 @@ start) ends the session, because an input may or may not have been applied and t
 no longer known. The only way back is reset(), which first resets over HTTP (this works even if
 the TAS stopped), then opens a fresh connection and resets again over the socket. Interrupted
 episodes must be discarded; a failed step is never retried.
+
+Loading: if an input starts a loading scene (for example restarting the chapter from the pause menu),
+the mod lets loading finish before replying, so every reply is a frame the policy can act on. The
+number of engine updates spent loading is in diagnostics["loading_updates"].
 """
 from __future__ import annotations
 
@@ -31,7 +35,9 @@ DEFAULT_LOCKSTEP_PORT = 32280
 
 
 class LockstepBridge:
-    def __init__(self, http_bridge: CelesteBridge, port: int = DEFAULT_LOCKSTEP_PORT, timeout: float = 10.0):
+    # The mod bounds each pending command at 10 s and then replies with an error. The client waits longer,
+    # so that error arrives instead of a bare client timeout.
+    def __init__(self, http_bridge: CelesteBridge, port: int = DEFAULT_LOCKSTEP_PORT, timeout: float = 15.0):
         self.http = http_bridge
         self.port = port
         self.timeout = timeout

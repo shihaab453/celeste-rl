@@ -7,11 +7,14 @@ Run from the repo root with the RL interpreter:
 2. A reset with the wrong start frame is rejected immediately, not left waiting.
 3. A second connection replaces the first: the first is closed, and the second must reset before stepping.
 4. A client that disconnects right after sending a step does not leak that step's reply to the next client.
-5. After all of the above, the normal client still resets and steps correctly.
+5. A connection replaced at random points during its reset never strands the replacement (100 rounds).
+6. A client that sends requests but never reads replies is closed, and a new client can recover.
+7. After all of the above, the normal client still resets and steps correctly.
 """
 from __future__ import annotations
 
 import json
+import random
 import socket
 import sys
 import time
@@ -114,7 +117,54 @@ def main() -> int:
         results.append(check("no leftover reply afterwards", extra == "nothing", str(extra)[:80]))
         d.close()
 
-        print("5. Normal client afterwards")
+        print("5. Replace a connection at random points during its reset (100 rounds)")
+        rng = random.Random(0)
+        stranded = []
+        worst = 0.0
+        for round_number in range(100):
+            a = RawClient()
+            a.request({"id": 1, "cmd": "reset", "start_frame": start})
+            a.send({"id": 2, "cmd": "reset", "start_frame": start})
+            time.sleep(rng.uniform(0, 0.015))
+            a.close()
+            b = RawClient()
+            began = time.perf_counter()
+            try:
+                reset = b.request({"id": 1, "cmd": "reset", "start_frame": start})
+                step = b.request({"id": 2, "cmd": "step", "line": "1,R"})
+                ok = (reset or {}).get("id") == 1 and (reset or {}).get("frame") == start and \
+                    (step or {}).get("id") == 2 and (step or {}).get("frame") == start + 1
+            except (TimeoutError, OSError) as error:
+                ok, reset = False, str(error)
+            worst = max(worst, time.perf_counter() - began)
+            if not ok:
+                stranded.append((round_number, str(reset)[:80]))
+            b.close()
+        results.append(check("replacement connection always resets and steps", not stranded,
+                             f"worst reset+step {worst * 1000:.0f} ms, failures {stranded[:3]}"))
+
+        print("6. A client that stops reading replies")
+        flood = RawClient()
+        flood.request({"id": 1, "cmd": "reset", "start_frame": start})
+        began = time.perf_counter()
+        try:
+            # Steps are answered as fast as the game can run, so unread replies fill the socket buffer and
+            # the mod's 2 s send timeout has to close the connection.
+            for i in range(2, 200_000):
+                flood.send({"id": i, "cmd": "step", "line": "1"})
+        except OSError:
+            pass  # the server closed the connection or the send buffer filled after it stopped reading
+        flooded_for = time.perf_counter() - began
+        recover = RawClient()
+        began = time.perf_counter()
+        reply = recover.request({"id": 1, "cmd": "reset", "start_frame": start})
+        recovered_in = time.perf_counter() - began
+        results.append(check("new client recovers after a non-reading client", (reply or {}).get("frame") == start,
+                             f"flood ran {flooded_for:.1f} s, recovery reset took {recovered_in * 1000:.0f} ms"))
+        recover.close()
+        flood.close()
+
+        print("7. Normal client afterwards")
         bridge = LockstepBridge(http)
         observation = bridge.reset()
         steps = [bridge.step("R").tas_frame for _ in range(10)]
