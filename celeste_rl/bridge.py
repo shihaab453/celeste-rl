@@ -133,8 +133,18 @@ class DebugRcClient:
             return body
         raise AssertionError("unreachable")
 
-    def info(self) -> TasInfo:
-        return parse_info(self.get("/tas/info"))
+    def info(self, attempts: int = 20) -> TasInfo:
+        # CelesteTAS builds this page on the HTTP thread while the game thread may be changing entity
+        # lists (seen during level loading), which makes the request fail with an error page. Such
+        # failures are transient, so retry briefly.
+        for attempt in range(attempts):
+            try:
+                return parse_info(self.get("/tas/info"))
+            except BridgeError:
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(0.005)
+        raise AssertionError("unreachable")
 
     def game_state(self) -> dict | None:
         text = self.get("/tas/game_state")

@@ -50,3 +50,7 @@ scratch/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# C# build output
+mod/**/bin/
+mod/**/obj/

@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>CelesteRLLockstep</AssemblyName>
+        <RootNamespace>CelesteRL.Lockstep</RootNamespace>
+        <TargetFramework>net8.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+
+        <!-- The instrumented game copy. Override with: dotnet build -p:GameDir=... -->
+        <GameDir Condition="'$(GameDir)' == ''">C:\Projects\celeste-research-scratch\game-probe</GameDir>
+        <!-- CelesteTAS assemblies extracted from its release zip (bin/*.dll). Never committed. -->
+        <RefsDir Condition="'$(RefsDir)' == ''">$(GameDir)\..\mod-refs</RefsDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- Private="false": the game already loads these, so they must not be copied into the mod. -->
+        <Reference Include="$(GameDir)\Celeste.dll" Private="false" />
+        <Reference Include="$(GameDir)\FNA.dll" Private="false" />
+        <Reference Include="$(GameDir)\MMHOOK_Celeste.dll" Private="false" />
+        <Reference Include="$(GameDir)\MonoMod.RuntimeDetour.dll" Private="false" />
+        <Reference Include="$(GameDir)\MonoMod.Utils.dll" Private="false" />
+        <Reference Include="$(RefsDir)\CelesteTAS-EverestInterop.dll" Private="false" />
+        <Reference Include="$(RefsDir)\StudioCommunication.dll" Private="false" />
+        <Reference Include="$(RefsDir)\MemoryPack.Core.dll" Private="false" />
+    </ItemGroup>
+
+    <!-- Install into the game copy's Mods folder after every build. -->
+    <Target Name="InstallMod" AfterTargets="Build">
+        <MakeDir Directories="$(GameDir)\Mods\CelesteRLLockstep" />
+        <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll;$(OutputPath)$(AssemblyName).pdb;everest.yaml"
+              DestinationFolder="$(GameDir)\Mods\CelesteRLLockstep" />
+    </Target>
+
+</Project>

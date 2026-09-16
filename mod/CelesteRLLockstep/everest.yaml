@@ -1,0 +1,8 @@
+- Name: CelesteRLLockstep
+  Version: 0.1.0
+  DLL: CelesteRLLockstep.dll
+  Dependencies:
+    - Name: EverestCore
+      Version: 1.5935.0
+    - Name: CelesteTAS
+      Version: 3.47.1
