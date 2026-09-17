@@ -288,7 +288,7 @@ Zero passing does not prove absence: 1,000 fault-free episodes bound the fault r
 
 ### 11.1 Results
 
-Full run `runs/env-probes/20260917-145048` (P11: `runs/extras-noninterference/`), all passing:
+Full run `runs/env-probes/20260917-160721` and P11 run `runs/extras-noninterference/20260917-160652`, both from a clean checkout of commit `741c533` on the pinned runtime (`config/pinned_runtime.json`: Celeste 1.4.0.0-fna, Everest 6531 stable, CelesteTAS 3.47.1, Speedrun Tool 3.27.21, mod DLL built from that commit). The live scripts refuse uncommitted changes and runtime mismatches unless told otherwise, and record the runtime manifest in `results.json`. All passing:
 
 | ID | Result |
 |---|---|
@@ -300,7 +300,7 @@ Full run `runs/env-probes/20260917-145048` (P11: `runs/extras-noninterference/`)
 | P6 | 100 resets identical; exit, death and movement routes identical across 10 repeats with 5, 50 and 500 ms delays |
 | P7 | menus disabled: 1,000/1,000 episodes classified (all deaths, median 70 frames), zero faults. All inputs: 987 classified (246 death, 674 restart, 67 left_level); 13 faults, all CelesteTAS stopping the TAS during pause-menu sequences mid-episode, 13/13 reproduced exactly on replay. Menu inputs stay disabled for training (D1) |
 | P8 | 236 sampled frames, zero collision mismatches, zero schema violations |
-| P9 | environment 1,492 to 1,497 steps/s versus raw bridge 1,840 to 1,863 (81.1%, target 80%); environment overhead p50 116, p95 167, p99 254 microseconds; reset p50 5.0 ms, p95 13.2 ms. The margin is small; the encoder is the first place to optimise if later changes add cost |
+| P9 | environment 1,463 to 1,500 steps/s versus raw bridge 1,807 to 1,851 (81.7%, target 80%); environment overhead p50 118, p95 172, p99 246 microseconds; reset p50 5.0 ms, p95 14.0 ms. The ratio's margin over 80% is within run-to-run noise (81.1% to 81.9% across the saved passing runs); the overhead p95 under 200 microseconds is the robust half of this probe |
 | P10 | exit (285), death (74) and three random episodes (46, 77, 294 frames) match plain TAS playback on every expected player frame |
 | P11 | state identical with extras and events on and off across exit, death, restart and 600 random frames |
 
