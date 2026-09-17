@@ -105,7 +105,7 @@ def _running_versions(game_dir: Path) -> dict[str, str | None]:
 
 def collect(game_dir: Path, tas_prefix_lines: list[str] | None = None) -> dict:
     """The runtime manifest. Call after the game has launched, so the log shows the running versions."""
-    from celeste_rl.reward import REWARD_VERSION
+    from celeste_rl.reward import REWARD_VERSIONS
     from celeste_rl.schema import ACT_VERSION, FINGERPRINT, OBS_VERSION
 
     game_dir = Path(game_dir)
@@ -123,7 +123,10 @@ def collect(game_dir: Path, tas_prefix_lines: list[str] | None = None) -> dict:
         "settings": _profile_settings(game_dir),
         "tas_prefix_sha256": hashlib.sha256(prefix.encode()).hexdigest() if prefix is not None else None,
         "python": {"version": platform.python_version(), **packages},
-        "schema": {"obs": OBS_VERSION, "act": ACT_VERSION, "reward": REWARD_VERSION, "fingerprint": FINGERPRINT},
+        # Every reward version the code implements, not the one a run chose: that belongs to the run's own
+        # manifest. Adding or removing a version is code drift and should trip the pins.
+        "schema": {"obs": OBS_VERSION, "act": ACT_VERSION, "reward": list(REWARD_VERSIONS),
+                   "fingerprint": FINGERPRINT},
     }
 
 

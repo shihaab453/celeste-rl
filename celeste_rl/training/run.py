@@ -59,6 +59,9 @@ class TrainConfig:
     max_grad_norm: float = 0.5
     device: str = "cpu"
     disabled_inputs: tuple[str, ...] = MENU_INPUTS  # decision D1
+    # rew-v1 is the unshaped baseline; rew-v2 adds the unspent-deadline charge and progress shaping (Codex K1).
+    reward_version: str = "rew-v1"
+    shaping_scale: float = 0.2  # rew-v2 only
     max_consecutive_discards: int = 3
     checkpoint_every: int = 50_000  # accepted steps
     eval_every: int = 250_000  # accepted steps; 0 disables
@@ -176,8 +179,9 @@ class RunRecorder(BaseCallback):
             "mean_return": float(np.mean([e["return"] for e in episodes])) if episodes else "",
             "mean_success_length": float(np.mean([e["length"] for e in successes])) if successes else "",
             **{f"ending_{name}": endings.get(name, 0) for name in ("success", "death", "restart", "left_level", "wrong_room", "timeout")},
+            # From the reward version, so a version that adds a component records it instead of dropping it.
             **{f"component_{name}": sum(e["components"].get(name, 0.0) for e in episodes)
-               for name in ("completion", "failure", "time", "shaping")},
+               for name in self.env.reward_config.components},
             "env_steps_per_second": self.config.n_steps / seconds if seconds > 0 else "",
             "discarded_rollouts": self.model.fault_stats["discarded_rollouts"],
             # Process health for long runs (for example the game's memory); the keys must not change during a run.

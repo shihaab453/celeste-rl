@@ -12,6 +12,7 @@ import unittest
 from pathlib import Path
 
 from celeste_rl.env import CelesteRoomEnv
+from celeste_rl.reward import RewardConfig
 from celeste_rl.training.run import TrainConfig, train
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_training import EpochBridge
@@ -41,6 +42,20 @@ class RunTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         self.run_dir = Path(directory.name) / "run"
+
+    def test_rew_v2_records_the_unspent_deadline_charge(self):
+        """The progress columns follow the reward version, so the new charge is recorded and not dropped."""
+        env = CelesteRoomEnv(EpochBridge(), reward_config=RewardConfig(version="rew-v2"))
+        train(config(reward_version="rew-v2", eval_every=0), self.run_dir, env, PROVENANCE)
+        _, progress, episodes, _ = read(self.run_dir)
+
+        self.assertIn("component_unspent_deadline", progress[0])
+        self.assertLess(sum(float(row["component_unspent_deadline"]) for row in progress), 0.0)
+        self.assertTrue(episodes, "the fake bridge dies inside the first rollout")
+        for episode in episodes:
+            # Every death costs -1.03 before shaping, whenever it happened (Codex K1).
+            unshaped = sum(value for name, value in episode["components"].items() if name != "shaping")
+            self.assertAlmostEqual(unshaped, -1.03, places=9)
 
     def test_records_checkpoints_and_evaluation(self):
         model = train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)

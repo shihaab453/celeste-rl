@@ -25,7 +25,8 @@ policy <-- observation (obs-v1) --  CelesteRoomEnv  <-- state + extras + events 
 | `celeste_rl/actions.py` | Action vector to canonical input line, disabled inputs, applied action |
 | `celeste_rl/observation.py` | Pure functions from one reply (state, extras) plus cached room geometry to arrays. Never receives events, reward or evaluation data |
 | `celeste_rl/endings.py` | Ending classification from events and state |
-| `celeste_rl/reward.py` | `rew-v1` components |
+| `celeste_rl/reward.py` | `rew-v1` and `rew-v2` components |
+| `celeste_rl/potential.py` | the progress potential `rew-v2` shapes with |
 | `celeste_rl/env.py` | `CelesteRoomEnv(gymnasium.Env)` |
 | `celeste_rl/training/` (Phase 3, smoke-tested in Phase 2) | SB3 feature extractor and the rollout supervisor (section 9) |
 | `mod/CelesteRLLockstep` | Adds `extras`, `events` and a validation-only collision query (section 4) |
@@ -229,6 +230,23 @@ reward = +1 on success                      (once)
 - **Decision D3:** shaping is off for all Phase 2 validation and for an unshaped baseline. A bounded potential-based term `scale * (potential(next) - potential(current))` with terminal potential 0 may be added before the Phase 3 campaign as a separately versioned, disclosed component. At gamma 1 it sums to `-scale * potential(start)` over any complete episode, so it does not change which behaviour is best from a given start. A fault has no successor, so no shaping term is computed for it.
 - **Decision D5, the time cost stays from the start** (owner constraint). Known trade-off: failing immediately scores about -1.00002 and timing out scores -1.03, so a policy certain to fail slightly prefers dying early. Trying for the full 30 seconds is still better whenever its success chance exceeds about 1.5%. This is accepted and disclosed, not claimed to be absent.
 - Every component is reported separately in `info["reward_components"]`.
+
+## 8.1 Reward (`rew-v2`), the shaped version
+
+`rew-v1` above is frozen and stays selectable, so the unshaped baseline campaign remains reproducible. `rew-v2` is the separately versioned component decision D3 allowed for, and it is used from the first shaped Phase 3 experiment onwards. It makes two changes, which only work together:
+
+```
+reward = +1 on success                      (once)
+       + -1 on death, restart, left_level, wrong_room or timeout
+       + -(1,800 - t)/60,000 on those same failures at frame t   (the unspent deadline)
+       + -1/60,000 every step, including the final step
+       + 0.2 * (potential(next) - potential(current)),  potential(terminal) = 0
+```
+
+- **The unspent-deadline charge.** Under `rew-v1` a failure at frame t costs `-1 - t/60,000`, so failing sooner pays slightly more (decision D5's known trade-off). Charging a failure for the deadline it did not use makes every failure total exactly **-1.03 whenever it happens**. The time cost still applies from the first frame, so D5 is kept, and there is no survival bonus: staying alive is worth nothing by itself, it only stops being cheaper to die early. The charge is reported as its own component, `unspent_deadline`.
+- **Progress shaping.** The potential is the spike-weighted breadth-first tile distance to the room's exit (`celeste_rl/potential.py`): cost 1 per tile, plus 8 for a cell within 2 tiles of a spike and 1 per tile of open air below it, normalised so the exit is 1. It was chosen offline, before any training, by replaying a recorded clear of room 1 and a recorded death (`scripts/potential_check.py`): it rises along the real solution and falls on the way into the spike pit. The plain tile distance was rejected because it pays the agent to walk into that pit; a fall-weighted variant was rejected because it rates the pit floor above the start ledge.
+- The potential is a function of the state alone, is computed outside the observation encoder, and never enters the observation. With gamma 1 and a terminal potential of 0, an episode's shaping sums to exactly `-0.2 * potential(start)`, a constant per start, so it cannot change which ending the agent prefers.
+- Nothing here uses the recorded solution. A potential projected onto a recorded route is a demonstration method and belongs to Phase 3B.
 
 ## 9. Training integration (fixed now, built and smoke-tested in Phase 2)
 

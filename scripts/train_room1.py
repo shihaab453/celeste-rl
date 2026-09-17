@@ -28,6 +28,7 @@ from celeste_rl import runtime  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
+from celeste_rl.reward import RewardConfig  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
 from celeste_rl.training.run import TrainConfig, train  # noqa: E402
 from celeste_rl.training.supervisor import TrainingAborted  # noqa: E402
@@ -65,7 +66,8 @@ def main() -> int:
 
     game = GameSession(args.game_dir)
     http = CelesteBridge(Path(run_dir) / "episode.tas")
-    env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs)
+    reward = RewardConfig(version=config.reward_version, gamma=config.gamma, shaping_scale=config.shaping_scale)
+    env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs, reward_config=reward)
     try:
         manifest = runtime.collect(args.game_dir, http._prefix_lines())
         problems = runtime.check(manifest, runtime.load_pins())

@@ -21,6 +21,7 @@ from celeste_rl.actions import INDEX
 from celeste_rl.bridge import BridgeError, Observation
 from celeste_rl.endings import (
     DEATH,
+    FAILURES,
     LEFT_LEVEL,
     RESTART,
     SUCCESS,
@@ -31,6 +32,7 @@ from celeste_rl.endings import (
     classify,
 )
 from celeste_rl.env import BridgeFault, CelesteRoomEnv
+from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
 from celeste_rl.schema import ACTION_INPUTS, DEADLINE_FRAMES
 
@@ -138,6 +140,151 @@ class RewardTests(unittest.TestCase):
             self.assertEqual(sum(reward_components(ending, config).values()), -1 + TIME)
         with self.assertRaises(ValueError):
             reward_components("won", config)
+
+
+V2 = RewardConfig(version="rew-v2")
+
+
+def episode_total(ending: str, elapsed: int, config: RewardConfig = V2) -> float:
+    """What a whole episode of `elapsed` frames pays, ignoring shaping (which telescopes to a start constant)."""
+    ending_step = reward_components(ending, config, elapsed)
+    return sum(ending_step.values()) + (elapsed - 1) * config.time_per_frame
+
+
+class RewardV2Tests(unittest.TestCase):
+    """rew-v2: the unspent-deadline charge (Codex K1). Shaping is exercised by ShapingTests."""
+
+    def test_every_failure_costs_exactly_the_same_whenever_it_happens(self):
+        for elapsed in (1, 2, 60, 900, DEADLINE_FRAMES):
+            for ending in FAILURES:
+                with self.subTest(ending=ending, elapsed=elapsed):
+                    self.assertAlmostEqual(episode_total(ending, elapsed), -1.03, places=10)
+
+    def test_failing_earlier_is_never_better_than_failing_later(self):
+        for ending in FAILURES:
+            totals = [episode_total(ending, elapsed) for elapsed in range(1, DEADLINE_FRAMES + 1, 37)]
+            for earlier, later in zip(totals, totals[1:]):
+                self.assertLessEqual(earlier, later + 1e-12, f"{ending}: failing earlier pays more")
+
+    def test_success_always_beats_every_failure(self):
+        worst_success = 1 + DEADLINE_FRAMES * V2.time_per_frame
+        self.assertGreater(worst_success, episode_total(DEATH, 1))
+        for elapsed in (1, 900, DEADLINE_FRAMES):
+            self.assertAlmostEqual(episode_total(SUCCESS, elapsed), 1 + elapsed * V2.time_per_frame, places=10)
+
+    def test_the_charge_is_its_own_component_and_only_on_failures(self):
+        self.assertEqual(reward_components(None, V2, 10)["unspent_deadline"], 0.0)
+        self.assertEqual(reward_components(SUCCESS, V2, 10)["unspent_deadline"], 0.0)
+        self.assertAlmostEqual(reward_components(DEATH, V2, 10)["unspent_deadline"], -(DEADLINE_FRAMES - 10) / 60_000)
+        # A failure past the deadline cannot happen, but it must never pay the agent for the overrun.
+        self.assertEqual(reward_components(DEATH, V2, DEADLINE_FRAMES + 50)["unspent_deadline"], 0.0)
+
+    def test_rew_v1_is_unchanged_and_refuses_shaping(self):
+        config = RewardConfig()
+        self.assertEqual(config.version, "rew-v1")
+        self.assertEqual(set(reward_components(DEATH, config, 10)), {"completion", "failure", "time", "shaping"})
+        self.assertAlmostEqual(episode_total(DEATH, 10, config), -1 - 10 / 60_000, places=10)
+        with self.assertRaises(ValueError):
+            reward_components(None, config, 10, 0.5)
+
+    def test_unknown_version_is_refused(self):
+        with self.assertRaises(ValueError):
+            RewardConfig(version="rew-v3")
+
+
+class WalkingBridge(ReplayBridge):
+    """A bridge whose player walks through given positions, so the shaping term is not constant.
+
+    The last position is the last frame of the episode; `ending_events` are raised there.
+    """
+
+    def __init__(self, positions, ending_events):
+        super().__init__()
+        self.positions, self.ending_events = positions, ending_events
+
+    def step(self, buttons="", dash_only="", move_only=""):
+        observation = super().step(buttons, dash_only, move_only)
+        x, y = self.positions[self.index - 1]
+        observation.state["Player"]["Position"] = {"X": x, "Y": y}
+        last = self.index == len(self.positions)
+        return Observation(observation.episode_id, observation.step_id, observation.tas_frame, observation.room,
+                           None if last and self.ending_events else observation.state, None, observation.extras,
+                           self.ending_events if last else [])
+
+
+class ShapingTests(unittest.TestCase):
+    """Potential-based shaping: the sum over an episode is exactly -scale * potential(start), whatever happens
+    in between, so shaping cannot change which ending the agent prefers."""
+
+    WALK = [(27, 144), (35, 144), (43, 140), (51, 136), (60, 152), (60, 164)]
+    DEATH_EVENTS = [{"type": "death", "room": "1"}]
+
+    def run_walk(self, events):
+        env = CelesteRoomEnv(WalkingBridge(self.WALK, events), reward_config=V2)
+        _, info = env.reset()
+        start_potential = info["potential"]
+        shaping, total, steps = 0.0, 0.0, 0
+        for _ in range(len(self.WALK)):
+            _, reward, terminated, _, info = env.step(noop())
+            shaping += info["reward_components"]["shaping"]
+            total += reward
+            steps += 1
+            if terminated:
+                break
+        return start_potential, shaping, total, steps, info
+
+    def test_shaping_telescopes_to_the_start_potential(self):
+        """Over a finished episode: the terminal potential is 0, so the sum is exactly -scale * potential(start)."""
+        start, shaping, _, _, info = self.run_walk(self.DEATH_EVENTS)
+        self.assertEqual(info["ending"], DEATH)
+        self.assertGreater(start, 0.0)
+        self.assertAlmostEqual(shaping, -V2.shaping_scale * start, places=9)
+
+    def test_an_unfinished_episode_telescopes_to_where_the_player_got_to(self):
+        """The same sum with no ending: scale * (potential(now) - potential(start)), and nothing else."""
+        start, shaping, _, _, info = self.run_walk([])
+        self.assertIsNone(info["ending"])
+        self.assertAlmostEqual(shaping, V2.shaping_scale * (info["potential"] - start), places=9)
+
+    def test_the_shaped_return_is_the_unshaped_one_plus_that_constant(self):
+        start, shaping, total, steps, info = self.run_walk(self.DEATH_EVENTS)
+        self.assertEqual(info["ending"], DEATH)
+        self.assertAlmostEqual(total, episode_total(DEATH, steps) + shaping, places=9)
+        self.assertAlmostEqual(total, -1.03 - V2.shaping_scale * start, places=9)
+
+    def test_moving_towards_the_exit_pays_and_moving_back_charges(self):
+        env = CelesteRoomEnv(WalkingBridge([(84, 128), (19, 144)], []), reward_config=V2)
+        env.reset()
+        _, _, _, _, forward = env.step(noop())
+        _, _, _, _, back = env.step(noop())
+        self.assertGreater(forward["reward_components"]["shaping"], 0.0)
+        self.assertAlmostEqual(forward["reward_components"]["shaping"] + back["reward_components"]["shaping"], 0.0,
+                               places=9)
+
+    def test_rew_v1_never_shapes_and_builds_no_potential(self):
+        env = CelesteRoomEnv(WalkingBridge(self.WALK, []))
+        _, info = env.reset()
+        self.assertEqual(info["potential"], 0.0)
+        for _ in range(3):
+            _, _, _, _, info = env.step(noop())
+            self.assertEqual(info["reward_components"]["shaping"], 0.0)
+        self.assertIsNone(env._potential)
+
+    def test_the_environment_reports_its_reward_version(self):
+        env = CelesteRoomEnv(ReplayBridge(), reward_config=V2)
+        _, info = env.reset()
+        self.assertEqual(info["reward_version"], "rew-v2")
+        _, _, _, _, info = env.step(noop())
+        self.assertIn("unspent_deadline", info["reward_components"])
+
+    def test_the_potential_is_reused_while_the_room_is_unchanged(self):
+        env = CelesteRoomEnv(ReplayBridge(), reward_config=V2)
+        env.reset()
+        built = env._potential
+        self.assertIsInstance(built, RoomPotential)
+        env.reset()
+        self.assertIs(env._potential, built)
+
 
 
 class RecordedEpisodeTests(unittest.TestCase):

@@ -1,8 +1,10 @@
 """CelesteRoomEnv: the Gymnasium environment for one Celeste room (Phase 2 spec).
 
-One step is one game frame. The action is act-v1 (24 on/off inputs), the observation obs-v1, the reward
-rew-v1. The episode ends on success, death, restart, leaving the level, entering the wrong room or the
-30-second deadline; every ending is task termination, and the environment never truncates.
+One step is one game frame. The action is act-v1 (24 on/off inputs), the observation obs-v1, and the reward
+whichever version `reward_config` selects: rew-v1 unshaped, or rew-v2 with the unspent-deadline charge and
+progress shaping over `celeste_rl.potential`. The episode ends on success, death, restart, leaving the level,
+entering the wrong room or the 30-second deadline; every ending is task termination, and the environment
+never truncates.
 
 Bridge faults: a transport or protocol failure, a malformed reply, or events the ending rules cannot explain
 raise BridgeFault. That step produces no transition, the episode cannot continue, and step() refuses until
@@ -24,7 +26,8 @@ from celeste_rl.actions import apply_disabled, disabled_mask, to_parts
 from celeste_rl.bridge import BridgeError
 from celeste_rl.endings import EndingFault, RoomTask, classify
 from celeste_rl.observation import ObservationBuilder, SchemaViolation, observation_space
-from celeste_rl.reward import REWARD_VERSION, RewardConfig, reward_components
+from celeste_rl.potential import RoomPotential
+from celeste_rl.reward import RewardConfig, reward_components
 from celeste_rl.schema import ACT_VERSION, ACTION_INPUTS, FINGERPRINT, MENU_INPUTS, OBS_VERSION
 
 # The canonical start: TAS frame 300 of the episode prefix, room 1, standing at (19, 144) with one dash.
@@ -52,12 +55,16 @@ class CelesteRoomEnv(gym.Env):
         self._builder = ObservationBuilder()
         self._elapsed = 0
         self._ready = False
+        # rew-v2 only: the room's progress potential, rebuilt only when the room changes, and its value at
+        # the previous step. Both stay out of the observation.
+        self._potential: RoomPotential | None = None
+        self._potential_value = 0.0
 
     def _info(self, **extra) -> dict:
         return {
             "obs_version": OBS_VERSION,
             "act_version": ACT_VERSION,
-            "reward_version": REWARD_VERSION,
+            "reward_version": self.reward_config.version,
             "schema_fingerprint": FINGERPRINT,
             "disabled_inputs": self.disabled_inputs,
             "elapsed": self._elapsed,
@@ -98,8 +105,10 @@ class CelesteRoomEnv(gym.Env):
         except (BridgeError, SchemaViolation) as error:
             raise BridgeFault(f"reset failed: {error}") from error
         self._elapsed = 0
+        self._potential_value = self._start_potential(observation.state)
         self._ready = True
-        return obs, self._info(start="canonical", frame=observation.tas_frame, reset_events=observation.events)
+        return obs, self._info(start="canonical", frame=observation.tas_frame, reset_events=observation.events,
+                               potential=self._potential_value)
 
     def step(self, action):
         if not self._ready:
@@ -121,12 +130,29 @@ class CelesteRoomEnv(gym.Env):
             raise BridgeFault(f"step at frame {observation.tas_frame} could not be interpreted: {error}") from error
 
         self._elapsed = elapsed
-        components = reward_components(ending, self.reward_config)
         terminated = ending is not None
+        # The terminal potential is 0 by definition, so an episode's shaping sums to -scale * potential(start).
+        value = 0.0 if terminated or self._potential is None else self._potential.value(observation.state)
+        shaping = 0.0
+        if self.reward_config.shaped:
+            shaping = self.reward_config.shaping_scale * (self.reward_config.gamma * value - self._potential_value)
+        self._potential_value = value
+        components = reward_components(ending, self.reward_config, elapsed, shaping)
         self._ready = not terminated
         info = self._info(ending=ending, events=observation.events, reward_components=components,
-                          applied_action=applied, frame=observation.tas_frame)
+                          applied_action=applied, frame=observation.tas_frame, potential=value)
         return obs, float(sum(components.values())), terminated, False, info
+
+    def _start_potential(self, state: dict | None) -> float:
+        """Build the room's potential if rew-v2 asked for shaping, reusing it while the room is unchanged."""
+        if not self.reward_config.shaped:
+            return 0.0
+        try:
+            if self._potential is None or not self._potential.matches(state):
+                self._potential = RoomPotential(state)
+            return self._potential.value(state)
+        except (KeyError, TypeError, ValueError) as error:
+            raise BridgeFault(f"the room's progress potential could not be built: {error}") from error
 
     def close(self):
         self._ready = False

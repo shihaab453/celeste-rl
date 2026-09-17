@@ -27,15 +27,16 @@ Candidates:
               the recorded solution, so it is a demonstration-derived potential and belongs to the demonstration
               branch, measured here only for comparison.
 
+The candidates themselves live in `celeste_rl/potential.py`, which is what rew-v2 imports: a potential
+validated here and reimplemented there would not be validated at all.
+
 Results are written to runs/potential-check/<timestamp>/results.json.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import sys
-from collections import deque
 from datetime import datetime
 from pathlib import Path
 
@@ -43,100 +44,16 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from celeste_rl import runtime  # noqa: E402
-from celeste_rl.schema import CELL_SIZE  # noqa: E402
+from celeste_rl.potential import (  # noqa: E402
+    fall_cost,
+    hazard_cost,
+    room,
+    route_potential,
+    tile_distances,
+    tile_potential,
+)
 
 DEFAULT_TRACE = REPO / "runs" / "transition-check" / "20260916-124511-exit-regression" / "traces.json"
-
-
-def room(state: dict) -> dict:
-    """Tile grid, exit cells and spike rows from one state."""
-    rows = state["SolidsData"].replace("\r", "").split("\n")
-    solid = [[c != "0" for c in row] for row in rows]
-    bounds = state["Level"]["Bounds"]
-    # The exit is the open stretch of the room's top row: the player leaves the room upwards through it.
-    exits = [(0, col) for col, filled in enumerate(solid[0]) if not filled]
-    spikes = set()
-    for spike in state.get("Spikes") or []:
-        b, direction = spike["Bounds"], spike["Direction"]
-        # Up spikes sit 3 px above their exported position; they occupy the tile row above their surface.
-        top = b["Y"] - 3 if direction == 0 else b["Y"]
-        for x in range(int(b["X"]), int(b["X"] + b["W"]), CELL_SIZE):
-            spikes.add((int((top - bounds["Y"]) // CELL_SIZE), int((x - bounds["X"]) // CELL_SIZE)))
-    return {"solid": solid, "exits": exits, "spikes": spikes, "bounds": bounds,
-            "rows": len(solid), "cols": max(len(r) for r in solid)}
-
-
-def hazard_cost(geometry: dict, row: int, col: int, radius: int, near_spike: float, over_gap: float) -> float:
-    """Extra cost for being near spikes, or airborne over a gap: the two ways a cell kills a Celeste player."""
-    cost = 0.0
-    if any(abs(r - row) <= radius and abs(c - col) <= radius for r, c in geometry["spikes"]):
-        cost += near_spike
-    depth, below = 0, row + 1
-    while below < geometry["rows"] and not geometry["solid"][below][col]:
-        depth, below = depth + 1, below + 1
-    return cost + over_gap * min(depth, 6)
-
-
-def fall_cost(geometry: dict, row: int, col: int, per_tile: float, onto_hazard: float) -> float:
-    """How costly it is to be in this cell, based on what is below it: falling far, onto spikes, or out of the room."""
-    depth = 0
-    r = row + 1
-    while r < geometry["rows"] and not geometry["solid"][r][col]:
-        if (r, col) in geometry["spikes"]:
-            return depth * per_tile + onto_hazard
-        depth += 1
-        r += 1
-    if r >= geometry["rows"]:
-        return depth * per_tile + onto_hazard  # nothing below: the player leaves the room and dies
-    return depth * per_tile
-
-
-def tile_distances(geometry: dict, cost_of=None) -> dict:
-    """Cost to reach the exit from every open cell, 4-connected, ignoring physics."""
-    costs: dict[tuple[int, int], float] = {}
-    queue: deque = deque()
-    for cell in geometry["exits"]:
-        costs[cell] = 0.0
-        queue.append(cell)
-    # Dijkstra-like when weighted, plain breadth-first when not; the weighted graph has small integer-ish costs.
-    while queue:
-        row, col = queue.popleft()
-        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            r, c = row + dr, col + dc
-            if not (0 <= r < geometry["rows"] and 0 <= c < len(geometry["solid"][r])) or geometry["solid"][r][c]:
-                continue
-            step = 1.0 + (cost_of(geometry, r, c) if cost_of else 0.0)
-            if costs.get((r, c), math.inf) > costs[(row, col)] + step:
-                costs[(r, c)] = costs[(row, col)] + step
-                queue.append((r, c))
-    return costs
-
-
-def tile_potential(geometry: dict, costs: dict):
-    largest = max(costs.values()) or 1.0
-
-    def potential(x: float, y: float) -> float:
-        row = int((y - geometry["bounds"]["Y"]) // CELL_SIZE)
-        col = int((x - geometry["bounds"]["X"]) // CELL_SIZE)
-        best = costs.get((row, col))
-        if best is None:  # inside a wall or outside the map: use the nearest open cell
-            best = min((cost for (r, c), cost in costs.items() if abs(r - row) + abs(c - col) <= 2), default=largest)
-        return max(0.0, 1.0 - best / largest)
-
-    return potential
-
-
-def route_potential(positions: list[tuple[float, float]], distance_weight: float = 0.01):
-    def potential(x: float, y: float) -> float:
-        best, nearest = None, 0
-        for index, (px, py) in enumerate(positions):
-            gap = math.hypot(px - x, py - y)
-            if best is None or gap < best:
-                best, nearest = gap, index
-        progress = nearest / (len(positions) - 1)
-        return max(0.0, progress - distance_weight * best)
-
-    return potential
 
 
 def evaluate(potential, positions: list[tuple[float, float]]) -> dict:

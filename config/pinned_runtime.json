@@ -30,7 +30,10 @@
     "act": "act-v1",
     "fingerprint": "b710a27fa4f1d96f",
     "obs": "obs-v1",
-    "reward": "rew-v1"
+    "reward": [
+      "rew-v1",
+      "rew-v2"
+    ]
   },
   "tas_prefix_sha256": "0f672ddc7bcb462ae85a6ab5d0c94e9de9360b31910ed3e030d68111743674c1"
 }
