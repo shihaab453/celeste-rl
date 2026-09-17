@@ -41,13 +41,18 @@ class SupervisedPPO(PPO):
                  on_fault: Callable[[BridgeFault], None] | None = None,
                  abort_checkpoint_path: str | Path | None = None, **kwargs):
         super().__init__(*args, **kwargs)
-        if not isinstance(self.env, DummyVecEnv):
+        # A model loaded without an environment (for example to evaluate a checkpoint) has nothing to supervise.
+        if self.env is not None and not isinstance(self.env, DummyVecEnv):
             raise TypeError(f"SupervisedPPO supports DummyVecEnv only, got {type(self.env).__name__}")
         self.max_consecutive_discards = max_consecutive_discards
         self.on_fault = on_fault
         self.abort_checkpoint_path = abort_checkpoint_path
         self.fault_stats = {"accepted_transitions": 0, "discarded_transitions": 0, "discarded_rollouts": 0,
                             "faults": []}
+
+    def _excluded_save_params(self) -> list[str]:
+        # The fault hook usually holds a game process handle; it belongs to the running session, not the checkpoint.
+        return [*super()._excluded_save_params(), "on_fault"]
 
     def collect_rollouts(self, env: VecEnv, callback, rollout_buffer, n_rollout_steps: int) -> bool:
         consecutive = 0
