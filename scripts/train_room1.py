@@ -24,36 +24,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from celeste_rl import game_process, runtime  # noqa: E402
+from celeste_rl import runtime  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
+from celeste_rl.training.game import GameSession  # noqa: E402
 from celeste_rl.training.run import TrainConfig, train  # noqa: E402
 from celeste_rl.training.supervisor import TrainingAborted  # noqa: E402
-
-
-class Game:
-    """The game process for this run, relaunched if a fault finds it gone."""
-
-    def __init__(self, game_dir: Path):
-        self.game_dir = game_dir
-        self.relaunches = 0
-        self.process = self._launch()
-
-    def _launch(self):
-        process = game_process.launch(self.game_dir, focus=False)
-        game_process.set_window_mode(process.pid, "minimized")
-        return process
-
-    def on_fault(self, fault) -> None:
-        if self.process.poll() is not None:
-            print(f"Game process exited ({self.process.returncode}) after: {fault}. Relaunching.")
-            game_process.stop(self.process)
-            self.process = self._launch()
-            self.relaunches += 1
-
-    def close(self) -> None:
-        game_process.stop(self.process)
 
 
 def main() -> int:
@@ -86,7 +63,7 @@ def main() -> int:
         print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
         return 2
 
-    game = Game(args.game_dir)
+    game = GameSession(args.game_dir)
     http = CelesteBridge(Path(run_dir) / "episode.tas")
     env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs)
     try:
@@ -105,7 +82,7 @@ def main() -> int:
             print(f"ABORTED: {aborted}")
             return 1
         print(f"Finished: {model.num_timesteps:,} accepted steps, faults {model.fault_stats['discarded_rollouts']} "
-              f"discarded rollouts, game relaunches {game.relaunches}. Records in {run_dir}")
+              f"discarded rollouts, game relaunches {len(game.relaunches)}. Records in {run_dir}")
         return 0
     finally:
         env.close()
