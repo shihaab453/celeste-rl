@@ -33,7 +33,6 @@ import hashlib
 import json
 import math
 import statistics
-import subprocess
 import sys
 import time
 import traceback
@@ -46,7 +45,7 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from celeste_rl import game_process  # noqa: E402
+from celeste_rl import game_process, runtime  # noqa: E402
 from celeste_rl.actions import INDEX, parse_line, to_line, to_parts  # noqa: E402
 from celeste_rl.bridge import BridgeError, CelesteBridge, format_input_line  # noqa: E402
 from celeste_rl.endings import DEATH, SUCCESS, TIMEOUT  # noqa: E402
@@ -545,17 +544,22 @@ def main() -> int:
     parser.add_argument("--probes", default=",".join(ALL_PROBES))
     parser.add_argument("--episodes", type=int, default=1000, help="P7 episodes per input setting")
     parser.add_argument("--collision-episodes", type=int, default=30, help="P8 episodes")
+    parser.add_argument("--allow-dirty", action="store_true", help="run with uncommitted changes (exploratory only)")
+    parser.add_argument("--allow-runtime-mismatch", action="store_true",
+                        help="run although the runtime differs from config/pinned_runtime.json")
     args = parser.parse_args()
     selected = [p.strip().upper() for p in args.probes.split(",") if p.strip()]
     unknown = set(selected) - set(ALL_PROBES)
     if unknown:
         parser.error(f"unknown probes {sorted(unknown)}")
 
+    git = runtime.git_state()
+    if git["uncommitted_changes"] and not args.allow_dirty:
+        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+        return 2
     output_dir = REPO / "runs" / "env-probes" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
-    git = lambda *a: subprocess.run(["git", *a], cwd=REPO, capture_output=True, text=True).stdout.strip()
-    results = {"commit": git("rev-parse", "HEAD"), "uncommitted_changes": bool(git("status", "--porcelain")),
-               "args": {**vars(args), "game_dir": str(args.game_dir)}, "probes": {}}
+    results = {**git, "args": {**vars(args), "game_dir": str(args.game_dir)}, "probes": {}}
 
     def save():
         (output_dir / "results.json").write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
@@ -567,6 +571,13 @@ def main() -> int:
     }
     session = Session(args.game_dir, output_dir)
     try:
+        results["runtime"] = runtime.collect(args.game_dir, session.http._prefix_lines())
+        results["runtime_problems"] = runtime.check(results["runtime"], runtime.load_pins())
+        if results["runtime_problems"]:
+            print("Runtime differs from the pins:\n  " + "\n  ".join(results["runtime_problems"]))
+            if not args.allow_runtime_mismatch:
+                results["refused"] = "runtime mismatch"
+                return 2
         for name in selected:
             start = time.perf_counter()
             try:
@@ -585,7 +596,12 @@ def main() -> int:
         session.close()
         save()
     passed = all(p["passed"] for p in results["probes"].values())
-    print("All probes passed." if passed else "SOME PROBES FAILED.")
+    attributable = not results["uncommitted_changes"] and not results["runtime_problems"]
+    results["attributable"] = attributable
+    save()
+    print(("All probes passed." if passed else "SOME PROBES FAILED.")
+          + (f" Commit {results['commit'][:7]}, pinned runtime." if attributable
+             else " NOT ATTRIBUTABLE: uncommitted changes or a runtime differing from the pins."))
     print(f"Results: {output_dir / 'results.json'}")
     return 0 if passed else 1
 

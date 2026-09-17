@@ -17,7 +17,6 @@ import argparse
 import json
 import os
 import random
-import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +24,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from celeste_rl import game_process  # noqa: E402
+from celeste_rl import game_process, runtime  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 
@@ -56,14 +55,17 @@ def play(bridge: LockstepBridge, trace: list[tuple[str, str, str]]) -> dict:
     return {"frames": frames, "replies_with_extras": extras_replies, "replies": len(trace) + 1}
 
 
-def run_game(game_dir: Path, output_dir: Path, traces: dict, extras_enabled: bool) -> dict:
+def run_game(game_dir: Path, output_dir: Path, traces: dict, extras_enabled: bool, manifest: dict | None = None) -> dict:
     if extras_enabled:
         os.environ.pop("CELESTE_RL_LOCKSTEP_EXTRAS", None)
     else:
         os.environ["CELESTE_RL_LOCKSTEP_EXTRAS"] = "0"
     process = game_process.launch(game_dir, focus=False)
-    bridge = LockstepBridge(CelesteBridge(output_dir / f"episode-{'on' if extras_enabled else 'off'}.tas"))
+    http = CelesteBridge(output_dir / f"episode-{'on' if extras_enabled else 'off'}.tas")
+    bridge = LockstepBridge(http)
     try:
+        if manifest is not None:
+            manifest.update(runtime.collect(game_dir, http._prefix_lines()))
         return {name: play(bridge, trace) for name, trace in traces.items()}
     finally:
         bridge.close()
@@ -76,11 +78,17 @@ def main() -> int:
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
     parser.add_argument("--random-frames", type=int, default=600)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--allow-dirty", action="store_true", help="run with uncommitted changes (exploratory only)")
+    parser.add_argument("--allow-runtime-mismatch", action="store_true",
+                        help="run although the runtime differs from config/pinned_runtime.json")
     args = parser.parse_args()
 
+    git = runtime.git_state()
+    if git["uncommitted_changes"] and not args.allow_dirty:
+        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+        return 2
     output_dir = REPO / "runs" / "extras-noninterference" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
-    git = lambda *a: subprocess.run(["git", *a], cwd=REPO, capture_output=True, text=True).stdout.strip()
 
     traces = {}
     for name in FIXTURES:
@@ -88,7 +96,13 @@ def main() -> int:
         traces[name] = [(buttons, "", "") for buttons in route["actions"]]
     traces["random"] = random_trace(random.Random(args.seed), args.random_frames)
 
-    enabled = run_game(args.game_dir, output_dir, traces, extras_enabled=True)
+    manifest: dict = {}
+    enabled = run_game(args.game_dir, output_dir, traces, extras_enabled=True, manifest=manifest)
+    problems = runtime.check(manifest, runtime.load_pins())
+    if problems:
+        print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
+        if not args.allow_runtime_mismatch:
+            return 2
     disabled = run_game(args.game_dir, output_dir, traces, extras_enabled=False)
 
     comparisons = {}
@@ -108,8 +122,10 @@ def main() -> int:
 
     passed = all(c["identical"] and c["extras_delivered_correctly"] for c in comparisons.values())
     results = {
-        "commit": git("rev-parse", "HEAD"),
-        "uncommitted_changes": bool(git("status", "--porcelain")),
+        **git,
+        "attributable": not git["uncommitted_changes"] and not problems,
+        "runtime": manifest,
+        "runtime_problems": problems,
         "args": {**vars(args), "game_dir": str(args.game_dir)},
         "comparisons": comparisons,
         "passed": passed,
