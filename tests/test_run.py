@@ -13,7 +13,7 @@ from pathlib import Path
 
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
-from celeste_rl.training.run import TrainConfig, train
+from celeste_rl.training.run import PROGRESS_FIELDS, TrainConfig, new_progress, train, update_progress
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_training import EpochBridge
 
@@ -37,6 +37,33 @@ def read(run_dir: Path):
     return manifest, progress, episodes, evaluations
 
 
+class ProgressRecordTests(unittest.TestCase):
+    """update_progress folds one step's info into an episode's record."""
+
+    @staticmethod
+    def info(x=None, y=None, potential=None):
+        player = None if x is None else {"x": x, "y": y, "speed_x": 0, "speed_y": 0, "dashes": 1}
+        return {"player": player, "potential": potential}
+
+    def test_keeps_the_furthest_right_the_highest_and_the_last(self):
+        progress = new_progress()
+        for x, y, potential in ((19, 144, 0.2), (80, 120, 0.3), (60, 130, 0.2)):
+            update_progress(progress, self.info(x, y, potential))
+        self.assertEqual(progress["max_x"], 80)
+        self.assertEqual(progress["min_y"], 120)          # y grows downwards, so this is the highest point
+        self.assertEqual((progress["end_x"], progress["end_y"]), (60, 130))
+        self.assertEqual(progress["max_potential"], 0.3)
+
+    def test_a_step_without_a_player_keeps_the_last_known_position(self):
+        progress = update_progress(new_progress(), self.info(80, 120, 0.3))
+        update_progress(progress, self.info())             # the death step: no player, no potential
+        self.assertEqual((progress["end_x"], progress["end_y"], progress["max_x"]), (80, 120, 80))
+        self.assertEqual(progress["max_potential"], 0.3)
+
+    def test_fields_never_reported_stay_none(self):
+        self.assertEqual(update_progress(new_progress(), self.info()), dict.fromkeys(PROGRESS_FIELDS))
+
+
 class RunTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
@@ -56,6 +83,27 @@ class RunTests(unittest.TestCase):
             # Every death costs -1.03 before shaping, whenever it happened (Codex K1).
             unshaped = sum(value for name, value in episode["components"].items() if name != "shaping")
             self.assertAlmostEqual(unshaped, -1.03, places=9)
+
+    def test_progress_records_say_how_far_each_episode_got(self):
+        """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
+        train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        _, progress, episodes, evaluations = read(self.run_dir)
+
+        for episode in episodes:
+            for field in PROGRESS_FIELDS:
+                self.assertIsNotNone(episode[field], f"{field} missing from an episode record")
+            self.assertEqual((episode["end_x"], episode["end_y"]), (19, 144))  # the fake bridge never moves
+        for column in ("median_max_potential", "best_max_potential", "median_max_x", "best_max_x", "best_min_y"):
+            self.assertIn(column, progress[0])
+        self.assertEqual(float(progress[2]["median_max_x"]), 19.0)
+        self.assertIn("median_max_potential", evaluations[0])
+        self.assertEqual(len(evaluations[0]["stochastic_progress"]), 2)
+
+    def test_a_rollout_with_no_finished_episode_records_blanks_not_zeros(self):
+        train(config(total_timesteps=32, eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        _, progress, _, _ = read(self.run_dir)
+        self.assertEqual(progress[0]["median_max_x"], "")
+        self.assertEqual(progress[0]["best_max_potential"], "")
 
     def test_records_checkpoints_and_evaluation(self):
         model = train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)

@@ -5,15 +5,23 @@ A run directory holds everything needed to audit or resume the run:
   manifest.json      config, git state, runtime manifest, schema versions; status and fault statistics, rewritten
                      at every rollout boundary and at the end
   progress.csv       one row per accepted rollout: accepted steps, episodes and endings, success rate, returns,
-                     reward components, environment steps per second
-  episodes.jsonl     one line per finished episode from an accepted rollout: length, ending, return, components
-  evaluations.jsonl  one line per evaluation: stochastic success rate and clear times, deterministic episode
+                     reward components, how far the episodes got, environment steps per second
+  episodes.jsonl     one line per finished episode from an accepted rollout: length, ending, return, components,
+                     and its progress record
+  evaluations.jsonl  one line per evaluation: stochastic success rate, clear times, progress, deterministic episode
   checkpoints/       latest.zip, previous.zip, best.zip, step_<accepted>.zip, aborted.zip; each written to a
                      temporary file and renamed, so a crash never leaves a half-written checkpoint
 
 Everything counts accepted transitions only (SupervisedPPO rolls the step counter back on a discarded rollout):
 episodes that finish inside a discarded rollout are never written, and checkpoints and evaluations are scheduled on
 the accepted step count after the update, not on SB3's callback call count.
+
+Progress records (Codex J9, K8) answer the question the unshaped campaign could not: not just that an episode
+ended, but where. Each episode records the highest progress potential it reached, the furthest right and the
+highest it got, and where it was on its last frame with a player. The reward version does not matter: the
+potential is recorded even when nothing is paid for it, so an unshaped run and a shaped one can be compared.
+Per-checkpoint policy diagnostics (entropy and per-input marginals) are measured offline afterwards by
+`scripts/checkpoint_policy.py`, which never touches a run.
 
 Evaluation runs between rollouts on the training environment. It abandons the training episode in progress, which
 fabricates nothing: PPO has already bootstrapped that episode at the rollout boundary, and the episode is not
@@ -80,17 +88,56 @@ def _atomic_json(path: Path, data: dict) -> None:
     os.replace(temporary, path)
 
 
+# How far an episode got, for the diagnostics the unshaped campaign lacked (Codex J9, K8). A field is None when
+# no step of the episode reported one, which keeps the records honest instead of inventing a zero.
+PROGRESS_FIELDS = ("max_potential", "max_x", "min_y", "end_x", "end_y")
+
+
+def new_progress() -> dict:
+    return dict.fromkeys(PROGRESS_FIELDS)
+
+
+def update_progress(progress: dict, info: dict) -> dict:
+    """Fold one step's info into an episode's progress record. y grows downwards, so the minimum is the highest
+    point the player reached."""
+    def keep(field, value, better):
+        if value is not None and (progress[field] is None or better(value, progress[field])):
+            progress[field] = value
+
+    keep("max_potential", info.get("potential"), lambda new, old: new > old)
+    player = info.get("player")
+    if player is not None:
+        keep("max_x", player["x"], lambda new, old: new > old)
+        keep("min_y", player["y"], lambda new, old: new < old)
+        # The last step that had a player: for a death, the frame before the player vanished.
+        progress["end_x"], progress["end_y"] = player["x"], player["y"]
+    return progress
+
+
+def _median(episodes, field: str):
+    values = [e[field] for e in episodes if e.get(field) is not None]
+    return float(np.median(values)) if values else ""
+
+
+def _best(episodes, field: str, pick=max):
+    values = [e[field] for e in episodes if e.get(field) is not None]
+    return pick(values) if values else ""
+
+
 def run_episode(model: SupervisedPPO, env: CelesteRoomEnv, deterministic: bool) -> dict:
-    obs, _ = env.reset()
+    obs, info = env.reset()
     total, components, length = 0.0, Counter(), 0
+    progress = update_progress(new_progress(), info)
     while True:
         action, _ = model.predict(obs, deterministic=deterministic)
         obs, reward, terminated, truncated, info = env.step(action)
         length += 1
         total += reward
         components.update(info["reward_components"])
+        update_progress(progress, info)
         if terminated or truncated:
-            return {"ending": info["ending"], "length": length, "return": total, "components": dict(components)}
+            return {"ending": info["ending"], "length": length, "return": total, "components": dict(components),
+                    **progress}
 
 
 @dataclass
@@ -151,13 +198,16 @@ class RunRecorder(BaseCallback):
     def _on_step(self) -> bool:
         infos, dones = self.locals["infos"], self.locals["dones"]
         for index, (info, done) in enumerate(zip(infos, dones)):
-            episode = self._running.setdefault(index, {"length": 0, "return": 0.0, "components": Counter()})
+            episode = self._running.setdefault(index, {"length": 0, "return": 0.0, "components": Counter(),
+                                                       "progress": new_progress()})
             episode["length"] += 1
             episode["return"] += float(self.locals["rewards"][index])
             episode["components"].update(info["reward_components"])
+            update_progress(episode["progress"], info)
             if done:
                 self._rollout.episodes.append({"ending": info["ending"], "length": episode["length"],
-                                               "return": episode["return"], "components": dict(episode["components"])})
+                                               "return": episode["return"], "components": dict(episode["components"]),
+                                               **episode["progress"]})
                 del self._running[index]
         return True
 
@@ -182,6 +232,13 @@ class RunRecorder(BaseCallback):
             # From the reward version, so a version that adds a component records it instead of dropping it.
             **{f"component_{name}": sum(e["components"].get(name, 0.0) for e in episodes)
                for name in self.env.reward_config.components},
+            # How far the episodes got: the typical episode and the rollout's frontier. Codex K9's stop rules
+            # are read off these. Blank when a rollout finished no episodes.
+            "median_max_potential": _median(episodes, "max_potential"),
+            "best_max_potential": _best(episodes, "max_potential"),
+            "median_max_x": _median(episodes, "max_x"),
+            "best_max_x": _best(episodes, "max_x"),
+            "best_min_y": _best(episodes, "min_y", min),
             "env_steps_per_second": self.config.n_steps / seconds if seconds > 0 else "",
             "discarded_rollouts": self.model.fault_stats["discarded_rollouts"],
             # Process health for long runs (for example the game's memory); the keys must not change during a run.
@@ -208,18 +265,27 @@ class RunRecorder(BaseCallback):
         stochastic = [run_episode(self.model, self.env, deterministic=False) for _ in range(self.config.eval_episodes)]
         deterministic = run_episode(self.model, self.env, deterministic=True)
         successes = [e["length"] for e in stochastic if e["ending"] == SUCCESS]
+        median_potential = _median(stochastic, "max_potential")
         record = {
             "accepted_steps": steps,
             "stochastic_episodes": len(stochastic),
             "stochastic_success_rate": len(successes) / len(stochastic) if stochastic else 0.0,
             "stochastic_endings": dict(Counter(e["ending"] for e in stochastic)),
             "stochastic_success_lengths": successes,
+            "median_max_potential": median_potential,
+            "median_max_x": _median(stochastic, "max_x"),
+            "best_max_x": _best(stochastic, "max_x"),
+            "stochastic_progress": [{field: e[field] for field in PROGRESS_FIELDS} for e in stochastic],
             "deterministic": deterministic,
         }
         with (self.run_dir / "evaluations.jsonl").open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
-        # Best: highest success rate, then shortest mean successful clear.
-        score = (record["stochastic_success_rate"], -float(np.mean(successes)) if successes else -1e9)
+        # Best: highest success rate, then the furthest typical episode, then the shortest successful clear
+        # (Codex K8). Before the first clear every evaluation ties at zero success, and the old two-part rule
+        # then kept the very first evaluation for the whole run; median maximum potential separates them.
+        score = (record["stochastic_success_rate"],
+                 median_potential if median_potential != "" else -1e9,
+                 -float(np.mean(successes)) if successes else -1e9)
         if self.best is None or score > tuple(self.best):
             self.best = score
             _atomic_save(self.model, self.checkpoints / "best.zip")

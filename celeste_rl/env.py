@@ -55,8 +55,9 @@ class CelesteRoomEnv(gym.Env):
         self._builder = ObservationBuilder()
         self._elapsed = 0
         self._ready = False
-        # rew-v2 only: the room's progress potential, rebuilt only when the room changes, and its value at
-        # the previous step. Both stay out of the observation.
+        # The room's progress potential, rebuilt only when the room changes, and its value at the previous
+        # step. Both stay out of the observation. It is recorded under every reward version, so an unshaped
+        # run can be compared with a shaped one, but only rew-v2 pays anything for it.
         self._potential: RoomPotential | None = None
         self._potential_value = 0.0
 
@@ -95,6 +96,21 @@ class CelesteRoomEnv(gym.Env):
         if problems:
             raise BridgeFault(f"Episode start is not the canonical start: {'; '.join(problems)}")
 
+    @staticmethod
+    def _player_facts(state: dict | None, extras: dict | None) -> dict | None:
+        """Raw position, speed and dashes for the run's records (Codex J9, K8).
+
+        These go in `info` and never in the observation: the encoder already sees position and speed as scaled
+        features, and a run needs the unscaled values to say how far an episode actually got. None when there
+        is no player, which is every ending except success and timeout.
+        """
+        if state is None:
+            return None
+        position, speed = state["Player"]["Position"], state["Player"]["Speed"]
+        player = extras.get("player", {}) if isinstance(extras, dict) else {}
+        return {"x": position["X"], "y": position["Y"], "speed_x": speed["X"], "speed_y": speed["Y"],
+                "dashes": player.get("Dashes")}
+
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
         self._ready = False
@@ -108,7 +124,8 @@ class CelesteRoomEnv(gym.Env):
         self._potential_value = self._start_potential(observation.state)
         self._ready = True
         return obs, self._info(start="canonical", frame=observation.tas_frame, reset_events=observation.events,
-                               potential=self._potential_value)
+                               potential=self._potential_value,
+                               player=self._player_facts(observation.state, observation.extras))
 
     def step(self, action):
         if not self._ready:
@@ -140,19 +157,27 @@ class CelesteRoomEnv(gym.Env):
         components = reward_components(ending, self.reward_config, elapsed, shaping)
         self._ready = not terminated
         info = self._info(ending=ending, events=observation.events, reward_components=components,
-                          applied_action=applied, frame=observation.tas_frame, potential=value)
+                          applied_action=applied, frame=observation.tas_frame, potential=value,
+                          player=self._player_facts(observation.state, observation.extras))
         return obs, float(sum(components.values())), terminated, False, info
 
     def _start_potential(self, state: dict | None) -> float:
-        """Build the room's potential if rew-v2 asked for shaping, reusing it while the room is unchanged."""
-        if not self.reward_config.shaped:
-            return 0.0
+        """Build the room's progress potential, reusing it while the room is unchanged.
+
+        Built under every reward version, because how far an episode got is a record every run wants (Codex K8)
+        and the two versions are only comparable if both report it. Under rew-v1 nothing is paid for it, so a
+        potential that cannot be built there is recorded as absent rather than failing the episode; under
+        rew-v2 the reward depends on it, so the same failure is a fault.
+        """
         try:
             if self._potential is None or not self._potential.matches(state):
                 self._potential = RoomPotential(state)
             return self._potential.value(state)
         except (KeyError, TypeError, ValueError) as error:
-            raise BridgeFault(f"the room's progress potential could not be built: {error}") from error
+            if self.reward_config.shaped:
+                raise BridgeFault(f"the room's progress potential could not be built: {error}") from error
+            self._potential = None
+            return 0.0
 
     def close(self):
         self._ready = False

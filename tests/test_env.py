@@ -261,14 +261,16 @@ class ShapingTests(unittest.TestCase):
         self.assertAlmostEqual(forward["reward_components"]["shaping"] + back["reward_components"]["shaping"], 0.0,
                                places=9)
 
-    def test_rew_v1_never_shapes_and_builds_no_potential(self):
+    def test_rew_v1_records_the_potential_but_never_shapes_with_it(self):
+        """The record is what makes an unshaped run comparable with a shaped one; the reward ignores it."""
         env = CelesteRoomEnv(WalkingBridge(self.WALK, []))
         _, info = env.reset()
-        self.assertEqual(info["potential"], 0.0)
+        self.assertGreater(info["potential"], 0.0)
         for _ in range(3):
-            _, _, _, _, info = env.step(noop())
+            _, reward, _, _, info = env.step(noop())
             self.assertEqual(info["reward_components"]["shaping"], 0.0)
-        self.assertIsNone(env._potential)
+            self.assertNotIn("unspent_deadline", info["reward_components"])
+            self.assertAlmostEqual(reward, TIME, places=10)
 
     def test_the_environment_reports_its_reward_version(self):
         env = CelesteRoomEnv(ReplayBridge(), reward_config=V2)
