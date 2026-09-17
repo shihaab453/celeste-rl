@@ -83,6 +83,10 @@ internal static class LockstepDriver {
     private static string? pendingId;
     private static string? pendingCommand;
     private static readonly Stopwatch operationTimer = new();
+    // A command taken from the socket while the game could not start it (loading, playback stopped, or
+    // playing inputs with nothing pending). It is bounded by the same OperationTimeout from when it was taken.
+    private static string? waitingMessage;
+    private static readonly Stopwatch admissionTimer = new();
     private static int resetUpdates;
     private static int loadingUpdates;
 
@@ -130,6 +134,8 @@ internal static class LockstepDriver {
             sessionGeneration = generation;
             sessionReady = false;
             ClearPending();
+            // A command still waiting to start belonged to the old connection; its reply could not be sent.
+            ClearWaiting();
         }
 
         if (generation == 0) {
@@ -140,6 +146,8 @@ internal static class LockstepDriver {
         if (!Manager.Running) {
             if (phase != Phase.Idle) {
                 Fail($"TAS playback stopped while {pendingCommand} was pending");
+            } else {
+                WaitForAdmission("TAS playback is not running");
             }
             orig();
             return;
@@ -169,6 +177,8 @@ internal static class LockstepDriver {
             if (phase == Phase.Advancing) {
                 loadingUpdates += 1;
                 SetPlaybackSpeed(SteppingSpeed);
+            } else if (phase == Phase.Idle) {
+                WaitForAdmission("the game is loading");
             }
         } else if (atEnd) {
             // Every input so far has been played and simulated, and nothing is loading.
@@ -183,6 +193,9 @@ internal static class LockstepDriver {
             // replaced while its reset is paused on the savestate breakpoint. The new owner must still be
             // able to reset; stepping is refused here.
             HandleNextCommand(controller, atEnd: false);
+        } else if (phase == Phase.Idle) {
+            // Playing inputs this driver did not start (for example an HTTP playback), with nothing pending.
+            WaitForAdmission(Manager.IsLoading() ? "the game is loading" : "TAS playback is between inputs");
         }
 
         orig();
@@ -203,8 +216,44 @@ internal static class LockstepDriver {
         ClearPending();
     }
 
+    /// Take the next command even though it cannot start yet, so its wait is bounded: if the game still cannot
+    /// start it after OperationTimeout, reply with an error instead of leaving it queued with no reply.
+    private static void WaitForAdmission(string reason) {
+        if (waitingMessage == null) {
+            if (!server!.TryTake(sessionGeneration, out string message, TimeSpan.Zero)) {
+                return;
+            }
+            waitingMessage = message;
+            admissionTimer.Restart();
+            return;
+        }
+        if (admissionTimer.Elapsed <= OperationTimeout) {
+            return;
+        }
+
+        string id = "null";
+        try {
+            using var document = JsonDocument.Parse(waitingMessage);
+            id = document.RootElement.GetProperty("id").GetRawText();
+        } catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException) {
+            // Report the timeout without an id, as a malformed command would be.
+        }
+        ClearWaiting();
+        SendError(id, $"Command could not start within {OperationTimeout.TotalSeconds:F0} s: {reason}");
+        sessionReady = false;
+    }
+
+    private static void ClearWaiting() {
+        waitingMessage = null;
+        admissionTimer.Reset();
+    }
+
     private static void HandleNextCommand(InputController controller, bool atEnd) {
-        if (!server!.TryTake(sessionGeneration, out string message, CommandWait)) {
+        string message;
+        if (waitingMessage != null) {
+            message = waitingMessage;
+            ClearWaiting();
+        } else if (!server!.TryTake(sessionGeneration, out message, CommandWait)) {
             // Python has not answered yet: let CelesteTAS end this game tick so the window keeps drawing.
             SetPlaybackSpeed(1.0f);
             return;

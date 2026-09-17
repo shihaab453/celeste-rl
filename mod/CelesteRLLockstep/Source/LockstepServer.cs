@@ -72,8 +72,9 @@ internal sealed class LockstepServer : IDisposable {
 
         var deadline = DateTime.UtcNow + timeout;
         while (true) {
+            // A zero or elapsed timeout still takes a message that is already queued.
             var remaining = deadline - DateTime.UtcNow;
-            if (remaining < TimeSpan.Zero || !incoming.TryTake(out var item, remaining)) {
+            if (!incoming.TryTake(out var item, remaining < TimeSpan.Zero ? TimeSpan.Zero : remaining)) {
                 return false;
             }
             if (item.Generation == forGeneration) {

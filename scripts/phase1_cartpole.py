@@ -71,7 +71,7 @@ def run_benchmark():
     print("PHASE 1: PPO CARTPOLE-V1 BENCHMARK")
     print(f"Timestamp:        {timestamp}")
     print(f"Seeds:            {seeds}")
-    print(f"Timesteps:        {total_timesteps:,} steps per run")
+    print(f"Timesteps:        {total_timesteps:,} steps requested per run")
     print(f"Pass Criterion:   Mean Return >= {pass_threshold:.1f} over {eval_episodes} evaluation episodes")
     print(f"Device:           CPU")
     print("=" * 80)
@@ -107,6 +107,8 @@ def run_benchmark():
 
         model, train_metrics = train_ppo("CartPole-v1", config=config, device="cpu")
         wall_time = train_metrics["wall_time"]
+        # Only whole rollouts run, so the actual count is the largest multiple of the batch size.
+        actual_steps = train_metrics["total_timesteps"]
 
         # Evaluate model on fresh episodes
         eval_base_seed = 1000 + seed * 100
@@ -141,7 +143,8 @@ def run_benchmark():
             "mean_return": mean_ret,
             "std_return": std_ret,
             "all_returns": all_rets,
-            "training_steps": total_timesteps,
+            "requested_steps": total_timesteps,
+            "training_steps": actual_steps,
             "wall_time_seconds": round(wall_time, 2),
             "reload_exact_match": reload_exact_match,
             "passed": passed,
@@ -153,7 +156,7 @@ def run_benchmark():
             "impl": "Our PPO",
             "seed": seed,
             "eval_return": f"{mean_ret:.1f} +/- {std_ret:.1f}",
-            "steps": f"{total_timesteps:,}",
+            "steps": f"{actual_steps:,}",
             "wall_time": f"{wall_time:.1f}s",
             "reload": "Exact" if reload_exact_match else "Mismatch",
             "status": status_str,
@@ -185,6 +188,8 @@ def run_benchmark():
         sb3_start = time.perf_counter()
         sb3_model.learn(total_timesteps=total_timesteps)
         sb3_wall_time = time.perf_counter() - sb3_start
+        # SB3 finishes its last rollout, so it can run slightly past the requested count.
+        actual_steps = sb3_model.num_timesteps
         sb3_train_env.close()
 
         eval_base_seed = 1000 + seed * 100
@@ -211,7 +216,8 @@ def run_benchmark():
             "mean_return": mean_ret,
             "std_return": std_ret,
             "all_returns": all_rets,
-            "training_steps": total_timesteps,
+            "requested_steps": total_timesteps,
+            "training_steps": actual_steps,
             "wall_time_seconds": round(sb3_wall_time, 2),
             "reload_exact_match": reload_exact_match,
             "passed": passed,
@@ -222,7 +228,7 @@ def run_benchmark():
             "impl": "SB3 PPO",
             "seed": seed,
             "eval_return": f"{mean_ret:.1f} +/- {std_ret:.1f}",
-            "steps": f"{total_timesteps:,}",
+            "steps": f"{actual_steps:,}",
             "wall_time": f"{sb3_wall_time:.1f}s",
             "reload": "Exact" if reload_exact_match else "Mismatch",
             "status": status_str,
@@ -236,7 +242,7 @@ def run_benchmark():
             "timestamp": timestamp,
             "task": "Phase 1 CartPole-v1 PPO Benchmark",
             "target_environment": "CartPole-v1",
-            "total_timesteps_per_run": total_timesteps,
+            "requested_timesteps_per_run": total_timesteps,
             "pass_threshold_return": pass_threshold,
             "eval_episodes": eval_episodes,
             "total_elapsed_seconds": round(overall_elapsed, 2),

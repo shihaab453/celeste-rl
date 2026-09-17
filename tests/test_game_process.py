@@ -9,7 +9,7 @@ import subprocess
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from celeste_rl.game_process import _is_game_exe, launch, running_game_pids, stop
 
@@ -160,8 +160,28 @@ class StopShutdownTests(unittest.TestCase):
         stop(mock_process, timeout=0.01, _port_checker=lambda port: False)
 
         # Ensure taskkill targeted only PID 9876.
-        mock_subproc_run.assert_called_once_with(["taskkill", "/PID", "9876"], capture_output=True)
+        mock_subproc_run.assert_called_once_with(["taskkill", "/PID", "9876"], capture_output=True, timeout=ANY)
         # Ensure only the given process instance was killed.
+        mock_process.kill.assert_called_once()
+
+    @patch("subprocess.run")
+    def test_stop_bounds_a_stalled_taskkill(self, mock_subproc_run):
+        mock_process = MagicMock(spec=subprocess.Popen)
+        mock_process.pid = 5555
+        mock_process.poll.return_value = None
+        mock_process.wait.side_effect = [subprocess.TimeoutExpired(cmd="Celeste.exe", timeout=0), 0]
+
+        # taskkill uses its whole timeout and then times out; stop() must still kill and stay in budget.
+        def stalled_taskkill(args, capture_output, timeout):
+            time.sleep(timeout)
+            raise subprocess.TimeoutExpired(cmd=args, timeout=timeout)
+
+        mock_subproc_run.side_effect = stalled_taskkill
+
+        began = time.perf_counter()
+        self.assertFalse(stop(mock_process, timeout=0.2, _port_checker=lambda port: True))
+        self.assertLess(time.perf_counter() - began, 0.4)
+        self.assertLessEqual(mock_subproc_run.call_args.kwargs["timeout"], 0.2)
         mock_process.kill.assert_called_once()
 
     def test_stop_returns_immediately_when_ports_already_closed(self):

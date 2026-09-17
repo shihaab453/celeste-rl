@@ -182,7 +182,7 @@ Because PPO's clipped objective actively prevents the new policy from moving too
 
 ## 4. Benchmark Results on CartPole-v1
 
-The implementation was validated against Stable-Baselines3 using `scripts/phase1_cartpole.py`. Both implementations were trained across seeds 0, 1, and 2 on CPU for 100,000 steps, evaluated over 20 fresh episodes with greedy actions, saved to disk, and reloaded to confirm evaluation determinism.
+The implementation was validated against Stable-Baselines3 using `scripts/phase1_cartpole.py`. Both implementations were trained across seeds 0, 1, and 2 on CPU for 100,000 requested steps (our PPO runs only whole rollouts, 99,840 steps; SB3 finishes its last rollout, 100,352 steps), evaluated over 20 fresh episodes with greedy actions, saved to disk, and reloaded to confirm evaluation determinism.
 
 Pass criterion: mean evaluation return $\ge 475.0$ out of a maximum possible 500.0.
 
@@ -190,15 +190,15 @@ Pass criterion: mean evaluation return $\ge 475.0$ out of a maximum possible 500
 
 | Implementation | Seed | Evaluation Return (20 eps) | Total Steps | Wall Time | Reload Match | Status |
 |---|---|---|---|---|---|---|
-| **Our PPO** | 0 | 500.0 +/- 0.0 | 100,000 | 17.7s | Exact | **PASS** |
-| **Our PPO** | 1 | 500.0 +/- 0.0 | 100,000 | 16.8s | Exact | **PASS** |
-| **Our PPO** | 2 | 500.0 +/- 0.0 | 100,000 | 16.8s | Exact | **PASS** |
-| **SB3 PPO** | 0 | 500.0 +/- 0.0 | 100,000 | 15.8s | Exact | **PASS** |
-| **SB3 PPO** | 1 | 500.0 +/- 0.0 | 100,000 | 15.7s | Exact | **PASS** |
-| **SB3 PPO** | 2 | 500.0 +/- 0.0 | 100,000 | 15.9s | Exact | **PASS** |
+| **Our PPO** | 0 | 500.0 +/- 0.0 | 99,840 | 20.2s | Exact | **PASS** |
+| **Our PPO** | 1 | 500.0 +/- 0.0 | 99,840 | 20.1s | Exact | **PASS** |
+| **Our PPO** | 2 | 500.0 +/- 0.0 | 99,840 | 20.7s | Exact | **PASS** |
+| **SB3 PPO** | 0 | 500.0 +/- 0.0 | 100,352 | 19.4s | Exact | **PASS** |
+| **SB3 PPO** | 1 | 500.0 +/- 0.0 | 100,352 | 18.7s | Exact | **PASS** |
+| **SB3 PPO** | 2 | 500.0 +/- 0.0 | 100,352 | 19.4s | Exact | **PASS** |
 
 ### Summary Observations
 1. **Convergence and Score:** Both Our PPO and Stable-Baselines3 achieved a perfect score of 500.0 across all three random seeds.
-2. **Execution Speed:** Our single-file implementation trained 100,000 steps in approximately 17 seconds on CPU, directly comparable to Stable-Baselines3 (~16 seconds). Total benchmark wall time across all 6 runs was 112.2 seconds (under 2 minutes).
+2. **Execution Speed:** Our single-file implementation trained about 100,000 steps in approximately 20 seconds on CPU, directly comparable to Stable-Baselines3 (~19 seconds). Total benchmark wall time across all 6 runs was 133.4 seconds (`runs/phase1/20260917-121824`).
 3. **Save and Reload Verification:** Reloading each saved model from disk reproduced the exact evaluation returns frame-for-frame across all 20 test episodes for every seed.
 4. **Structured Artifacts:** Full metrics, coarse learning curves, and model checkpoints are preserved in `runs/phase1/20260917-020124/results.json`.

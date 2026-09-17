@@ -244,16 +244,6 @@ def process_memory(pid: int) -> dict[str, float]:
         kernel32.CloseHandle(handle)
 
 
-def memory_mb(pid: int) -> float:
-    """Working set of the game process in MB, read from tasklist."""
-    output = subprocess.run(
-        ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True, text=True
-    ).stdout
-    # e.g. "Celeste.exe","1234","Console","1","542,236 K"
-    fields = [field.strip('"') for field in output.strip().split('","')]
-    return int(fields[-1].rstrip(' K"').replace(",", "")) / 1024 if len(fields) >= 5 else float("nan")
-
-
 def _port_accepts_connections(port: int, host: str = "127.0.0.1", timeout: float = 0.05) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)
@@ -320,7 +310,11 @@ def stop(process: subprocess.Popen, timeout: float = 10.0,
         return max(0.0, deadline - time.perf_counter())
 
     if process.poll() is None:
-        subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True)
+        try:
+            # Bounded like everything else here: a stalled taskkill falls through to the forced kill.
+            subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True, timeout=remaining())
+        except subprocess.TimeoutExpired:
+            pass
         try:
             process.wait(remaining())
         except subprocess.TimeoutExpired:
@@ -332,5 +326,5 @@ def stop(process: subprocess.Popen, timeout: float = 10.0,
             return True
         if time.perf_counter() >= deadline:
             return False
-        time.sleep(0.05)
+        time.sleep(min(0.05, remaining()))
 
