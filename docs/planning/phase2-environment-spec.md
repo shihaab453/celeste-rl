@@ -1,6 +1,6 @@
 # Phase 2: Celeste environment specification (v2)
 
-Status: implementation steps 1 to 3 done (mod additions, schema and encoders, endings, reward and environment); steps 4 and 5 (training integration, live probes) remain. The version tags `obs-v1`, `act-v1` and `rew-v1` are assigned in code (`celeste_rl/schema.py`, `celeste_rl/reward.py`) and are frozen before the Phase 3 campaign. Any later change gets a new tag.
+Status: implementation steps 1 to 4 done (mod additions, schema and encoders, endings, reward and environment, training integration); step 5 (live probes) remains. The version tags `obs-v1`, `act-v1` and `rew-v1` are assigned in code (`celeste_rl/schema.py`, `celeste_rl/reward.py`) and are frozen before the Phase 3 campaign. Any later change gets a new tag.
 
 Changes from the first draft: ending detection moves from state snapshots to game events captured by the mod (restarts hidden by loading were not detectable before); the observation gains control, collider and wall-boost state, a four-step history, exact units and a defined terminal encoding; the action mapping claim is narrowed to canonical input lines; the grid gets exact coordinates and an independent collision check; Stable-Baselines3 integration and bridge-fault recovery are specified; open decisions are decided; probes get pass thresholds.
 
@@ -249,7 +249,7 @@ If any environment raises `BridgeFault` during rollout collection:
 4. Weights and optimizer state are those of the last completed update. Any statistics updated from the discarded rollout are restored.
 5. Attempted, discarded and accepted transitions are counted separately. After 3 consecutive discarded rollouts the run stops with its last checkpoint saved.
 
-Phase 3 starts with one environment. Faults are injected in tests before a step is sent, after an ambiguous step, after a reply, during reset, and in worker communication; no optimizer step may see discarded data.
+Phase 3 starts with one environment. Implemented in `celeste_rl/training/supervisor.py` (`SupervisedPPO`) for a single-process `DummyVecEnv` without `VecNormalize`. A reset that faults during recovery is retried and counts toward the consecutive limit. The first reset inside `learn()` happens before collection and is not supervised. Offline tests inject faults mid-rollout, in episode-end resets and in recovery resets, and check that no update sees data from before a fault, weights and optimizer state are unchanged by discarded rollouts, the step budget counts accepted transitions only, and episodes finished inside a discarded rollout are not logged. Worker processes and their communication faults come with multi-worker training.
 
 ## 10. Offline tests (no game)
 
