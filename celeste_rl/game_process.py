@@ -13,8 +13,10 @@ from __future__ import annotations
 
 import ctypes
 import os
+import socket
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from celeste_rl.bridge import DebugRcClient
@@ -29,6 +31,93 @@ if _user32 is not None:
     _user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
     _user32.IsIconic.argtypes = [ctypes.c_void_p]
     _user32.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+
+_kernel32 = ctypes.windll.kernel32 if os.name == "nt" else None
+if _kernel32 is not None:
+    _kernel32.OpenProcess.restype = ctypes.c_void_p
+    _kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+    _kernel32.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    _kernel32.CreateToolhelp32Snapshot.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+    _kernel32.Process32FirstW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    _kernel32.Process32FirstW.restype = ctypes.c_bool
+    _kernel32.Process32NextW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    _kernel32.Process32NextW.restype = ctypes.c_bool
+    _kernel32.QueryFullProcessImageNameW.argtypes = [
+        ctypes.c_void_p, ctypes.c_uint32, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_uint32)
+    ]
+    _kernel32.QueryFullProcessImageNameW.restype = ctypes.c_bool
+
+
+class _ProcessEntry32W(ctypes.Structure):
+    _fields_ = [
+        ("dwSize", ctypes.c_uint32),
+        ("cntUsage", ctypes.c_uint32),
+        ("th32ProcessID", ctypes.c_uint32),
+        ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_uint32),
+        ("cntThreads", ctypes.c_uint32),
+        ("th32ParentProcessID", ctypes.c_uint32),
+        ("pcPriClassBase", ctypes.c_long),
+        ("dwFlags", ctypes.c_uint32),
+        ("szExeFile", ctypes.c_wchar * 260),
+    ]
+
+
+def _running_celeste_processes() -> list[tuple[int, Path]]:
+    """Enumerate running processes whose executable name is Celeste.exe."""
+    if _kernel32 is None:
+        return []
+    snapshot = _kernel32.CreateToolhelp32Snapshot(0x00000002, 0)  # TH32CS_SNAPPROCESS
+    if not snapshot or snapshot == ctypes.c_void_p(-1).value:
+        return []
+
+    entry = _ProcessEntry32W()
+    entry.dwSize = ctypes.sizeof(_ProcessEntry32W)
+    found: list[tuple[int, Path]] = []
+    try:
+        success = _kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while success:
+            if entry.szExeFile.lower() == "celeste.exe":
+                pid = int(entry.th32ProcessID)
+                handle = _kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+                if handle:
+                    try:
+                        buf = ctypes.create_unicode_buffer(1024)
+                        size = ctypes.c_uint32(len(buf))
+                        if _kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                            found.append((pid, Path(buf.value)))
+                    finally:
+                        _kernel32.CloseHandle(handle)
+            success = _kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        _kernel32.CloseHandle(snapshot)
+    return found
+
+
+def _is_game_exe(exe_path: Path, game_dir: Path) -> bool:
+    try:
+        norm_exe = Path(os.path.normcase(str(exe_path.resolve())))
+        norm_dir = Path(os.path.normcase(str(game_dir.resolve())))
+        return norm_exe.name == "celeste.exe" and (
+            norm_exe == norm_dir / "celeste.exe" or norm_exe.is_relative_to(norm_dir)
+        )
+    except (ValueError, OSError):
+        return False
+
+
+def running_game_pids(game_dir: Path, _processes: list[tuple[int, Path]] | None = None) -> list[int]:
+    """Return the PIDs of running Celeste.exe processes inside game_dir.
+
+    Compares full resolved paths case-insensitively so Celeste instances outside game_dir
+    (such as the real Steam install) are excluded.
+    """
+    game_dir = Path(game_dir)
+    candidates = _running_celeste_processes() if _processes is None else _processes
+    pids = [
+        pid for pid, exe_path in candidates
+        if _is_game_exe(exe_path, game_dir)
+    ]
+    return sorted(pids)
 
 
 def check_game_dir(game_dir: Path) -> Path:
@@ -165,12 +254,28 @@ def memory_mb(pid: int) -> float:
     return int(fields[-1].rstrip(' K"').replace(",", "")) / 1024 if len(fields) >= 5 else float("nan")
 
 
+def _port_accepts_connections(port: int, host: str = "127.0.0.1", timeout: float = 0.05) -> bool:
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        return s.connect_ex((host, port)) == 0
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
 def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: bool = True,
            extra_args: list[str] | None = None) -> subprocess.Popen:
     """Start the game and wait until DebugRC answers.
 
     `focus=False` leaves the window unfocused during startup, to check whether startup needs focus.
     """
+    running = running_game_pids(game_dir)
+    if running:
+        pids_str = ", ".join(str(p) for p in running)
+        raise RuntimeError(f"Celeste is already running for {game_dir} (PID {pids_str}); close that game first")
+
     client = DebugRcClient(port)
     if client.is_available():
         raise RuntimeError(f"Something is already answering on port {port}; close that game first")
@@ -200,13 +305,32 @@ def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: boo
     raise RuntimeError(f"DebugRC did not answer on port {port} within {timeout:.0f} s")
 
 
-def stop(process: subprocess.Popen, timeout: float = 10.0) -> None:
-    """Ask the game to close, then force it if it does not."""
-    if process.poll() is not None:
-        return
-    subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True)
-    try:
-        process.wait(timeout)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait(timeout)
+def stop(process: subprocess.Popen, timeout: float = 10.0,
+         ports: tuple[int, ...] = (32279, 32280),
+         _port_checker: Callable[[int], bool] = _port_accepts_connections) -> bool:
+    """Close the game and wait until its ports stop accepting connections.
+
+    Only `process` is ever terminated. The whole call shares one `timeout` budget, except for a short
+    wait after a forced kill so the process is reaped. Returns True if the ports closed in time and
+    False if one was still open at the deadline, so a caller can avoid launching into a busy port.
+    """
+    deadline = time.perf_counter() + timeout
+
+    def remaining() -> float:
+        return max(0.0, deadline - time.perf_counter())
+
+    if process.poll() is None:
+        subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True)
+        try:
+            process.wait(remaining())
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(max(remaining(), 2.0))
+
+    while True:
+        if not any(_port_checker(port) for port in ports):
+            return True
+        if time.perf_counter() >= deadline:
+            return False
+        time.sleep(0.05)
+
