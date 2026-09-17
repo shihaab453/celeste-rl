@@ -207,6 +207,12 @@ class Observation:
     # Bridge-level facts such as loading or freeze status, for tests and diagnostics only. Never a
     # policy input. The HTTP bridge does not provide them.
     diagnostics: dict | None = None
+    # Lockstep only (None from the HTTP bridge or with the mod's extras disabled). extras: player, input
+    # buffer and level facts missing from state, or None with no player. events: game events since the
+    # previous reply (death, transition, load_level, level_exit, pause, unpause), for ending
+    # classification; never a policy input.
+    extras: dict | None = None
+    events: list[dict] | None = None
 
     @property
     def transitional(self) -> bool | None:

@@ -31,8 +31,13 @@ namespace CelesteRL.Lockstep;
 ///                                                  connection before stepping
 ///   {"id": 2, "cmd": "step", "line": "1,R,J"}      play one frame holding those buttons
 ///   {"id": 3, "cmd": "observe"}                    report the current state without advancing
-/// Replies: {"id": 1, "frame": 301, "state": {...}, "diagnostics": {...}} or {"id": 1, "error": "..."}.
-/// "state" is serialized exactly like CelesteTAS's /tas/game_state endpoint, or null with no player.
+///   {"id": 4, "cmd": "query_solids", "rects": [[x, y, w, h], ...]}
+///                                                  validation only: whether each world rectangle collides
+///                                                  with a Solid; replies {"id": 4, "solids": [true, ...]}
+/// Replies: {"id": 1, "frame": 301, "state": {...}, "extras": {...}, "events": [...], "diagnostics": {...}}
+/// or {"id": 1, "error": "..."}. "state" is serialized exactly like CelesteTAS's /tas/game_state endpoint,
+/// or null with no player. "extras" (GameExtras) and "events" (GameEvents) are omitted when
+/// CELESTE_RL_LOCKSTEP_EXTRAS=0, which the noninterference check uses.
 internal static class LockstepDriver {
     private const string LogTag = "CelesteRLLockstep";
     private const int DefaultPort = 32280;
@@ -90,6 +95,8 @@ internal static class LockstepDriver {
     private static int resetUpdates;
     private static int loadingUpdates;
 
+    private static readonly bool ExtrasEnabled = Environment.GetEnvironmentVariable("CELESTE_RL_LOCKSTEP_EXTRAS") != "0";
+
     public static void Load() {
         int port = int.TryParse(Environment.GetEnvironmentVariable("CELESTE_RL_LOCKSTEP_PORT"), out int parsed)
             ? parsed
@@ -100,8 +107,15 @@ internal static class LockstepDriver {
         } else if (FastForwardsField == null || !typeof(IDictionary).IsAssignableFrom(FastForwardsField.FieldType)) {
             incompatibility = "CelesteTAS InputController.FastForwards dictionary not found";
         }
+        if (ExtrasEnabled) {
+            GameExtras.Load();
+            incompatibility ??= GameExtras.Incompatibility;
+            GameEvents.Subscribe();
+        } else {
+            Logger.Log(LogLevel.Info, LogTag, "Extras and events disabled (CELESTE_RL_LOCKSTEP_EXTRAS=0).");
+        }
         if (incompatibility != null) {
-            Logger.Log(LogLevel.Error, LogTag, $"Incompatible CelesteTAS version: {incompatibility}. Commands will be refused.");
+            Logger.Log(LogLevel.Error, LogTag, $"Incompatible game or CelesteTAS version: {incompatibility}. Commands will be refused.");
         }
         if (TrailManagerDispose == null) {
             Logger.Log(LogLevel.Warn, LogTag, "TrailManager.Dispose not found; dash trail render targets will leak on every reset.");
@@ -116,6 +130,7 @@ internal static class LockstepDriver {
     }
 
     public static void Unload() {
+        GameEvents.Unsubscribe();
         managerUpdateHook?.Dispose();
         managerUpdateHook = null;
         server?.Dispose();
@@ -136,6 +151,8 @@ internal static class LockstepDriver {
             ClearPending();
             // A command still waiting to start belonged to the old connection; its reply could not be sent.
             ClearWaiting();
+            // Events belong to the old connection's episode; the new one must reset first anyway.
+            GameEvents.Clear();
         }
 
         if (generation == 0) {
@@ -266,7 +283,7 @@ internal static class LockstepDriver {
             id = root.GetProperty("id").GetRawText();
             Debug($"command {message}");
             if (incompatibility != null) {
-                SendError(id, $"Incompatible CelesteTAS version: {incompatibility}");
+                SendError(id, $"Incompatible game or CelesteTAS version: {incompatibility}");
                 return;
             }
 
@@ -331,11 +348,21 @@ internal static class LockstepDriver {
                     SendObservation(id);
                     return;
 
+                case "query_solids": {
+                    bool[]? solids = GameExtras.QuerySolids(root.GetProperty("rects"));
+                    if (solids == null) {
+                        SendError(id, "query_solids needs a Level scene");
+                        return;
+                    }
+                    server!.Send(sessionGeneration, $"{{\"id\":{id},\"solids\":{JsonSerializer.Serialize(solids)}}}");
+                    return;
+                }
+
                 default:
                     SendError(id, "Unknown command");
                     return;
             }
-        } catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException) {
+        } catch (Exception e) when (e is JsonException or KeyNotFoundException or InvalidOperationException or FormatException or IndexOutOfRangeException) {
             SendError(id, $"Malformed command: {e.Message}");
         }
     }
@@ -407,9 +434,23 @@ internal static class LockstepDriver {
             ["loading_updates"] = pendingId != null ? loadingUpdates : null,
         });
 
+        // Extras and events are sampled at the same boundary as state; events are cleared once reported.
+        string extras = "";
+        if (ExtrasEnabled) {
+            try {
+                extras = $",\"extras\":{GameExtras.Serialize()},\"events\":{GameEvents.TakeJson()}";
+            } catch (Exception e) {
+                // Like GetGameState above: a failure here must never take down the game.
+                SendError(id, $"Could not read extras: {e.GetType().Name}: {e.Message}");
+                sessionReady = false;
+                return;
+            }
+            GameEvents.RoomAtLastReply = (Engine.Scene as Level)?.Session.Level;
+        }
+
         Debug($"reply {id} frame={Manager.Controller.CurrentFrameInTas}");
         server!.Send(sessionGeneration,
-            $"{{\"id\":{id},\"frame\":{Manager.Controller.CurrentFrameInTas},\"state\":{state},\"diagnostics\":{diagnostics}}}");
+            $"{{\"id\":{id},\"frame\":{Manager.Controller.CurrentFrameInTas},\"state\":{state}{extras},\"diagnostics\":{diagnostics}}}");
     }
 
     private static void ReleaseTrailRenderTargets() {
@@ -438,6 +479,8 @@ internal static class LockstepDriver {
     }
 
     private static void SendError(string id, string error) {
+        // A failed command ends the Python session, so its events must not leak into a later reply.
+        GameEvents.Clear();
         server!.Send(sessionGeneration, $"{{\"id\":{id},\"error\":{JsonSerializer.Serialize(error)}}}");
         Logger.Log(LogLevel.Warn, LogTag, error);
     }

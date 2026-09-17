@@ -70,6 +70,9 @@ class FakeGame:
         self._listener.close()
 
 
+EXTRAS = {"player": {"Dashes": 1}, "input_buffers": {"Jump": 0.0}, "level": {"Paused": False}}
+
+
 def reply(request, frame, state=START_STATE, **extra):
     return (json.dumps({"id": request["id"], "frame": frame, "state": state, **extra}) + "\n").encode()
 
@@ -173,6 +176,12 @@ class LockstepFailureTests(unittest.TestCase):
             {"frame": 301, "state": {"RoomName": "1", "Player": [1, 2]}},
             {"frame": 301, "state": START_STATE, "diagnostics": "loading"},
             {"frame": 301},
+            {"frame": 301, "state": START_STATE, "extras": [], "events": []},
+            {"frame": 301, "state": START_STATE, "extras": {"player": {}}, "events": []},
+            {"frame": 301, "state": START_STATE, "extras": EXTRAS},
+            {"frame": 301, "state": START_STATE, "events": []},
+            {"frame": 301, "state": START_STATE, "extras": EXTRAS, "events": {"type": "death"}},
+            {"frame": 301, "state": START_STATE, "extras": EXTRAS, "events": [{"room": "1"}]},
         ]
         for body in malformed:
             with self.subTest(body=body):
@@ -221,6 +230,38 @@ class LockstepFailureTests(unittest.TestCase):
         self.assertIsNone(bridge.failure)
         self.assertEqual(bridge.step("R").tas_frame, 301)
         self.assertEqual(len(game.requests), 2)
+
+
+    def test_extras_and_events_reach_the_observation(self):
+        events = [{"type": "transition", "from": "1", "to": "2"}, {"type": "load_level", "room": "2"}]
+
+        def respond(request, _):
+            if request["cmd"] == "reset":
+                return reply(request, 300, extras=EXTRAS, events=[{"type": "load_level", "room": "1"}])
+            return reply(request, 301, extras=None, events=events)
+
+        _, _, bridge = self.make(respond)
+        start = bridge.reset()
+        self.assertEqual(start.extras, EXTRAS)
+        self.assertEqual(start.events, [{"type": "load_level", "room": "1"}])
+        step = bridge.step("R")
+        self.assertIsNone(step.extras)
+        self.assertEqual(step.events, events)
+
+    def test_query_solids(self):
+        def respond(request, _):
+            if request["cmd"] == "query_solids":
+                return (json.dumps({"id": request["id"], "solids": [True, False][:len(request["rects"])]}) + "\n").encode()
+            return reply(request, 300)
+
+        _, _, bridge = self.make(respond)
+        bridge.reset()
+        self.assertEqual(bridge.query_solids([(0, 0, 8, 8), (40, 40, 8, 8)]), [True, False])
+        # A reply of the wrong length ends the session.
+        with self.assertRaisesRegex(BridgeError, "malformed query_solids"):
+            bridge.query_solids([(0, 0, 8, 8), (1, 1, 1, 1), (2, 2, 2, 2)])
+        with self.assertRaisesRegex(BridgeError, "call reset"):
+            bridge.step("R")
 
 
 if __name__ == "__main__":

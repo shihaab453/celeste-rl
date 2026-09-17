@@ -208,6 +208,7 @@ Each step is classified from that reply's events, then its state, in this order:
 - A pause event alone does not end the episode; paused frames still spend the deadline.
 - With menu inputs enabled, pause-menu retry is expected to produce `death`, restart chapter `restart` or `left_level`, and save and quit `left_level`. Probe P7 confirms each. Sequences that make CelesteTAS stop the TAS are a known bridge limitation; while they exist, menu inputs stay disabled for training (D1).
 - `info["ending"]` names the cause and `info["events"]` lists the step's events.
+- Observed on the fixtures after step 1: the exit route's `transition` (1 to 2) arrives on step 285, whose `state` still says room `1`, and its `load_level` (intro `Transition`) on step 286. The death route's `death` event arrives one step before the first frame without a player. The pause-menu restart arrives as `level_exit` (mode `Restart`) plus `load_level` (intro `Jump`, from the loader) on the step whose reply follows the loading. Resets carry no events.
 
 ## 7. Bridge faults
 

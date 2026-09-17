@@ -71,7 +71,7 @@ class LockstepBridge:
         self._buffer = b""
         return BridgeError(f"Lockstep session ended: {reason}. Discard this episode and call reset().")
 
-    def _request(self, message: dict) -> dict:
+    def _request(self, message: dict, observation_reply: bool = True) -> dict:
         if self._socket is None:
             raise BridgeError(f"No lockstep session ({self.failure or 'not started'}); call reset()")
 
@@ -95,6 +95,8 @@ class LockstepBridge:
             raise self._end_session(f"expected reply to request {request_id}, got {str(reply)[:200]}")
         if "error" in reply:
             raise self._end_session(f"game rejected {message['cmd']}: {reply['error']}")
+        if not observation_reply:
+            return reply
         # Validate the shape before any local state changes, so a malformed reply (for example from a
         # mismatched mod version) ends the session like any other protocol failure.
         problem = None
@@ -108,6 +110,16 @@ class LockstepBridge:
             problem = "state.Player is not an object or null"
         elif not (reply.get("diagnostics") is None or isinstance(reply["diagnostics"], dict)):
             problem = "diagnostics is not an object or null"
+        elif not (reply.get("extras") is None or isinstance(reply["extras"], dict)):
+            problem = "extras is not an object or null"
+        elif isinstance(reply.get("extras"), dict) and not all(
+                isinstance(reply["extras"].get(key), dict) for key in ("player", "input_buffers", "level")):
+            problem = "extras lacks player, input_buffers or level objects"
+        elif ("extras" in reply) != ("events" in reply):
+            problem = "extras and events must be sent together"
+        elif "events" in reply and not (isinstance(reply["events"], list) and all(
+                isinstance(event, dict) and isinstance(event.get("type"), str) for event in reply["events"])):
+            problem = "events is not a list of objects with a type"
         if problem:
             raise self._end_session(f"malformed reply to {message['cmd']}: {problem}")
         return reply
@@ -118,7 +130,7 @@ class LockstepBridge:
         state = reply["state"]
         self._frame = expected_frame
         return Observation(self.episode_id, self.step_id, expected_frame, (state or {}).get("RoomName", ""), state,
-                           reply.get("diagnostics"))
+                           reply.get("diagnostics"), reply.get("extras"), reply.get("events"))
 
     # Episodes
 
@@ -144,7 +156,7 @@ class LockstepBridge:
         self.episode_id += 1
         self.failure = None
         return Observation(self.episode_id, 0, observation.tas_frame, observation.room, observation.state,
-                           observation.diagnostics)
+                           observation.diagnostics, observation.extras, observation.events)
 
     def step(self, buttons: str | set[str] | frozenset[str], dash_only: str = "", move_only: str = "") -> Observation:
         # Invalid inputs are rejected before anything is sent, so they do not end the session.
@@ -155,6 +167,16 @@ class LockstepBridge:
         observation = self._observation(reply, self._frame + 1)
         self.last_timing = StepTiming((time.perf_counter() - start) * 1000, 1)
         return observation
+
+    def query_solids(self, rects: list[tuple[int, int, int, int]]) -> list[bool]:
+        """Validation only: whether each world rectangle (x, y, w, h) collides with a Solid, using the game's own
+        collision check. Does not advance the game. Never used by the environment or the policy."""
+        reply = self._request({"cmd": "query_solids", "rects": [list(map(int, rect)) for rect in rects]},
+                              observation_reply=False)
+        solids = reply.get("solids")
+        if not (isinstance(solids, list) and len(solids) == len(rects) and all(isinstance(x, bool) for x in solids)):
+            raise self._end_session(f"malformed query_solids reply: {str(reply)[:200]}")
+        return solids
 
     def close(self) -> None:
         if self._socket is not None:
