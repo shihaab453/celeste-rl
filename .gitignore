@@ -54,3 +54,6 @@ desktop.ini
 # C# build output
 mod/**/bin/
 mod/**/obj/
+
+# Private handoff notes
+handoff.md
