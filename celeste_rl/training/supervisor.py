@@ -12,7 +12,8 @@ environment would force a fabricated transition. SupervisedPPO catches BridgeFau
      training budget counts accepted transitions only.
   5. Discarded and accepted transitions and every fault are recorded in fault_stats. A reset that faults during
      recovery is retried. After max_consecutive_discards faults with no completed rollout in between (rollout
-     or recovery reset faults), TrainingAborted is raised and no further update happens.
+     or recovery reset faults), the model is saved to abort_checkpoint_path (if given), the callback's
+     on_training_end runs, and TrainingAborted is raised. No further update happens.
 
 Supported: a DummyVecEnv (one process), no VecNormalize (its running statistics are not rolled back). The first
 reset inside learn() happens before collection and is not supervised; a fault there propagates to the caller.
@@ -21,6 +22,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 
@@ -36,12 +38,14 @@ class TrainingAborted(RuntimeError):
 
 class SupervisedPPO(PPO):
     def __init__(self, *args, max_consecutive_discards: int = 3,
-                 on_fault: Callable[[BridgeFault], None] | None = None, **kwargs):
+                 on_fault: Callable[[BridgeFault], None] | None = None,
+                 abort_checkpoint_path: str | Path | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         if not isinstance(self.env, DummyVecEnv):
             raise TypeError(f"SupervisedPPO supports DummyVecEnv only, got {type(self.env).__name__}")
         self.max_consecutive_discards = max_consecutive_discards
         self.on_fault = on_fault
+        self.abort_checkpoint_path = abort_checkpoint_path
         self.fault_stats = {"accepted_transitions": 0, "discarded_transitions": 0, "discarded_rollouts": 0,
                             "faults": []}
 
@@ -61,7 +65,7 @@ class SupervisedPPO(PPO):
                 self.num_timesteps = timesteps_before
                 self.ep_info_buffer, self.ep_success_buffer = episode_infos_before, episode_successes_before
                 rollout_buffer.reset()
-                consecutive = self._recover(env, fault, consecutive + 1)
+                consecutive = self._recover(env, callback, fault, consecutive + 1)
                 continue
             self.fault_stats["accepted_transitions"] += self.num_timesteps - timesteps_before
             return completed
@@ -70,14 +74,20 @@ class SupervisedPPO(PPO):
         self.fault_stats["faults"].append({"stage": stage, "error": str(fault), "discarded_transitions": discarded,
                                            "timesteps": timesteps})
 
-    def _recover(self, env: VecEnv, fault: BridgeFault, consecutive: int) -> int:
+    def _recover(self, env: VecEnv, callback, fault: BridgeFault, consecutive: int) -> int:
         """Reset every slot, retrying a faulting reset, until it succeeds or the consecutive limit is reached.
         Returns the consecutive failure count so far."""
         while True:
             if consecutive >= self.max_consecutive_discards:
                 self._last_obs = None
+                saved = ""
+                if self.abort_checkpoint_path is not None:
+                    # Weights and optimizer state are those of the last completed update.
+                    self.save(self.abort_checkpoint_path)
+                    saved = f"; model saved to {self.abort_checkpoint_path}"
+                callback.on_training_end()
                 raise TrainingAborted(
-                    f"{consecutive} consecutive bridge faults without a completed rollout; last: {fault}") from fault
+                    f"{consecutive} consecutive bridge faults without a completed rollout{saved}; last: {fault}") from fault
             if self.on_fault is not None:
                 self.on_fault(fault)
             try:

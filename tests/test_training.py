@@ -10,13 +10,17 @@ contain only data collected after the latest fault.
 from __future__ import annotations
 
 import copy
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch as th
+from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 
-from celeste_rl.bridge import BridgeError
+from celeste_rl.bridge import BridgeError, BridgeTransportError
 from celeste_rl.env import BridgeFault, CelesteRoomEnv
 from celeste_rl.schema import ACTION_INPUTS, HISTORY, PLAYER_FEATURE_COUNT, PLAYER_FEATURE_NAMES
 from celeste_rl.training.policy import CelesteFeatures, policy_kwargs
@@ -29,9 +33,10 @@ SPEED_X = PLAYER_FEATURE_NAMES.index("speed_x")
 class EpochBridge(ReplayBridge):
     """Replays the death route (an episode ends every 74 steps) and faults on chosen step or reset numbers."""
 
-    def __init__(self, fault_steps=(), fault_resets=(), fault_every_step=False):
+    def __init__(self, fault_steps=(), fault_resets=(), fault_every_step=False, refused_resets=()):
         super().__init__("room1_spike_death_route")
         self.fault_steps, self.fault_resets, self.fault_every_step = set(fault_steps), set(fault_resets), fault_every_step
+        self.refused_resets = set(refused_resets)
         self.epoch = 0
         self.total_steps = self.total_resets = 0
 
@@ -45,6 +50,10 @@ class EpochBridge(ReplayBridge):
         if self.total_resets in self.fault_resets:
             self.epoch += 1
             raise BridgeError("Lockstep session ended: simulated reset timeout")
+        if self.total_resets in self.refused_resets:
+            # As when the game has crashed or is still starting: the HTTP request is refused.
+            self.epoch += 1
+            raise BridgeTransportError("GET /tas/info failed: ConnectionRefusedError: simulated")
         return self._mark(super().reset())
 
     def step(self, buttons="", dash_only="", move_only=""):
@@ -178,6 +187,36 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(model.updates, [])
         self.assertEqual(model.num_timesteps, 0)
         self.assertEqual(model.fault_stats["discarded_rollouts"], 3)
+
+    def test_abort_saves_the_last_update_and_ends_training_callbacks(self):
+        ended = []
+
+        class EndRecorder(BaseCallback):
+            def _on_step(self):
+                return True
+
+            def _on_training_end(self):
+                ended.append(True)
+
+        # Step 40 and every step after it fault: one update completes, then three consecutive faults abort.
+        bridge = EpochBridge(fault_steps=set(range(40, 400)))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "aborted.zip"
+            model = make(bridge, abort_checkpoint_path=path)
+            with self.assertRaisesRegex(TrainingAborted, "model saved to"):
+                model.learn(96, callback=EndRecorder())
+            self.assertEqual(len(model.updates), 1)
+            self.assertEqual(ended, [True])
+            saved = PPO.load(path, device="cpu")
+            assert_same_weights(model.weights_after_update, saved.policy.state_dict())
+
+    def test_refused_recovery_reset_is_retried(self):
+        # Step 10 faults; the first recovery reset is refused as if the game were restarting; the next succeeds.
+        model = make(EpochBridge(fault_steps={10}, refused_resets={2}))
+        model.learn(64)
+        self.assertEqual([f["stage"] for f in model.fault_stats["faults"]], ["rollout", "recovery reset"])
+        self.assertEqual(model.num_timesteps, 64)
+        self.assertEqual(len(model.updates), 2)
 
     def test_faulting_recovery_resets_count_toward_the_limit(self):
         # Initial reset is 1; step 3 faults; recovery resets 2 and 3 fault: three consecutive faults.

@@ -32,6 +32,7 @@ from celeste_rl.schema import (
     GRID_SIZE,
     HISTORY,
     PLAYER_FEATURE_NAMES,
+    LIGHTNING_OFFSET,
     SPIKE_OFFSETS,
     SPINNER_BOX,
 )
@@ -71,7 +72,7 @@ def reference_grid(state: dict, extras: dict) -> np.ndarray:
         dx, dy = SPIKE_OFFSETS[d]
         rects.append((f"spikes_{d}", r["X"] + dx, r["Y"] + dy, r["W"], r["H"]))
     for r in state.get("Lightning") or []:
-        rects.append(("other_hazards", r["X"], r["Y"], r["W"], r["H"]))
+        rects.append(("other_hazards", r["X"] + LIGHTNING_OFFSET[0], r["Y"] + LIGHTNING_OFFSET[1], r["W"], r["H"]))
     for p in state.get("Spinners") or []:
         rects.append(("other_hazards", p["X"] - SPINNER_BOX / 2, p["Y"] - SPINNER_BOX / 2, SPINNER_BOX, SPINNER_BOX))
 
@@ -94,7 +95,7 @@ def reference_grid(state: dict, extras: dict) -> np.ndarray:
 class SchemaTests(unittest.TestCase):
     def test_fingerprint_is_pinned(self):
         # A deliberate schema change must update this value and the version tags together.
-        self.assertEqual(FINGERPRINT, "cb601cccc2c4252d")
+        self.assertEqual(FINGERPRINT, "b710a27fa4f1d96f")
 
     def test_space_and_names(self):
         space = observation_space()
@@ -162,6 +163,7 @@ class PlayerFeatureTests(unittest.TestCase):
             "bool as number": lambda s: s["extras"]["player"].__setitem__("Stamina", True),
             "number as flag": lambda s: s["extras"]["player"].__setitem__("Ducking", 1),
             "state index": lambda s: s["extras"]["player"].__setitem__("State", 2.0),
+            "zero-width room": lambda s: s["state"]["Level"]["Bounds"].__setitem__("W", 0),
         }
         for name, corrupt in cases.items():
             s = copy.deepcopy(base)
@@ -228,6 +230,35 @@ class GridTests(unittest.TestCase):
             with self.subTest(x=x, y=y):
                 np.testing.assert_array_equal(encode_grid(s["state"], s["extras"], cache), reference_grid(s["state"], s["extras"]))
 
+    def test_lightning_is_stamped_at_its_hitbox(self):
+        # Exported lightning is the entity position with the hitbox size; the hitbox starts 1 px right and down.
+        # An 8 x 8 hitbox from (25, 25) overlaps 2 x 2 cells; the exported rectangle alone would be one cell.
+        s = copy.deepcopy(sample("room1_exit_dash_route", "start"))
+        s["state"]["Lightning"] = [{"X": 24, "Y": 24, "W": 8, "H": 8}]
+        g = encode_grid(s["state"], s["extras"], GeometryCache())
+        self.assertEqual(g[CH["other_hazards"]].sum(), 4)
+        np.testing.assert_array_equal(g, reference_grid(s["state"], s["extras"]))
+
+    def test_shifted_up_spikes_touch_the_hurtbox_at_recorded_deaths(self):
+        # Independent of the encoder: at every recorded spike death the player's hurtbox overlaps an up spike's
+        # rectangle only after the schema's offset is applied.
+        deaths = [s for trace in FIXTURE.values() for s in trace["samples"] if "death_event" in s["reasons"]]
+        self.assertGreaterEqual(len(deaths), 4)
+
+        def overlaps(a, b):
+            return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
+
+        for s in deaths:
+            position, box = s["state"]["Player"]["Position"], s["extras"]["player"]["hurtbox"]
+            hurtbox = (position["X"] + box["X"], position["Y"] + box["Y"], box["W"], box["H"])
+            exported = [(b["X"], b["Y"], b["W"], b["H"]) for b in
+                        (spike["Bounds"] for spike in s["state"]["Spikes"] if spike["Direction"] == 0)]
+            dx, dy = SPIKE_OFFSETS["up"]
+            shifted = [(x + dx, y + dy, w, h) for x, y, w, h in exported]
+            with self.subTest(frame=s["frame"]):
+                self.assertTrue(any(overlaps(hurtbox, r) for r in shifted))
+                self.assertFalse(any(overlaps(hurtbox, r) for r in exported))
+
     def test_cache_follows_tiles_and_bounds(self):
         s = copy.deepcopy(sample("room1_exit_dash_route", "start"))
         cache = GeometryCache()
@@ -240,7 +271,8 @@ class GridTests(unittest.TestCase):
         self.assertEqual(after[CH["solid"], 16, 14], 0)
 
     def test_bad_entities_are_schema_violations(self):
-        for corrupt in (lambda st: st["Spikes"][0].__setitem__("Direction", 7),
+        for corrupt in (lambda st: st["Level"]["Bounds"].__setitem__("H", 0),
+                        lambda st: st["Spikes"][0].__setitem__("Direction", 7),
                         lambda st: st["Spikes"][0].__setitem__("Bounds", None),
                         lambda st: st.__setitem__("SolidsData", None)):
             s = copy.deepcopy(sample("room1_exit_dash_route", "start"))

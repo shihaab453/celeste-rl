@@ -228,6 +228,23 @@ class EnvironmentContractTests(unittest.TestCase):
         self.assertEqual(bridge.sent, [])
         env.step(noop())
 
+    def test_unreachable_game_during_reset_is_a_fault(self):
+        import socket
+        import tempfile
+
+        from celeste_rl.bridge import CelesteBridge, DebugRcClient
+        from celeste_rl.lockstep import LockstepBridge
+
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        with tempfile.TemporaryDirectory() as directory:
+            http = CelesteBridge(Path(directory) / "episode.tas", client=DebugRcClient(port, timeout=1.0))
+            env = CelesteRoomEnv(LockstepBridge(http, port=port, timeout=1.0))
+            with self.assertRaisesRegex(BridgeFault, "reset failed"):
+                env.reset()
+            env.close()
+
     def test_reset_rejects_a_non_canonical_start(self):
         moved = copy.deepcopy(START["state"])
         moved["Player"]["Position"]["X"] = 40

@@ -63,6 +63,11 @@ class BridgeError(RuntimeError):
     """The game did not behave the way the bridge requires."""
 
 
+class BridgeTransportError(BridgeError):
+    """The game could not be reached over HTTP (refused, reset or timed out), for example because it crashed or has
+    not started listening yet. A BridgeError, so callers that recover from bridge failures also recover from this."""
+
+
 def _checked_letters(value: str | set[str] | frozenset[str], allowed, what: str) -> set[str]:
     letters = set(value)
     unknown = letters - set(allowed)
@@ -149,10 +154,10 @@ class DebugRcClient:
                 self._connection.request("GET", path, headers={"Host": f"localhost:{self.port}"})
                 response = self._connection.getresponse()
                 body = response.read().decode("utf-8")
-            except (ConnectionError, http.client.HTTPException, OSError):
+            except (ConnectionError, http.client.HTTPException, OSError) as error:
                 self.close()
                 if not retry or attempt == 1:
-                    raise
+                    raise BridgeTransportError(f"GET {path} failed: {type(error).__name__}: {error}") from error
                 continue
             if response.status != 200:
                 raise BridgeError(f"GET {path} returned {response.status}: {body[:200]}")
@@ -166,6 +171,8 @@ class DebugRcClient:
         for attempt in range(attempts):
             try:
                 return parse_info(self.get("/tas/info"))
+            except BridgeTransportError:
+                raise  # the game is unreachable; retrying here would only multiply the request timeout
             except BridgeError:
                 if attempt == attempts - 1:
                     raise

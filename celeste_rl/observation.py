@@ -26,6 +26,7 @@ from celeste_rl.schema import (
     PLAYER_FEATURE_COUNT,
     PLAYER_FEATURES,
     PLAYER_STATES,
+    LIGHTNING_OFFSET,
     SPIKE_OFFSETS,
     SPINNER_BOX,
     STATE_SOURCE,
@@ -107,8 +108,8 @@ def encode_player(state: dict, extras: dict) -> np.ndarray:
                 values[i] = (raw if raw > 0 else 0.0) / scale
             else:
                 origin, size = bounds[bounds_key[0]], bounds[bounds_key[1]]
-                if origin.__class__ not in (int, float) or size.__class__ not in (int, float):
-                    raise SchemaViolation(f"Level.Bounds is not numeric: {bounds!r}")
+                if origin.__class__ not in (int, float) or size.__class__ not in (int, float) or not size > 0:
+                    raise SchemaViolation(f"Level.Bounds is not numeric with a positive size: {bounds!r}")
                 values[i] = (raw - origin) / size
         state_index = root["extras"]["player"]["State"]
     except (KeyError, TypeError) as error:
@@ -170,6 +171,8 @@ def encode_grid(state: dict, extras: dict, cache: GeometryCache) -> np.ndarray:
     grid = np.zeros((len(GRID_CHANNELS), GRID_SIZE, GRID_SIZE), dtype=np.uint8)
     bounds = _rect(_lookup({"state": state}, ("state", "Level", "Bounds")), "Level.Bounds")
     bx, by, bw, bh = bounds
+    if not (bw > 0 and bh > 0):
+        raise SchemaViolation(f"Level.Bounds has no positive size: {bounds!r}")
     position = _lookup({"state": state}, ("state", "Player", "Position"))
     collider = _rect(_lookup({"extras": extras}, ("extras", "player", "Collider")), "Collider")
     centre_x = _number(position.get("X"), ("Position", "X")) + collider[0] + collider[2] / 2
@@ -203,7 +206,8 @@ def encode_grid(state: dict, extras: dict, cache: GeometryCache) -> np.ndarray:
         dx, dy = SPIKE_OFFSETS[direction]
         stamp(CHANNEL[f"spikes_{direction}"], x + dx, y + dy, w, h)
     for rect in state.get("Lightning") or []:
-        stamp(CHANNEL["other_hazards"], *_rect(rect, "Lightning"))
+        x, y, w, h = _rect(rect, "Lightning")
+        stamp(CHANNEL["other_hazards"], x + LIGHTNING_OFFSET[0], y + LIGHTNING_OFFSET[1], w, h)
     for spinner in state.get("Spinners") or []:
         x, y = _number(spinner.get("X"), ("Spinners", "X")), _number(spinner.get("Y"), ("Spinners", "Y"))
         stamp(CHANNEL["other_hazards"], x - SPINNER_BOX / 2, y - SPINNER_BOX / 2, SPINNER_BOX, SPINNER_BOX)

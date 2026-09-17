@@ -160,8 +160,8 @@ Timers are in seconds as exported and divided by a scale; they are not converted
 |---|---|---|
 | 0 | solid | `SolidsData` characters other than `0` (foreground solid tiles), plus `StaticSolids` rectangles, re-read every step because they can move |
 | 1-4 | jump-through facing up, down, left, right | `JumpThrus` (only the types CelesteTAS exports: `JumpthruPlatform`, `SidewaysJumpThru`, `UpsideDownJumpThru`) |
-| 5-8 | spikes pointing up, down, left, right | `Spikes` with `Direction` (0 up, 1 down, 2 left, 3 right), shifted to the hitbox: CelesteTAS exports an entity's position with its collider's size, and up spikes' hitbox is 3 px above the position (left spikes' 3 px left) |
-| 9 | other hazards | `Lightning` rectangles; `Spinners` exported as positions, stamped as a 16 x 16 box around the position (a declared approximation, checked in step 2) |
+| 5-8 | spikes pointing up, down, left, right | `Spikes` with `Direction` (0 up, 1 down, 2 left, 3 right), shifted to the hitbox: CelesteTAS exports an entity's position with its collider's size, and the game's spike hitboxes are 3 px above the position for up spikes and 3 px left for left spikes (confirmed from the pinned binary) |
+| 9 | other hazards | `Lightning` rectangles shifted 1 px right and down to the hitbox (`Hitbox(w - 2, h - 2, 1, 1)`); `Spinners` exported as positions, stamped as a 16 x 16 box around the position, which contains the spinner's colliders (a radius 6 circle and a 16 x 4 box) |
 | 10 | outside the room | any part of the cell outside `Level.Bounds`. Room 1's tiles span 184 px but its bounds are 180 px, so the bottom tile row is partly outside |
 
 - Outside-room is geometry information, not solid. Exits and pits are not marked.
@@ -214,7 +214,7 @@ Each step is classified from that reply's events, then its state, in this order:
 
 ## 7. Bridge faults
 
-`BridgeFault` covers timeouts, dropped connections, error replies, invalid replies, schema violations and unexpected TAS stops. For the environment it means: **no sample for this step, and this episode cannot continue.** The environment never returns a fabricated transition, never retries a step, and refuses `step` until `reset`. Recovery belongs to the learner (section 9.2).
+`BridgeFault` covers timeouts, dropped connections, an unreachable game (for example after a crash, while resetting over HTTP), error replies, invalid replies, schema violations and unexpected TAS stops. For the environment it means: **no sample for this step, and this episode cannot continue.** The environment never returns a fabricated transition, never retries a step, and refuses `step` until `reset`. Recovery belongs to the learner (section 9.2).
 
 ## 8. Reward (`rew-v1`)
 
@@ -248,7 +248,7 @@ If any environment raises `BridgeFault` during rollout collection:
 2. **The whole current rollout is discarded**; no update uses it. Earlier completed updates are kept.
 3. The failed game worker is restarted; every environment slot is reset; the rollout buffer, last observations and episode-start flags are replaced with fresh, validated ones.
 4. Weights and optimizer state are those of the last completed update. Any statistics updated from the discarded rollout are restored.
-5. Attempted, discarded and accepted transitions are counted separately. After 3 consecutive discarded rollouts the run stops with its last checkpoint saved.
+5. Attempted, discarded and accepted transitions are counted separately. After 3 consecutive faults without a completed rollout the model (weights and optimizer state of the last update) is saved to the run's abort checkpoint path, training callbacks are ended, and `TrainingAborted` is raised.
 
 Phase 3 starts with one environment. Implemented in `celeste_rl/training/supervisor.py` (`SupervisedPPO`) for a single-process `DummyVecEnv` without `VecNormalize`. A reset that faults during recovery is retried and counts toward the consecutive limit. The first reset inside `learn()` happens before collection and is not supervised. Offline tests inject faults mid-rollout, in episode-end resets and in recovery resets, and check that no update sees data from before a fault, weights and optimizer state are unchanged by discarded rollouts, the step budget counts accepted transitions only, and episodes finished inside a discarded rollout are not logged. Worker processes and their communication faults come with multi-worker training.
 

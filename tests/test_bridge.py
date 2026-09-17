@@ -5,6 +5,7 @@ Run from the repo root:
 """
 import random
 import re
+import socket
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,7 +14,9 @@ from celeste_rl.bridge import (
     BUTTON_LETTERS,
     DIRECTIONS,
     BridgeError,
+    BridgeTransportError,
     CelesteBridge,
+    DebugRcClient,
     Observation,
     TasInfo,
     format_input_line,
@@ -124,6 +127,26 @@ class TasFileTests(unittest.TestCase):
             bridge = CelesteBridge(Path(directory) / "episode.tas")
             with self.assertRaises(BridgeError):
                 bridge.step("R")
+
+
+class TransportFailureTests(unittest.TestCase):
+    """An unreachable game is a BridgeError (so recovery code sees it), and info() does not retry it."""
+
+    def test_refused_connection_is_a_bridge_transport_error(self):
+        with socket.socket() as probe:  # a port with nothing listening
+            probe.bind(("127.0.0.1", 0))
+            port = probe.getsockname()[1]
+        client = DebugRcClient(port, timeout=1.0)
+        calls = []
+        original_get = client.get
+        client.get = lambda *args, **kwargs: calls.append(args) or original_get(*args, **kwargs)
+        with self.assertRaises(BridgeTransportError) as caught:
+            client.info()
+        self.assertIsInstance(caught.exception, BridgeError)
+        self.assertEqual(len(calls), 1, "info() must not retry an unreachable game (its 20 retries are for error pages)")
+        with self.assertRaises(BridgeTransportError):
+            client.send_hotkey("FrameAdvance")
+        self.assertFalse(client.is_available())
 
 
 class ResetPathTests(unittest.TestCase):

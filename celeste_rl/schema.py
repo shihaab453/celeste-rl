@@ -45,12 +45,15 @@ GRID_CHANNELS = (
 )
 SPINNER_BOX = 16  # spinners are exported as positions; stamped as a box this wide around the position
 # CelesteTAS exports entity rectangles as the entity's position plus its collider's size, not the collider's
-# location. Spike hitboxes are offset from the position by direction: up spikes' hitbox is 3 px above it,
-# confirmed on the recorded room 1 spike deaths (the player's hurtbox, y 157-166, overlaps the shifted spike,
-# y 165-168, not the exported one, y 168-171). The left offset mirrors it and is not yet confirmed on a trace;
-# down and right are assumed to start at the position. Other exported solids, jump-throughs and lightning are
-# assumed to have colliders at their position; probe P8 checks solids.
+# location, so colliders offset from their entity are shifted back here. Confirmed from the pinned game build's
+# constructors: Celeste.Spikes uses Hitbox(size, 3, 0, -3) up, (size, 3, 0, 0) down, (3, size, -3, 0) left and
+# (3, size, 0, 0) right (the up offset also matches the recorded room 1 spike deaths: the player's hurtbox,
+# y 157-166, overlaps the shifted spike, y 165-168, not the exported one, y 168-171). Celeste.Lightning uses
+# Hitbox(w - 2, h - 2, 1, 1). CrystalStaticSpinner's colliders (a radius 6 circle and Hitbox(16, 4, -8, -3)) fit
+# inside SPINNER_BOX centred on its position. JumpthruPlatform and exported static solids are taken to have
+# colliders at their position; probe P8 checks solids against the game.
 SPIKE_OFFSETS = {"up": (0, -3), "down": (0, 0), "left": (-3, 0), "right": (0, 0)}
+LIGHTNING_OFFSET = (1, 1)
 
 # Vanilla Celeste.Player state indices 0-25 (StNormal = 0 ... StIntroThinkForABit = 25), then "other".
 PLAYER_STATES = (
@@ -148,7 +151,8 @@ def _fingerprint() -> str:
         "history": HISTORY,
         "action_inputs": ACTION_INPUTS,
         "grid": {"cell": CELL_SIZE, "size": GRID_SIZE, "anchor": GRID_ANCHOR, "channels": GRID_CHANNELS,
-                 "spinner_box": SPINNER_BOX, "spike_offsets": SPIKE_OFFSETS},
+                 "spinner_box": SPINNER_BOX, "spike_offsets": SPIKE_OFFSETS,
+                 "lightning_offset": LIGHTNING_OFFSET},
         "player_features": [asdict(f) for f in PLAYER_FEATURES],
         "state_source": STATE_SOURCE,
         "player_states": PLAYER_STATES,
