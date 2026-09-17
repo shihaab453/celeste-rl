@@ -1,6 +1,6 @@
 # Phase 2: Celeste environment specification (v2)
 
-Status: revised after review, not implemented yet. The observation, action and reward definitions get version tags (`obs-v1`, `act-v1`, `rew-v1`) when implementation step 3 passes its tests, and are frozen before the Phase 3 campaign. Any later change gets a new tag.
+Status: implementation steps 1 to 3 done (mod additions, schema and encoders, endings, reward and environment); steps 4 and 5 (training integration, live probes) remain. The version tags `obs-v1`, `act-v1` and `rew-v1` are assigned in code (`celeste_rl/schema.py`, `celeste_rl/reward.py`) and are frozen before the Phase 3 campaign. Any later change gets a new tag.
 
 Changes from the first draft: ending detection moves from state snapshots to game events captured by the mod (restarts hidden by loading were not detectable before); the observation gains control, collider and wall-boost state, a four-step history, exact units and a defined terminal encoding; the action mapping claim is narrowed to canonical input lines; the grid gets exact coordinates and an independent collision check; Stable-Baselines3 integration and bridge-fault recovery are specified; open decisions are decided; probes get pass thresholds.
 
@@ -182,7 +182,7 @@ Room name or ID, target exit or direction, distance to the goal, reward or its c
 
 ### 6.1 Reset
 
-`bridge.reset()`, then validate: frame 300, prefix hash unchanged, room `1`, player at (19, 144), `StNormal`, `InControl`, not paused, `FreezeTimer` 0, `Dashes` = `MaxDashes` = 1, no `null` extras. Any failure raises `BridgeFault`. Events on the reset reply are logged and discarded. `info` holds the schema versions and fingerprint, `disabled_inputs` and the start configuration name (`canonical`).
+`bridge.reset()`, then validate: frame 300, room `1`, player at (19, 144), `StNormal`, `InControl`, not paused, `FreezeTimer` 0, `Dashes` = `MaxDashes` = 1, no `null` extras. The prefix itself is checked by the mod (input count and savestate breakpoint) and the bridge (every start must equal the first). Any failure raises `BridgeFault`. Events on the reset reply are logged and discarded. `info` holds the schema versions and fingerprint, `disabled_inputs` and the start configuration name (`canonical`).
 
 ### 6.2 The clock
 
@@ -197,13 +197,14 @@ Each step is classified from that reply's events, then its state, in this order:
 | 1 | (fault) | protocol error, invalid reply, schema violation, or an unexpected TAS stop | no transition; `BridgeFault` is raised | none |
 | 2 | `death` | a `death` event | True | -1 |
 | 2 | `restart` | a `load_level` event whose intro type is not `Transition` (chapter restart, reload, respawn), wherever it falls relative to other events | True | -1 |
-| 2 | `left_level` | a `level_exit` event | True | -1 |
+| 2 | `left_level` | a `level_exit` event with no such `load_level` (a pause-menu chapter restart sends both and counts as `restart`) | True | -1 |
 | 3 | `success` | a `transition` event from room `1` to room `2` in this episode, with no order-2 event in the same reply | True | +1 |
 | 4 | `wrong_room` | a `transition` event to any other room | True | -1 |
 | 5 | `timeout` | the step counter reaches 1,800 | True | -1 |
 
 - Death, restart and leaving always beat success in the same reply. A real ending on the deadline frame beats the timeout.
-- If the reply shows no player but carries no `death` event, that is a fault, not a death: absence alone is never relabelled.
+- If the reply shows no player and carries no `death`, `restart` or `left_level` event, that is a fault, not a death: absence alone is never relabelled. Unknown or malformed events are faults too.
+- A `transition` counts as `success` only if it is the reply's single transition, from the start room to the target room; anything else is `wrong_room`.
 - The deadline is part of the task, so hitting it is **termination**; elapsed time is observed. The environment never sets `truncated`. The end of a PPO rollout buffer is not an episode ending; the learner bootstraps across it.
 - A pause event alone does not end the episode; paused frames still spend the deadline.
 - With menu inputs enabled, pause-menu retry is expected to produce `death`, restart chapter `restart` or `left_level`, and save and quit `left_level`. Probe P7 confirms each. Sequences that make CelesteTAS stop the TAS are a known bridge limitation; while they exist, menu inputs stay disabled for training (D1).

@@ -42,12 +42,17 @@ def apply_disabled(action, mask: np.ndarray) -> np.ndarray:
     return applied
 
 
-def to_line(applied: np.ndarray) -> str:
-    """The canonical input line for an applied action vector."""
+def to_parts(applied: np.ndarray) -> tuple[str, str, str]:
+    """(buttons, dash_only, move_only) letters for an applied action vector, as the bridge's step() takes them."""
     buttons = "".join(name for name, on in zip(ACTION_INPUTS, applied) if on and len(name) == 1)
     dash_only = "".join(name[1] for name, on in zip(ACTION_INPUTS, applied) if on and name[0] == "A" and len(name) == 2)
     move_only = "".join(name[1] for name, on in zip(ACTION_INPUTS, applied) if on and name[0] == "M" and len(name) == 2)
-    return format_input_line(buttons, dash_only, move_only)
+    return buttons, dash_only, move_only
+
+
+def to_line(applied: np.ndarray) -> str:
+    """The canonical input line for an applied action vector."""
+    return format_input_line(*to_parts(applied))
 
 
 def parse_line(line: str, canonical_only: bool = False) -> np.ndarray:
