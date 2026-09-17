@@ -77,7 +77,8 @@ def main() -> int:
                       "attributable": not git["uncommitted_changes"] and not problems}
         print(f"Run {run_dir} ({'resuming' if args.resume else 'new'}), config {asdict(config)}")
         try:
-            model = train(config, Path(run_dir), env, provenance, on_fault=game.on_fault, resume=bool(args.resume))
+            model = train(config, Path(run_dir), env, provenance, on_fault=game.on_fault, resume=bool(args.resume),
+                          health=game.health)
         except TrainingAborted as aborted:
             print(f"ABORTED: {aborted}")
             return 1

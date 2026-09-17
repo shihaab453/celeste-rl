@@ -33,5 +33,15 @@ class GameSession:
         self.process = self._launch()
         self.relaunches.append({"exit_code": exit_code, "ports_closed": ports_closed, "fault": str(fault)[:300]})
 
+    def health(self) -> dict:
+        """The game's memory and relaunch count, for progress records. Keys never change; values are None if the
+        process cannot be read (for example between a crash and its relaunch)."""
+        try:
+            memory = game_process.process_memory(self.process.pid)
+        except OSError:
+            memory = {"private_mb": None, "working_set_mb": None}
+        return {"game_private_mb": memory["private_mb"], "game_working_set_mb": memory["working_set_mb"],
+                "game_relaunches": len(self.relaunches)}
+
     def close(self) -> None:
         game_process.stop(self.process)

@@ -104,9 +104,11 @@ class RunRecorder(BaseCallback):
     on_rollout_start, and episodes in progress at the fault are abandoned (the environment was reset).
     """
 
-    def __init__(self, run_dir: Path, config: TrainConfig, env: CelesteRoomEnv, write_manifest: Callable[[str], None]):
+    def __init__(self, run_dir: Path, config: TrainConfig, env: CelesteRoomEnv, write_manifest: Callable[[str], None],
+                 health: Callable[[], dict] | None = None):
         super().__init__()
         self.run_dir, self.config, self.env, self.write_manifest = run_dir, config, env, write_manifest
+        self.health = health
         self.checkpoints = run_dir / "checkpoints"
         self.checkpoints.mkdir(parents=True, exist_ok=True)
         self._in_rollout = False
@@ -178,6 +180,8 @@ class RunRecorder(BaseCallback):
                for name in ("completion", "failure", "time", "shaping")},
             "env_steps_per_second": self.config.n_steps / seconds if seconds > 0 else "",
             "discarded_rollouts": self.model.fault_stats["discarded_rollouts"],
+            # Process health for long runs (for example the game's memory); the keys must not change during a run.
+            **(self.health() if self.health is not None else {}),
         }
         path = self.run_dir / "progress.csv"
         new = not path.exists()
@@ -222,7 +226,7 @@ class RunRecorder(BaseCallback):
 
 
 def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: dict,
-          on_fault: Callable | None = None, resume: bool = False) -> SupervisedPPO:
+          on_fault: Callable | None = None, resume: bool = False, health: Callable[[], dict] | None = None) -> SupervisedPPO:
     """Train, or resume from run_dir/checkpoints/latest.zip. Raises TrainingAborted after repeated bridge faults,
     with the model saved to checkpoints/aborted.zip."""
     run_dir = Path(run_dir)
@@ -269,7 +273,7 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
         })
 
     resume_steps = model.num_timesteps
-    recorder = RunRecorder(run_dir, config, env, write_manifest)
+    recorder = RunRecorder(run_dir, config, env, write_manifest, health)
     recorder.init_callback(model)  # also needed when a resumed run has nothing left to learn
     if previous is not None and previous.get("recorder"):
         recorder.load_state(previous["recorder"])

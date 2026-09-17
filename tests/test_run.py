@@ -68,6 +68,13 @@ class RunTests(unittest.TestCase):
         loaded = SupervisedPPO.load(checkpoints / "latest.zip", device="cpu")
         self.assertEqual(loaded.num_timesteps, 160)
 
+    def test_health_columns_are_recorded_per_rollout(self):
+        calls = []
+        train(config(total_timesteps=64, eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE,
+              health=lambda: calls.append(1) or {"game_private_mb": 100.0 + len(calls)})
+        _, progress, _, _ = read(self.run_dir)
+        self.assertEqual([row["game_private_mb"] for row in progress], ["101.0", "102.0"])
+
     def test_episodes_in_a_discarded_rollout_are_not_recorded(self):
         # The first episode dies at step 74 inside the third rollout (steps 65-96), which faults at step 80.
         model = train(config(eval_every=0, total_timesteps=128), self.run_dir, CelesteRoomEnv(EpochBridge(fault_steps={80})),

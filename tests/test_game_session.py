@@ -33,6 +33,11 @@ class GameSessionTests(unittest.TestCase):
         self.assertEqual(session.relaunches, [{"exit_code": 1, "ports_closed": True, "fault": "step failed: connection reset"}])
         self.assertEqual(game_process.set_window_mode.call_count, 2)
 
+        game_process.process_memory.return_value = {"private_mb": 1300.0, "working_set_mb": 600.0}
+        self.assertEqual(session.health(), {"game_private_mb": 1300.0, "game_working_set_mb": 600.0, "game_relaunches": 1})
+        game_process.process_memory.side_effect = OSError("process gone")
+        self.assertEqual(session.health(), {"game_private_mb": None, "game_working_set_mb": None, "game_relaunches": 1})
+
         session.close()
         game_process.stop.assert_called_with(second)
 
