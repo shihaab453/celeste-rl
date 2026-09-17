@@ -3,8 +3,8 @@
 Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/soak_test.py --minutes 30 --window background
 
-Every minute it records throughput, step latency, resets, deaths, game memory and whether the
-window is still in the requested state. Every --check-every episodes it replays one fixed input
+Every minute it records throughput, step latency, resets, deaths, game memory (private bytes and
+working set) and whether the window is still in the requested state. Every --check-every episodes it replays one fixed input
 sequence and compares it with the first replay, to catch state corruption that builds up over time.
 
 Results are written to runs/soak/<timestamp>/results.json, including after a failure.
@@ -92,6 +92,8 @@ def main() -> int:
         game_process.set_window_mode(process.pid, args.window)
         time.sleep(0.5)
         print(f"Window mode: {args.window}, game focused: {game_process.window_is_focused(process.pid)}")
+        results["memory_start"] = game_process.process_memory(process.pid)
+        print(f"Private bytes at start: {results['memory_start']['private_mb']:.0f} MB")
 
         deadline = time.perf_counter() + args.minutes * 60
 
@@ -135,7 +137,9 @@ def main() -> int:
                     "random_step_p50_ms": percentile(ordered, 0.5),
                     "random_step_p99_ms": percentile(ordered, 0.99),
                     "random_step_max_ms": ordered[-1],
-                    "game_memory_mb": game_process.memory_mb(process.pid),
+                    # Private bytes include native and GPU driver allocations; working set alone hid the
+                    # render target leak.
+                    **{f"game_{key}": value for key, value in game_process.process_memory(process.pid).items()},
                     "game_focused": game_process.window_is_focused(process.pid),
                     "game_minimized": game_process.window_is_minimized(process.pid),
                 }
@@ -143,12 +147,16 @@ def main() -> int:
                 save()
                 print(f"#{summary['window']:3d} ({elapsed:.0f} s): {summary['steps_per_second']:6.0f} steps/s  "
                       f"p50 {summary['random_step_p50_ms']:.2f} p99 {summary['random_step_p99_ms']:.2f} "
-                      f"max {summary['random_step_max_ms']:.1f} ms  mem {summary['game_memory_mb']:.0f} MB  "
+                      f"max {summary['random_step_max_ms']:.1f} ms  private {summary['game_private_mb']:.0f} MB  "
                       f"focused {summary['game_focused']} minimized {summary['game_minimized']}  "
                       f"drift checks OK {sum(c['matches_first_replay'] for c in results['drift_checks'])}")
                 window = new_window()
 
         results["total"] = {"episodes": episodes, "steps": total_steps}
+        if results["minutes"]:
+            growth = results["minutes"][-1]["game_private_mb"] - results["memory_start"]["private_mb"]
+            results["total"]["private_mb_growth"] = growth
+            print(f"Private bytes change since start: {growth:+.0f} MB ({growth * 1024 / episodes:+.1f} KB per episode)")
         exit_code = 0
         print(f"Completed {total_steps:,} steps in {episodes} episodes without errors.")
     except Exception as error:
