@@ -126,6 +126,95 @@ class TasFileTests(unittest.TestCase):
                 bridge.step("R")
 
 
+class ResetPathTests(unittest.TestCase):
+    """Which way reset() restores the episode start, depending on where the game is."""
+
+    class Client:
+        def __init__(self, info):
+            self._info, self.calls = info, []
+
+        def info(self):
+            return self._info
+
+        def play_tas(self, path):
+            self.calls.append("play_tas")
+
+        def send_hotkey(self, name):
+            self.calls.append(name)
+
+    def reset_path(self, info: TasInfo) -> list[str]:
+        with tempfile.TemporaryDirectory() as directory:
+            client = self.Client(info)
+            bridge = CelesteBridge(Path(directory) / "episode.tas", client=client)
+            start = Observation(1, 0, 300, "1", {"Player": {"Position": {"X": 19, "Y": 144}}, "RoomName": "1"})
+            bridge._wait_for = lambda *args, **kwargs: info
+            bridge._play_from_level_load = lambda: client.calls.append("play_tas")
+            bridge._request_until = lambda *args, **kwargs: (info, 1)
+            bridge._read_observation = lambda frame: start
+            bridge.reset()
+            return client.calls
+
+    def test_running_in_a_level_uses_the_restart_hotkey(self):
+        self.assertEqual(self.reset_path(TasInfo(True, "Paused", 400, 400, "1")), ["Restart"])
+
+    def test_stopped_tas_plays_the_file_from_the_level_load(self):
+        self.assertEqual(self.reset_path(TasInfo(False, "Disabled", 0, 0, "")), ["play_tas"])
+
+    def test_running_outside_a_level_plays_the_file_from_the_level_load(self):
+        # After returning to the map the TAS can still report running, but the Restart hotkey cannot load the
+        # level savestate there.
+        self.assertEqual(self.reset_path(TasInfo(True, "Paused", 400, 400, "")), ["play_tas"])
+
+
+class PlayFromLevelLoadTests(unittest.TestCase):
+    """Replaying the file once more when CelesteTAS disables a playback that has just started (seen after
+    returning to the map), and never more than the attempt limit."""
+
+    class Client:
+        def __init__(self, sequences):
+            self.sequences, self.plays, self.current = sequences, 0, iter(())
+            self.last = TasInfo(True, "Paused", 356, 356, "")
+
+        def play_tas(self, path):
+            self.current = iter(self.sequences[self.plays])
+            self.plays += 1
+
+        def info(self):
+            self.last = next(self.current, self.last)
+            return self.last
+
+    STARTED = TasInfo(True, "Running", 0, 300, "")
+    STOPPED = TasInfo(False, "Disabled", 0, 300, "")
+    BREAKPOINT = TasInfo(True, "Paused", 299, 300, "1")
+
+    def bridge(self, sequences):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        client = self.Client(sequences)
+        return CelesteBridge(Path(directory.name) / "episode.tas", client=client), client
+
+    def test_playback_disabled_after_starting_is_played_again(self):
+        bridge, client = self.bridge([[self.STARTED, self.STOPPED], [self.STOPPED, self.STARTED, self.BREAKPOINT]])
+        bridge._play_from_level_load(timeout=1)
+        self.assertEqual(client.plays, 2)
+
+    def test_first_playback_reaching_the_breakpoint_is_not_repeated(self):
+        bridge, client = self.bridge([[self.STARTED, self.BREAKPOINT]])
+        bridge._play_from_level_load(timeout=1)
+        self.assertEqual(client.plays, 1)
+
+    def test_stopping_every_time_raises_after_the_attempt_limit(self):
+        bridge, client = self.bridge([[self.STARTED, self.STOPPED]] * 3)
+        with self.assertRaisesRegex(BridgeError, "stopped before the savestate breakpoint 2 times"):
+            bridge._play_from_level_load(timeout=1)
+        self.assertEqual(client.plays, 2)
+
+    def test_a_disabled_state_before_playback_starts_is_not_mistaken_for_a_stop(self):
+        bridge, client = self.bridge([[self.STOPPED, self.STOPPED, self.STARTED, self.BREAKPOINT]])
+        bridge._play_from_level_load(timeout=1)
+        self.assertEqual(client.plays, 1)
+
+
 class ObservationTests(unittest.TestCase):
     def test_transitional_flag(self):
         level = {"loading": False, "freeze_timer": 0, "scene": "Celeste.Level"}

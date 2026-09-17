@@ -53,6 +53,9 @@ class LockstepBridge:
         # Never reset across sessions, so a late reply from an old session cannot match a new request.
         self._next_request_id = 0
         self._frame = 0
+        # The last reply showed the level being exited with no level loaded after it (for example "return to
+        # map"). The savestate reset over the socket cannot restore from there, so the next reset recovers fully.
+        self._left_level = False
 
     # Transport
 
@@ -129,12 +132,18 @@ class LockstepBridge:
             raise self._end_session(f"expected frame {expected_frame}, game reported {reply['frame']}")
         state = reply["state"]
         self._frame = expected_frame
+        types = [event["type"] for event in reply.get("events") or []]
+        if "level_exit" in types:
+            self._left_level = "load_level" not in types[types.index("level_exit"):]
         return Observation(self.episode_id, self.step_id, expected_frame, (state or {}).get("RoomName", ""), state,
                            reply.get("diagnostics"), reply.get("extras"), reply.get("events"))
 
     # Episodes
 
     def reset(self) -> Observation:
+        if self._left_level and self._socket is not None:
+            self._end_session("the level was exited; recovering through a full reset")
+        self._left_level = False
         if self._socket is None:
             # New session: get the game to a known state over HTTP, then connect and reset over the socket.
             self.http.reset()
@@ -167,6 +176,14 @@ class LockstepBridge:
         observation = self._observation(reply, self._frame + 1)
         self.last_timing = StepTiming((time.perf_counter() - start) * 1000, 1)
         return observation
+
+    def end_session(self, reason: str) -> None:
+        """Deliberately end the session so the next reset() goes through full recovery (HTTP reset, new connection).
+
+        For states the savestate reset over the socket cannot restore from, such as after the level was exited to
+        the map. Nothing is sent.
+        """
+        self._end_session(reason)
 
     def query_solids(self, rects: list[tuple[int, int, int, int]]) -> list[bool]:
         """Validation only: whether each world rectangle (x, y, w, h) collides with a Solid, using the game's own

@@ -315,6 +315,31 @@ class CelesteBridge:
 
     # Waiting
 
+    def _play_from_level_load(self, attempts: int = 2, timeout: float = 60.0) -> None:
+        """Play the file from the level load until it pauses on the savestate breakpoint.
+
+        Observed: when the TAS is still running on the map after "return to map", the first playback starts and
+        CelesteTAS disables it within a fraction of a second; a second playback from the disabled state reaches
+        the breakpoint normally. So a playback that starts and then stops before the breakpoint is played once
+        more. Anything else (never starting, a timeout, stopping again) raises.
+        """
+        for attempt in range(1, attempts + 1):
+            self.client.play_tas(self.tas_path)
+            started = False
+            deadline = time.perf_counter() + timeout
+            while True:
+                info = self.client.info()
+                if self._paused_on_breakpoint(info):
+                    return
+                if info.running and info.current_frame < self.warmup_frames:
+                    started = True
+                elif started and not info.running:
+                    break  # playback stopped before the breakpoint
+                if time.perf_counter() > deadline:
+                    raise BridgeError(f"Timed out waiting for playback to reach the savestate breakpoint; last info: {info}")
+                time.sleep(0.0005)
+        raise BridgeError(f"Playback stopped before the savestate breakpoint {attempts} times; last info: {info}")
+
     def _wait_for(self, predicate, description: str, timeout: float) -> TasInfo:
         deadline = time.perf_counter() + timeout
         while True:
@@ -362,11 +387,13 @@ class CelesteBridge:
         self._actions = []
         self._write_tas()
 
-        if not self.client.info().running:
-            # First episode, or the TAS was stopped: play the file from the level load. This
-            # creates the savestate, or loads it if this game session already has one.
-            self.client.play_tas(self.tas_path)
-            self._wait_for(self._paused_on_breakpoint, "playback to reach the savestate breakpoint", timeout=60.0)
+        info = self.client.info()
+        if not info.running or not info.room:
+            # First episode, the TAS was stopped, or the game is not in a level (for example after returning to
+            # the map, where the Restart hotkey cannot load the level savestate and CelesteTAS disables itself):
+            # play the file from the level load. This creates the savestate, or loads it if this game session
+            # already has one.
+            self._play_from_level_load()
         else:
             # The previous episode's inputs must be gone from CelesteTAS's copy of the file before
             # restarting, or they would be replayed. Advancing at the end of the file forces a

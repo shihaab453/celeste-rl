@@ -248,6 +248,38 @@ class LockstepFailureTests(unittest.TestCase):
         self.assertIsNone(step.extras)
         self.assertEqual(step.events, events)
 
+    def test_end_session_makes_the_next_reset_recover_fully(self):
+        game, http, bridge = self.make(normal_game)
+        bridge.reset()
+        self.assertEqual(http.resets, 1)
+        bridge.end_session("left the level")
+        with self.assertRaisesRegex(BridgeError, "call reset"):
+            bridge.step("R")
+        self.assertEqual(bridge.reset().tas_frame, 300)
+        self.assertEqual(http.resets, 2)
+        self.assertEqual({number for number, _ in game.requests}, {1, 2})
+
+    def test_leaving_the_level_makes_the_next_reset_recover_fully(self):
+        cases = {
+            "return to map": ([{"type": "level_exit", "mode": "GiveUp"}], True),
+            "restart chapter reloads the level": ([{"type": "level_exit", "mode": "Restart"},
+                                                   {"type": "load_level", "room": "1", "intro": "Jump"}], False),
+            "death": ([{"type": "death", "room": "1"}], False),
+        }
+        for name, (events, full) in cases.items():
+            with self.subTest(name):
+                def respond(request, _, events=events):
+                    if request["cmd"] == "reset":
+                        return reply(request, 300, extras=None, events=[])
+                    return reply(request, 301, state=None, extras=None, events=events)
+
+                game, http, bridge = self.make(respond)
+                bridge.reset()
+                bridge.step("R")
+                bridge.reset()
+                self.assertEqual(http.resets, 2 if full else 1)
+                self.assertEqual(len({number for number, _ in game.requests}), 2 if full else 1)
+
     def test_query_solids(self):
         def respond(request, _):
             if request["cmd"] == "query_solids":

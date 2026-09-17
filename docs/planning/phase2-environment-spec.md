@@ -1,6 +1,6 @@
 # Phase 2: Celeste environment specification (v2)
 
-Status: implementation steps 1 to 4 done (mod additions, schema and encoders, endings, reward and environment, training integration); step 5 (live probes) remains. The version tags `obs-v1`, `act-v1` and `rew-v1` are assigned in code (`celeste_rl/schema.py`, `celeste_rl/reward.py`) and are frozen before the Phase 3 campaign. Any later change gets a new tag.
+Status: all five implementation steps done, and live probes P1 to P11 pass (section 11.1). The version tags `obs-v1`, `act-v1` and `rew-v1` are assigned in code (`celeste_rl/schema.py`, `celeste_rl/reward.py`) and are frozen before the Phase 3 campaign. Any later change gets a new tag.
 
 Changes from the first draft: ending detection moves from state snapshots to game events captured by the mod (restarts hidden by loading were not detectable before); the observation gains control, collider and wall-boost state, a four-step history, exact units and a defined terminal encoding; the action mapping claim is narrowed to canonical input lines; the grid gets exact coordinates and an independent collision check; Stable-Baselines3 integration and bridge-fault recovery are specified; open decisions are decided; probes get pass thresholds.
 
@@ -60,7 +60,7 @@ The environment requires the lockstep bridge. The HTTP bridge has no extras or e
 ### 3.2 How inputs reach the game
 
 - Movement (`L R U D`), move-only (`M`) directions and all buttons are fed as separate keys. Opposing movement keys are allowed and resolved by the game.
-- **Dash-only directions are not four independent keys.** CelesteTAS resolves them into one dash aim: left wins over right and down wins over up, before the game sees them. So pressing the opposite dash-only direction while holding one does not create a new key event. This is documented behaviour of the input layer, tested in probe P5.
+- **Dash-only directions are not four independent keys.** CelesteTAS resolves them into one dash aim: left wins over right and down wins over up, before the game sees them. So pressing the opposite dash-only direction while holding one does not create a new key event. Confirmed by probe P5. The game reads the dash aim when the dash begins, after its opening freeze (4 frames after the press), so the direction held then decides the dash, not the one held on the press frame.
 - Alternate bindings (`J`/`K`, `X`/`C`, `Z`/`V`, `G`/`H`) have separate press edges, so holding one jump key and pressing the other re-presses jump. Both stay.
 - Talk and Cancel can only be pressed together with Dash or Journal, and analog stick angles are excluded. Both are CelesteTAS limits, stated as scope.
 - Physical binding set: the one exercised by `scripts/binding_audit.py`.
@@ -88,7 +88,7 @@ Sampled at the same boundary as `state`. `null` when there is no Level or no pla
 | Wall | `wallSlideTimer`, `wallSpeedRetentionTimer`, `wallSpeedRetained`, `wallBoostTimer` (float), `wallBoostDir` (int) |
 | Forced movement | `forceMoveX` (int), `forceMoveXTimer`, `climbNoMoveTimer` (float) |
 | Other | `LiftBoost` (vector property), `InControl`, `Dead`, `JustRespawned` (bool) |
-| Input buffers | private `bufferCounter` (float seconds) of `Input.Jump`, `Input.Dash`, `Input.CrouchDash`, read by field. Never through `Pressed` or `Check`, which can consume the buffer. Grab has no buffer (its buffer time is zero); its held state is in the action history |
+| Input buffers | private `bufferCounter` (float seconds) of `Input.Jump`, `Input.Dash`, `Input.CrouchDash`, read by field. Never through `Pressed` or `Check`, which can consume the buffer. A buffered press survives only while its button stays held: releasing it clears the buffer (probe P5). Grab has no buffer (its buffer time is zero); its held state is in the action history |
 | Level | `Level.Paused`, `Level.InCutscene` (bool), `Engine.FreezeTimer` (float seconds) |
 
 The final field list is fixed in implementation step 1 by reading the pinned `Celeste.dll`, and recorded with the assembly hash.
@@ -209,6 +209,7 @@ Each step is classified from that reply's events, then its state, in this order:
 - A pause event alone does not end the episode; paused frames still spend the deadline.
 - With menu inputs enabled, pause-menu retry is expected to produce `death`, restart chapter `restart` or `left_level`, and save and quit `left_level`. Probe P7 confirms each. Sequences that make CelesteTAS stop the TAS are a known bridge limitation; while they exist, menu inputs stay disabled for training (D1).
 - `info["ending"]` names the cause and `info["events"]` lists the step's events.
+- After `left_level` (for example "return to map"), the savestate reset over the socket cannot work. The lockstep bridge sees the level exit with no level loaded after it and makes the next reset a full recovery. From the map, CelesteTAS disables the first playback of the episode file right after it starts, and a second playback succeeds; the HTTP reset plays it once more in exactly that case (at most two attempts).
 - Observed on the fixtures after step 1: the exit route's `transition` (1 to 2) arrives on step 285, whose `state` still says room `1`, and its `load_level` (intro `Transition`) on step 286. The death route's `death` event arrives one step before the first frame without a player. The pause-menu restart arrives as `level_exit` (mode `Restart`) plus `load_level` (intro `Jump`, from the loader) on the step whose reply follows the loading. Resets carry no events.
 
 ## 7. Bridge faults
@@ -284,6 +285,24 @@ Results are saved under `runs/env-probes/<timestamp>/`.
 | P11 | Noninterference: P1, P2 and a random trace with `extras` and `events` enabled versus disabled | `state` identical on every frame |
 
 Zero passing does not prove absence: 1,000 fault-free episodes bound the fault rate at about 0.3% per episode (95%).
+
+### 11.1 Results
+
+Full run `runs/env-probes/20260917-145048` (P11: `runs/extras-noninterference/`), all passing:
+
+| ID | Result |
+|---|---|
+| P1 | `success` at step 285 in 10/10 repeats, identical observations, return 0.99525 |
+| P2 | `death` at step 74 in 10/10 repeats, identical observations |
+| P3 | `timeout` at 1,800, return -1.03 |
+| P4 | 30 pause and unpause cycles, `timeout` at 1,800 |
+| P5 | jump speed -105; held jump apex 20 px higher; buffered jump fires 3 frames before landing only while held, not after release and not from 8 frames before; alternate jump binding re-jumps while the first is held; ducking collider 6 px; crouch dash ducks; dash-only left + right dashes left while facing right and up + down dashes down |
+| P6 | 100 resets identical; exit, death and movement routes identical across 10 repeats with 5, 50 and 500 ms delays |
+| P7 | menus disabled: 1,000/1,000 episodes classified (all deaths, median 70 frames), zero faults. All inputs: 987 classified (246 death, 674 restart, 67 left_level); 13 faults, all CelesteTAS stopping the TAS during pause-menu sequences mid-episode, 13/13 reproduced exactly on replay. Menu inputs stay disabled for training (D1) |
+| P8 | 236 sampled frames, zero collision mismatches, zero schema violations |
+| P9 | environment 1,492 to 1,497 steps/s versus raw bridge 1,840 to 1,863 (81.1%, target 80%); environment overhead p50 116, p95 167, p99 254 microseconds; reset p50 5.0 ms, p95 13.2 ms. The margin is small; the encoder is the first place to optimise if later changes add cost |
+| P10 | exit (285), death (74) and three random episodes (46, 77, 294 frames) match plain TAS playback on every expected player frame |
+| P11 | state identical with extras and events on and off across exit, death, restart and 600 random frames |
 
 ## 12. Later observation versions
 

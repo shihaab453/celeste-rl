@@ -9,7 +9,6 @@ SchemaViolation. The environment treats that as a bridge fault: no transition, t
 """
 from __future__ import annotations
 
-import hashlib
 import math
 
 import numpy as np
@@ -68,41 +67,64 @@ def _number(value, path: tuple[str, ...]) -> float:
     return number
 
 
+def _compile_features():
+    """Per-feature (index, path, kind, scale, bounds_key) tuples, resolved once instead of on every step."""
+    compiled = []
+    for i, feature in enumerate(PLAYER_FEATURES):
+        bounds_key = {"room_x": ("X", "W"), "room_y": ("Y", "H")}.get(feature.kind)
+        compiled.append((i, feature.source, feature.kind, feature.scale, bounds_key))
+    return tuple(compiled)
+
+
+_COMPILED_FEATURES = _compile_features()
+_STATE_OFFSET = len(PLAYER_FEATURES)
+_OTHER_STATE = len(PLAYER_STATES) - 1
+
+
 def encode_player(state: dict, extras: dict) -> np.ndarray:
     """The player feature vector (float32, PLAYER_FEATURE_COUNT) for a frame with a player."""
     root = {"state": state, "extras": extras}
-    bounds = _lookup(root, ("state", "Level", "Bounds"))
     out = np.zeros(PLAYER_FEATURE_COUNT, dtype=np.float32)
-    for i, feature in enumerate(PLAYER_FEATURES):
-        raw = _lookup(root, feature.source)
-        if feature.kind == "flag":
-            if not isinstance(raw, bool):
-                raise SchemaViolation(f"{'.'.join(feature.source)} is not a boolean: {raw!r}")
-            out[i] = float(raw)
-            continue
-        number = _number(raw, feature.source)
-        if feature.kind == "value":
-            out[i] = number / feature.scale
-        elif feature.kind == "nonzero":
-            out[i] = float(number != 0)
-        elif feature.kind == "buffer":
-            out[i] = max(number, 0.0) / feature.scale
-        elif feature.kind == "room_x":
-            out[i] = (number - _number(bounds.get("X"), ("Bounds", "X"))) / _number(bounds.get("W"), ("Bounds", "W"))
-        elif feature.kind == "room_y":
-            out[i] = (number - _number(bounds.get("Y"), ("Bounds", "Y"))) / _number(bounds.get("H"), ("Bounds", "H"))
-        else:
-            raise AssertionError(f"unknown feature kind {feature.kind}")
-    state_index = _lookup(root, STATE_SOURCE)
-    if isinstance(state_index, bool) or not isinstance(state_index, int):
+    values = [0.0] * _STATE_OFFSET
+    try:
+        bounds = root["state"]["Level"]["Bounds"]
+        for i, path, kind, scale, bounds_key in _COMPILED_FEATURES:
+            raw = root
+            for key in path:
+                raw = raw[key]
+            if kind == "flag":
+                if raw is not True and raw is not False:
+                    raise SchemaViolation(f"{'.'.join(path)} is not a boolean: {raw!r}")
+                values[i] = 1.0 if raw else 0.0
+                continue
+            if raw.__class__ is not float and raw.__class__ is not int:
+                raise SchemaViolation(f"{'.'.join(path)} is not a number: {raw!r}")
+            if kind == "value":
+                values[i] = raw / scale
+            elif kind == "nonzero":
+                values[i] = 1.0 if raw != 0 else 0.0
+            elif kind == "buffer":
+                values[i] = (raw if raw > 0 else 0.0) / scale
+            else:
+                origin, size = bounds[bounds_key[0]], bounds[bounds_key[1]]
+                if origin.__class__ not in (int, float) or size.__class__ not in (int, float):
+                    raise SchemaViolation(f"Level.Bounds is not numeric: {bounds!r}")
+                values[i] = (raw - origin) / size
+        state_index = root["extras"]["player"]["State"]
+    except (KeyError, TypeError) as error:
+        raise SchemaViolation(f"missing or malformed field: {error!r}") from None
+    if state_index.__class__ is not int:
         raise SchemaViolation(f"player state is not an integer: {state_index!r}")
-    other = len(PLAYER_STATES) - 1
-    out[len(PLAYER_FEATURES) + (state_index if 0 <= state_index < other else other)] = 1.0
+    out[:_STATE_OFFSET] = values
+    if not np.all(np.isfinite(out[:_STATE_OFFSET])):
+        bad = [PLAYER_FEATURES[i].name for i in np.flatnonzero(~np.isfinite(out[:_STATE_OFFSET]))]
+        raise SchemaViolation(f"not finite: {bad}")
+    out[_STATE_OFFSET + (state_index if 0 <= state_index < _OTHER_STATE else _OTHER_STATE)] = 1.0
     return out
 
 
 class GeometryCache:
-    """Room tile solidity parsed from SolidsData, cached by room name, bounds and a hash of the tile text."""
+    """Room tile solidity parsed from SolidsData, cached by room name, bounds and the tile text."""
 
     def __init__(self):
         self._key = None
@@ -113,8 +135,8 @@ class GeometryCache:
         if not isinstance(text, str):
             raise SchemaViolation("SolidsData is not a string")
         bounds = state["Level"]["Bounds"]
-        key = (state.get("RoomName"), bounds["X"], bounds["Y"], bounds["W"], bounds["H"],
-               hashlib.sha1(text.encode()).hexdigest())
+        # Comparing the tile text itself is cheaper than hashing it on every step.
+        key = (state.get("RoomName"), bounds["X"], bounds["Y"], bounds["W"], bounds["H"], text)
         if key != self._key:
             rows = text.replace("\r", "").split("\n")
             width = max(len(row) for row in rows)
@@ -233,9 +255,9 @@ class ObservationBuilder:
     def step(self, state: dict | None, extras: dict | None, applied_action: np.ndarray, elapsed: int) -> dict[str, np.ndarray]:
         # Encode first, so a schema violation leaves the history untouched.
         player, grid, present = self._encode_current(state, extras)
-        self._player = np.roll(self._player, 1, axis=0)
-        self._actions = np.roll(self._actions, 1, axis=0)
-        self._valid = np.roll(self._valid, 1)
+        self._player[1:] = self._player[:-1].copy()
+        self._actions[1:] = self._actions[:-1].copy()
+        self._valid[1:] = self._valid[:-1].copy()
         self._player[0], self._actions[0], self._valid[0], self._grid = player, applied_action, 1, grid
         self._context[:] = (elapsed / DEADLINE_FRAMES, float(present))
         return self.observation()
