@@ -140,14 +140,14 @@ Timers are in seconds as exported and divided by a scale; they are not converted
 | Direction | `Facing` (-1 or 1), `DashDir` x and y, `wallBoostDir`, `forceMoveX` | [-1, 1] |
 | Collider | collider and hurtbox height and top offset relative to `Position`, / 11 | [-1.5, 1] |
 | Jump | `JumpTimer / 0.25`, `jumpGraceTimer / 0.1`, `varJumpSpeed / 160`, `AutoJumpTimer / 0.1`, `MaxFall / 320` | about [-1, 1] |
-| Dash timers | `dashCooldownTimer / 0.2`, `dashRefillCooldownTimer / 0.2`, `dashAttackTimer / 0.3` | [0, 1] |
-| Wall | `wallSlideTimer / 1.2`, `wallSpeedRetentionTimer / 0.06`, `wallSpeedRetained / 400`, `wallBoostTimer / 0.15` | about [-1, 1] |
+| Dash timers | `dashCooldownTimer / 0.2`, `dashRefillCooldownTimer / 0.1`, `dashAttackTimer / 0.3` | [0, 1] |
+| Wall | `wallSlideTimer / 1.2`, `wallSpeedRetentionTimer / 0.06`, `wallSpeedRetained / 400`, `wallBoostTimer / 0.2` | about [-1, 1] |
 | Forced movement | `forceMoveXTimer / 0.2`, `climbNoMoveTimer / 0.1` | [0, 1] |
 | Input buffers | jump, dash, crouch dash `bufferCounter / 0.08`; a value of 0 or below means no buffered press and is encoded as 0 | [0, 1] |
 | Control | `Level.Paused`, `Level.InCutscene`, `Engine.FreezeTimer / 0.1` | [0, 1] |
 | Movement state | one-hot over the 26 vanilla state indices (`StNormal` = 0 to `StIntroThinkForABit` = 25), plus one "other" slot | 0 or 1 |
 
-- Scales come from game constants (dash speed 240, super horizontal 260, 0.08 s input buffer, 0.2 s var jump and dash cooldown, 110 stamina, 250 lift boost cap). They are checked against the pinned binary in step 1 and fixed in `schema.py`; the table there, not this page, is authoritative once versioned.
+- Scales come from game constants (dash speed 240, super horizontal 260, 0.08 s input buffer, 0.2 s var jump and dash cooldown, 0.1 s dash refill cooldown, 0.2 s wall boost window, 110 stamina, 250 lift boost cap). They are checked against the pinned binary in step 1 and fixed in `schema.py`; the table there, not this page, is authoritative once versioned.
 - Feature order, the state enumeration and every scale are part of the schema fingerprint. A checkpoint records the fingerprint and refuses to load with a different one.
 
 ### 5.2 `grid`
@@ -160,7 +160,7 @@ Timers are in seconds as exported and divided by a scale; they are not converted
 |---|---|---|
 | 0 | solid | `SolidsData` characters other than `0` (foreground solid tiles), plus `StaticSolids` rectangles, re-read every step because they can move |
 | 1-4 | jump-through facing up, down, left, right | `JumpThrus` (only the types CelesteTAS exports: `JumpthruPlatform`, `SidewaysJumpThru`, `UpsideDownJumpThru`) |
-| 5-8 | spikes pointing up, down, left, right | `Spikes` with `Direction` (0 up, 1 down, 2 left, 3 right) |
+| 5-8 | spikes pointing up, down, left, right | `Spikes` with `Direction` (0 up, 1 down, 2 left, 3 right), shifted to the hitbox: CelesteTAS exports an entity's position with its collider's size, and up spikes' hitbox is 3 px above the position (left spikes' 3 px left) |
 | 9 | other hazards | `Lightning` rectangles; `Spinners` exported as positions, stamped as a 16 x 16 box around the position (a declared approximation, checked in step 2) |
 | 10 | outside the room | any part of the cell outside `Level.Bounds`. Room 1's tiles span 184 px but its bounds are 180 px, so the bottom tile row is partly outside |
 
