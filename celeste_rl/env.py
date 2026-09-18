@@ -13,6 +13,12 @@ retries a step.
 
 What leaves the environment besides the observation (reward components, ending cause, events, applied action,
 frame) is returned in `info` and is never part of the observation.
+
+Starts: by default every episode begins at the canonical start. With a `start_sampler`, an episode may instead
+begin from a state the agent reached before, by resetting canonically and replaying that state's inputs. The
+replayed frames are not transitions and earn no reward; `elapsed` begins at the prefix length, so the 30 second
+deadline still covers the whole route. A stale entry that no longer reproduces falls back to the canonical
+start with the reason in `info`, because a bad recipe is not a bridge fault.
 """
 from __future__ import annotations
 
@@ -22,13 +28,14 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from celeste_rl.actions import apply_disabled, disabled_mask, to_parts
+from celeste_rl.actions import apply_disabled, disabled_mask, parse_line, to_line, to_parts
 from celeste_rl.bridge import BridgeError
 from celeste_rl.endings import EndingFault, RoomTask, classify
 from celeste_rl.observation import ObservationBuilder, SchemaViolation, observation_space
 from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
 from celeste_rl.schema import ACT_VERSION, ACTION_INPUTS, FINGERPRINT, MENU_INPUTS, OBS_VERSION
+from celeste_rl.starts import Start, StartArchive
 
 # The canonical start: TAS frame 300 of the episode prefix, room 1, standing at (19, 144) with one dash.
 CANONICAL_START = {"room": "1", "position": (19, 144), "dashes": 1}
@@ -42,12 +49,20 @@ class CelesteRoomEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, bridge, disabled_inputs: Iterable[str] = MENU_INPUTS, task: RoomTask = RoomTask(),
-                 reward_config: RewardConfig = RewardConfig()):
+                 reward_config: RewardConfig = RewardConfig(), start_sampler=None,
+                 archive: StartArchive | None = None):
         """`bridge` is a LockstepBridge (or anything with the same reset/step/close). `disabled_inputs` defaults to
-        pause, quick restart and journal (decision D1); pass () to enable all 24 inputs."""
+        pause, quick restart and journal (decision D1); pass () to enable all 24 inputs.
+
+        `start_sampler` is called with no arguments at each reset and returns a `Start` to begin from, or None
+        for the canonical start. `archive` collects the states this environment reaches. They are separate so
+        that an evaluation can run held-out starts without writing to the archive it is measuring.
+        """
         self.bridge = bridge
         self.task = task
         self.reward_config = reward_config
+        self.start_sampler = start_sampler
+        self.archive = archive
         self.disabled_inputs = tuple(disabled_inputs)
         self._mask = disabled_mask(self.disabled_inputs)
         self.action_space = spaces.MultiBinary(len(ACTION_INPUTS))
@@ -60,6 +75,9 @@ class CelesteRoomEnv(gym.Env):
         # run can be compared with a shaped one, but only rew-v2 pays anything for it.
         self._potential: RoomPotential | None = None
         self._potential_value = 0.0
+        # The input lines of the episode so far, including any replayed start prefix. This is what an archive
+        # entry is made of, so it is kept whenever an archive is attached and left empty otherwise.
+        self._lines: list[str] = []
 
     def _info(self, **extra) -> dict:
         return {
@@ -111,20 +129,70 @@ class CelesteRoomEnv(gym.Env):
         return {"x": position["X"], "y": position["Y"], "speed_x": speed["X"], "speed_y": speed["Y"],
                 "dashes": player.get("Dashes")}
 
+    def _replay(self, start: Start):
+        """Play a start's inputs from the canonical start. Returns (observation, obs, problem); problem is None
+        on success and a short reason otherwise.
+
+        These frames are not transitions: no reward is computed, nothing is returned to the learner, and the
+        episode's step count begins at the end of them. They do go through the observation builder, so the
+        history the policy sees at its first real step is the history it would have had if it had played here
+        itself (Codex K5).
+        """
+        observation, obs = None, None
+        for index, line in enumerate(start.lines, start=1):
+            applied = apply_disabled(parse_line(line), self._mask)
+            try:
+                observation = self.bridge.step(*to_parts(applied))
+                ending = classify(observation.events, observation.state, index, self.task)
+                obs = self._builder.step(observation.state, observation.extras, applied, index)
+            except (EndingFault, SchemaViolation) as error:
+                return observation, obs, f"frame {index} of the prefix could not be interpreted: {error}"
+            if ending is not None:
+                return observation, obs, f"the prefix ended the episode at frame {index} ({ending})"
+        facts = self._player_facts(observation.state, observation.extras)
+        if facts is None:
+            return observation, obs, "the prefix ended with no player"
+        arrived = (facts["x"], facts["y"])
+        if arrived != tuple(start.position):
+            return observation, obs, f"the prefix arrived at {arrived}, not {tuple(start.position)}"
+        if observation.room != start.room:
+            return observation, obs, f"the prefix arrived in room {observation.room!r}, not {start.room!r}"
+        if start.dashes is not None and facts["dashes"] != start.dashes:
+            return observation, obs, f"the prefix arrived with {facts['dashes']} dashes, not {start.dashes}"
+        return observation, obs, None
+
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
         self._ready = False
+        start = (options or {}).get("start")
+        if start is None and self.start_sampler is not None and not (options or {}).get("canonical"):
+            start = self.start_sampler()
+        problem = None
         try:
             observation = self.bridge.reset()
             self._check_start(observation)
             obs = self._builder.reset(observation.state, observation.extras)
+            if start is not None:
+                replayed, replayed_obs, problem = self._replay(start)
+                if problem is None:
+                    observation, obs = replayed, replayed_obs
+                else:
+                    # A stale entry is not a bridge fault: the bridge is fine, the recipe is not. Start
+                    # canonically instead and say so, so the caller can drop the entry.
+                    observation = self.bridge.reset()
+                    self._check_start(observation)
+                    obs = self._builder.reset(observation.state, observation.extras)
         except (BridgeError, SchemaViolation) as error:
             raise BridgeFault(f"reset failed: {error}") from error
-        self._elapsed = 0
+        used = start if problem is None else None
+        self._elapsed = used.frames if used is not None else 0
+        self._lines = list(used.lines) if (used is not None and self.archive is not None) else []
         self._potential_value = self._start_potential(observation.state)
         self._ready = True
-        return obs, self._info(start="canonical", frame=observation.tas_frame, reset_events=observation.events,
-                               potential=self._potential_value,
+        return obs, self._info(start="archive" if used is not None else "canonical",
+                               start_frames=used.frames if used is not None else 0,
+                               start_problem=problem, frame=observation.tas_frame,
+                               reset_events=observation.events, potential=self._potential_value,
                                player=self._player_facts(observation.state, observation.extras))
 
     def step(self, action):
@@ -156,9 +224,14 @@ class CelesteRoomEnv(gym.Env):
         self._potential_value = value
         components = reward_components(ending, self.reward_config, elapsed, shaping)
         self._ready = not terminated
+        player = self._player_facts(observation.state, observation.extras)
+        if self.archive is not None:
+            self._lines.append(to_line(applied))
+            if player is not None and self.archive.would_keep((player["x"], player["y"]), len(self._lines)):
+                self.archive.offer(Start(tuple(self._lines), (player["x"], player["y"]), observation.room,
+                                         player["dashes"]))
         info = self._info(ending=ending, events=observation.events, reward_components=components,
-                          applied_action=applied, frame=observation.tas_frame, potential=value,
-                          player=self._player_facts(observation.state, observation.extras))
+                          applied_action=applied, frame=observation.tas_frame, potential=value, player=player)
         return obs, float(sum(components.values())), terminated, False, info
 
     def _start_potential(self, state: dict | None) -> float:

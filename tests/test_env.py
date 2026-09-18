@@ -35,6 +35,7 @@ from celeste_rl.env import BridgeFault, CelesteRoomEnv
 from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
 from celeste_rl.schema import ACTION_INPUTS, DEADLINE_FRAMES
+from celeste_rl.starts import Start, StartArchive
 
 FIXTURE = json.loads((Path(__file__).resolve().parent / "fixtures" / "env_replies.json").read_text(encoding="utf-8"))
 START = next(s for s in FIXTURE["room1_exit_dash_route"]["samples"] if "start" in s["reasons"])
@@ -166,6 +167,20 @@ class RewardV2Tests(unittest.TestCase):
             for earlier, later in zip(totals, totals[1:]):
                 self.assertLessEqual(earlier, later + 1e-12, f"{ending}: failing earlier pays more")
 
+    def test_a_failure_from_a_varied_start_still_costs_the_same_whenever_it_happens(self):
+        """With a prefix of P frames the per-step time cost only runs for the counted steps, so a failure at
+        elapsed t costs -1 - (1800 - P)/60,000: it depends on the start, never on when the failure came."""
+        for prefix_frames in (0, 60, 300, 900):
+            totals = []
+            for elapsed in (prefix_frames + 1, prefix_frames + 200, DEADLINE_FRAMES):
+                counted = elapsed - prefix_frames
+                ending_step = reward_components(DEATH, V2, elapsed)
+                totals.append(sum(ending_step.values()) + (counted - 1) * V2.time_per_frame)
+            expected = -1 - (DEADLINE_FRAMES - prefix_frames) / 60_000
+            for total in totals:
+                with self.subTest(prefix=prefix_frames):
+                    self.assertAlmostEqual(total, expected, places=10)
+
     def test_success_always_beats_every_failure(self):
         worst_success = 1 + DEADLINE_FRAMES * V2.time_per_frame
         self.assertGreater(worst_success, episode_total(DEATH, 1))
@@ -287,6 +302,124 @@ class ShapingTests(unittest.TestCase):
         env.reset()
         self.assertIs(env._potential, built)
 
+
+
+class MovingBridge(ReplayBridge):
+    """A bridge whose player follows a fixed path of positions, one per step, repeating the last one forever.
+
+    Unlike WalkingBridge it never ends the episode, so a start prefix can be replayed through it and the
+    episode carried on afterwards.
+    """
+
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def step(self, buttons="", dash_only="", move_only=""):
+        observation = super().step(buttons, dash_only, move_only)
+        x, y = self.path[min(self.index, len(self.path)) - 1]
+        observation.state["Player"]["Position"] = {"X": x, "Y": y}
+        return observation
+
+
+PATH = [(27, 144), (35, 144), (43, 140), (51, 136), (59, 132), (67, 128)]
+
+
+def prefix(frames: int, position, room: str = "1", dashes: int | None = 1) -> Start:
+    return Start(tuple("1,R" for _ in range(frames)), position, room, dashes)
+
+
+class StartReplayTests(unittest.TestCase):
+    """Starting an episode from a state the agent reached before (Codex K5)."""
+
+    def test_the_prefix_is_replayed_and_does_not_count_as_transitions(self):
+        bridge = MovingBridge(PATH)
+        env = CelesteRoomEnv(bridge, start_sampler=lambda: prefix(3, PATH[2]))
+        _, info = env.reset()
+        self.assertEqual(info["start"], "archive")
+        self.assertEqual(info["start_frames"], 3)
+        self.assertIsNone(info["start_problem"])
+        # The three prefix frames were sent to the game but are not transitions the learner sees.
+        self.assertEqual(len(bridge.sent), 3)
+        # elapsed begins at the prefix length, so the 30 second deadline covers the whole route.
+        self.assertEqual(info["elapsed"], 3)
+        self.assertEqual((info["player"]["x"], info["player"]["y"]), PATH[2])
+        _, _, _, _, info = env.step(noop())
+        self.assertEqual(info["elapsed"], 4)
+
+    def test_the_observation_history_is_filled_by_the_replay(self):
+        """The policy's first real step must see the history it would have had if it had played here itself."""
+        env = CelesteRoomEnv(MovingBridge(PATH), start_sampler=lambda: prefix(4, PATH[3]))
+        obs, _ = env.reset()
+        self.assertTrue(obs["history_valid"].all(), "a replayed start should leave no blank history slots")
+        canonical = CelesteRoomEnv(MovingBridge(PATH))
+        fresh, _ = canonical.reset()
+        self.assertFalse(fresh["history_valid"].all(), "a canonical start has nothing behind it yet")
+
+    def test_an_entry_that_arrives_somewhere_else_falls_back_to_canonical(self):
+        """A stale recipe is not a bridge fault: the bridge is fine, so the run continues and says what happened."""
+        env = CelesteRoomEnv(MovingBridge(PATH), start_sampler=lambda: prefix(3, (200, 40)))
+        _, info = env.reset()
+        self.assertEqual(info["start"], "canonical")
+        self.assertEqual(info["elapsed"], 0)
+        self.assertIn("arrived at", info["start_problem"])
+        self.assertEqual((info["player"]["x"], info["player"]["y"]), (19, 144))
+
+    def test_a_prefix_that_dies_falls_back_too(self):
+        env = CelesteRoomEnv(ReplayBridge("room1_spike_death_route"), start_sampler=lambda: prefix(100, (60, 164)))
+        _, info = env.reset()
+        self.assertEqual(info["start"], "canonical")
+        self.assertIn("ended the episode", info["start_problem"])
+
+    def test_a_wrong_dash_count_is_caught(self):
+        env = CelesteRoomEnv(MovingBridge(PATH), start_sampler=lambda: prefix(3, PATH[2], dashes=0))
+        _, info = env.reset()
+        self.assertEqual(info["start"], "canonical")
+        self.assertIn("dashes", info["start_problem"])
+
+    def test_no_sampler_means_every_episode_is_canonical(self):
+        env = CelesteRoomEnv(MovingBridge(PATH))
+        _, info = env.reset()
+        self.assertEqual((info["start"], info["start_frames"], info["elapsed"]), ("canonical", 0, 0))
+
+    def test_a_caller_can_force_the_canonical_start(self):
+        """Evaluation on the canonical start must not be diverted by the training sampler."""
+        env = CelesteRoomEnv(MovingBridge(PATH), start_sampler=lambda: prefix(3, PATH[2]))
+        _, info = env.reset(options={"canonical": True})
+        self.assertEqual(info["start"], "canonical")
+
+    def test_a_caller_can_pass_a_start_directly(self):
+        env = CelesteRoomEnv(MovingBridge(PATH))
+        _, info = env.reset(options={"start": prefix(2, PATH[1])})
+        self.assertEqual((info["start"], info["start_frames"]), ("archive", 2))
+
+
+class ArchiveRecordingTests(unittest.TestCase):
+    def test_reached_states_are_offered_to_the_archive(self):
+        archive = StartArchive(seed=0)
+        env = CelesteRoomEnv(MovingBridge(PATH), archive=archive)
+        env.reset()
+        for _ in range(len(PATH)):
+            env.step(noop())
+        self.assertEqual(len(archive), len({(int(x // 8), int(y // 8)) for x, y in PATH}))
+        entry = archive.starts[(PATH[0][0] // 8, PATH[0][1] // 8)]
+        self.assertEqual(entry.frames, 1, "the first cell should be reachable in one frame")
+        self.assertEqual(entry.position, PATH[0])
+
+    def test_a_prefix_is_carried_into_the_entries_it_leads_to(self):
+        """An entry found after a replayed start must replay from the canonical start, not from that start."""
+        archive = StartArchive(seed=0)
+        env = CelesteRoomEnv(MovingBridge(PATH), archive=archive, start_sampler=lambda: prefix(3, PATH[2]))
+        env.reset()
+        env.step(noop())
+        entry = archive.starts[(PATH[3][0] // 8, PATH[3][1] // 8)]
+        self.assertEqual(entry.frames, 4, "3 replayed frames plus the one real step")
+
+    def test_without_an_archive_nothing_is_recorded_and_no_history_is_kept(self):
+        env = CelesteRoomEnv(MovingBridge(PATH))
+        env.reset()
+        env.step(noop())
+        self.assertEqual(env._lines, [])
 
 
 class RecordedEpisodeTests(unittest.TestCase):
