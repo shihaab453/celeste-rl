@@ -56,7 +56,7 @@ from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.observation import observation_space  # noqa: E402
 from celeste_rl.schema import ACTION_INPUTS, MENU_INPUTS  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
-from celeste_rl.training.policy import policy_kwargs  # noqa: E402
+from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E402
 
 DEFAULT_ROUTE = REPO / "tests" / "fixtures" / "room1_exit_dash_route.json"
 OBS_KEYS = ("player", "actions", "history_valid", "grid", "context")
@@ -140,7 +140,7 @@ def load_dataset(path: Path) -> dict:
 def fit(data: dict, seed: int, epochs: int, batch_size: int, learning_rate: float) -> dict:
     """Stage 2: fit the training policy's action head to the recorded pairs with binary cross entropy."""
     th.manual_seed(seed)
-    model = PPO("MultiInputPolicy", _SpacesOnly(), policy_kwargs=policy_kwargs(), device="cpu", seed=seed)
+    model = PPO(CelestePolicy, _SpacesOnly(), policy_kwargs=policy_kwargs(), device="cpu", seed=seed)
     policy = model.policy
     policy.set_training_mode(True)
     optimizer = th.optim.Adam(policy.parameters(), lr=learning_rate)

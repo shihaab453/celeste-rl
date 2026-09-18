@@ -50,7 +50,7 @@ from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.schema import MENU_INPUTS
 from celeste_rl.starts import StartArchive
-from celeste_rl.training.policy import policy_kwargs
+from celeste_rl.training.policy import CelestePolicy, policy_kwargs
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 
 
@@ -76,6 +76,10 @@ class TrainConfig:
     reward_version: str = "rew-v1"
     shaping_scale: float = 0.2  # rew-v2 only
     # starts-v1 (Codex K5, K10). Off by default, so the baseline and the shaped diagnostics stay reproducible.
+    # The initial bias on every action logit. 0.0 is probability 0.5 per input, which samples about twelve of
+    # the 21 enabled inputs at once; -2.2 is 0.10 per input, about 2.3 at once, which is what real play looks
+    # like. 0.0 reproduces every run before 2026-09-18.
+    action_bias: float = 0.0
     varied_starts: bool = False
     canonical_fraction: float = 0.25  # the share of training episodes that still begin at the canonical start
     max_start_frames: int = 600  # a start costing more than a third of the deadline to reach is not archived
@@ -390,8 +394,10 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
         if manifest_path.exists():
             raise FileExistsError(f"{run_dir} already holds a run; resume it or choose another directory")
         model = SupervisedPPO(
-            "MultiInputPolicy", env, policy_kwargs=policy_kwargs(), n_steps=config.n_steps, batch_size=config.batch_size,
-            n_epochs=config.n_epochs, learning_rate=config.learning_rate, gamma=config.gamma, gae_lambda=config.gae_lambda,
+            CelestePolicy, env, policy_kwargs=policy_kwargs(config.action_bias), n_steps=config.n_steps,
+            batch_size=config.batch_size,
+            n_epochs=config.n_epochs, learning_rate=config.learning_rate, gamma=config.gamma,
+            gae_lambda=config.gae_lambda,
             clip_range=config.clip_range, ent_coef=config.ent_coef, vf_coef=config.vf_coef,
             max_grad_norm=config.max_grad_norm, seed=config.seed, device=config.device,
             max_consecutive_discards=config.max_consecutive_discards)

@@ -10,6 +10,7 @@ contain only data collected after the latest fault.
 from __future__ import annotations
 
 import copy
+import math
 import tempfile
 import unittest
 from pathlib import Path
@@ -23,7 +24,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecMonitor
 from celeste_rl.bridge import BridgeError, BridgeTransportError
 from celeste_rl.env import BridgeFault, CelesteRoomEnv
 from celeste_rl.schema import ACTION_INPUTS, HISTORY, PLAYER_FEATURE_COUNT, PLAYER_FEATURE_NAMES
-from celeste_rl.training.policy import CelesteFeatures, policy_kwargs
+from celeste_rl.training.policy import (
+    CelesteFeatures,
+    CelestePolicy,
+    bias_for_probability,
+    policy_kwargs,
+)
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_env import ReplayBridge
 
@@ -89,7 +95,7 @@ def assert_same_weights(expected: dict, actual: dict) -> None:
 
 
 def make(bridge: EpochBridge, **kwargs) -> RecordingPPO:
-    return RecordingPPO("MultiInputPolicy", CelesteRoomEnv(bridge), bridge=bridge, policy_kwargs=policy_kwargs(),
+    return RecordingPPO(CelestePolicy, CelesteRoomEnv(bridge), bridge=bridge, policy_kwargs=policy_kwargs(),
                         n_steps=32, batch_size=32, n_epochs=1, gamma=1.0, device="cpu", seed=0, **kwargs)
 
 
@@ -230,8 +236,54 @@ class SupervisorTests(unittest.TestCase):
     def test_only_dummy_vec_env_is_supported(self):
         env = VecMonitor(DummyVecEnv([lambda: CelesteRoomEnv(EpochBridge())]))
         with self.assertRaisesRegex(TypeError, "DummyVecEnv"):
-            SupervisedPPO("MultiInputPolicy", env, policy_kwargs=policy_kwargs(), n_steps=32, batch_size=32, device="cpu")
+            SupervisedPPO(CelestePolicy, env, policy_kwargs=policy_kwargs(), n_steps=32, batch_size=32, device="cpu")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ActionBiasTests(unittest.TestCase):
+    """How many inputs a fresh policy holds at once.
+
+    act-v1 is 24 independent on/off inputs, so a zero bias means every one starts at probability 0.5 and the
+    policy samples about twelve buttons held at once, every frame. A recorded clear of room 1 holds 2.31 per
+    frame and never more than three.
+    """
+
+    @staticmethod
+    def expected_inputs_per_frame(action_bias: float) -> float:
+        model = SupervisedPPO(CelestePolicy, CelesteRoomEnv(EpochBridge()), policy_kwargs=policy_kwargs(action_bias),
+                              n_steps=32, batch_size=32, device="cpu", seed=0)
+        with th.no_grad():
+            return float(th.sigmoid(model.policy.action_net.bias).sum())
+
+    def test_the_default_still_samples_twelve_inputs_at_once(self):
+        """Unchanged from every run before the sparse initialisation, so those stay reproducible."""
+        self.assertAlmostEqual(self.expected_inputs_per_frame(0.0), 12.0, delta=0.5)
+
+    def test_a_negative_bias_gives_the_sparsity_real_play_has(self):
+        self.assertAlmostEqual(self.expected_inputs_per_frame(bias_for_probability(0.10)), 2.4, delta=0.3)
+
+    def test_the_bias_maps_to_the_probability_it_claims(self):
+        for probability in (0.05, 0.10, 0.25, 0.5):
+            with self.subTest(probability=probability):
+                bias = bias_for_probability(probability)
+                self.assertAlmostEqual(1 / (1 + math.exp(-bias)), probability, places=9)
+        self.assertAlmostEqual(bias_for_probability(0.10), -2.197, places=3)
+        for bad in (0.0, 1.0, -0.5):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                bias_for_probability(bad)
+
+    def test_the_bias_survives_a_save_and_load(self):
+        """A resumed run must keep its learned biases, not have the initial one reapplied."""
+        model = SupervisedPPO(CelestePolicy, CelesteRoomEnv(EpochBridge()),
+                              policy_kwargs=policy_kwargs(bias_for_probability(0.10)), n_steps=32, batch_size=32,
+                              device="cpu", seed=0)
+        with th.no_grad():
+            model.policy.action_net.bias.fill_(0.75)   # stand in for what training would have learned
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "model.zip"
+            model.save(path)
+            loaded = SupervisedPPO.load(path, device="cpu")
+        self.assertTrue(th.allclose(loaded.policy.action_net.bias, th.full((len(ACTION_INPUTS),), 0.75)))

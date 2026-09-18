@@ -32,7 +32,7 @@ from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
-from celeste_rl.training.policy import policy_kwargs  # noqa: E402
+from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E402
 from celeste_rl.training.run import TrainConfig  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
 
@@ -132,7 +132,8 @@ def main() -> int:
         results["runtime"], results["runtime_problems"] = manifest, problems
         results["attributable"] = runtime.attributable(git, problems)
 
-        untrained = SupervisedPPO("MultiInputPolicy", env, policy_kwargs=policy_kwargs(), n_steps=64, batch_size=64,
+        untrained = SupervisedPPO(CelestePolicy, env, policy_kwargs=policy_kwargs(config.action_bias),
+                                  n_steps=64, batch_size=64,
                                   device="cpu", seed=config.seed)
         for name, model in [("untrained (same architecture, seed)", untrained)] + \
                            [(n, SupervisedPPO.load(checkpoint_dir / n, env=env, device="cpu")) for n in names]:
