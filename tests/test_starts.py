@@ -11,7 +11,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from celeste_rl.starts import Start, StartArchive, cell_of
+from celeste_rl.starts import OUTCOME_WINDOW, Start, StartArchive, cell_of
 
 
 def start(frames: int, x: float, y: float, room: str = "1") -> Start:
@@ -114,6 +114,104 @@ class ArchiveTests(unittest.TestCase):
     def test_a_start_round_trips_through_json(self):
         original = start(3, 80, 120)
         self.assertEqual(Start.from_json(json.loads(json.dumps(original.to_json()))), original)
+
+
+class ReverseCurriculumTests(unittest.TestCase):
+    """`sampling="success"`: weight cells by how often the agent clears them, so the band it is learning moves
+    backwards from the exit without anything measuring distance to the exit."""
+
+    def archive(self, cells=4) -> StartArchive:
+        archive = StartArchive(canonical_fraction=0.0, seed=0, sampling="success")
+        for i in range(cells):
+            archive.offer(start(10 + i, 80 + 8 * i, 120))
+        return archive
+
+    def test_an_unmeasured_cell_reads_as_half(self):
+        """So the frontier is tried first rather than last."""
+        archive = self.archive()
+        self.assertEqual(archive.success_rate((99, 99)), 0.5)
+        self.assertAlmostEqual(archive.weight((99, 99)), 0.25)
+
+    def test_mastered_and_hopeless_cells_are_both_down_weighted(self):
+        archive = self.archive()
+        mastered, hopeless, learning = start(10, 80, 120), start(11, 88, 120), start(12, 96, 120)
+        for _ in range(OUTCOME_WINDOW):
+            archive.record_outcome(mastered, True)
+            archive.record_outcome(hopeless, False)
+        for i in range(OUTCOME_WINDOW):
+            archive.record_outcome(learning, i % 2 == 0)
+        weights = {name: archive.weight(cell_of(s.position))
+                   for name, s in (("mastered", mastered), ("hopeless", hopeless), ("learning", learning))}
+        self.assertGreater(weights["learning"], 3 * weights["mastered"])
+        self.assertGreater(weights["learning"], 3 * weights["hopeless"])
+        self.assertGreaterEqual(min(weights.values()), 0.01, "no cell should be excluded outright")
+
+    def test_the_curriculum_moves_backwards_as_cells_are_mastered(self):
+        """The behaviour the whole change exists for: once the exit-side cells are reliable, sampling shifts
+        to the ones behind them."""
+        archive = self.archive()
+        near_exit = [start(10, 80, 120), start(11, 88, 120)]
+        for s in near_exit:
+            for _ in range(OUTCOME_WINDOW):
+                archive.record_outcome(s, True)
+        def mastered_share(a):
+            drawn = Counter(cell_of(s.position) for s in (a.sample() for _ in range(4000)) if s)
+            return sum(drawn[cell_of(s.position)] for s in near_exit) / sum(drawn.values())
+
+        # Coverage sampling would keep drawing them: four cells, so half the draws.
+        coverage = StartArchive(canonical_fraction=0.0, seed=0)
+        for i in range(4):
+            coverage.offer(start(10 + i, 80 + 8 * i, 120))
+        self.assertAlmostEqual(mastered_share(coverage), 0.5, delta=0.05)
+        self.assertLess(mastered_share(archive), 0.2, "mastered cells should fall away under the curriculum")
+
+    def test_only_recent_attempts_count(self):
+        archive = self.archive()
+        s = start(10, 80, 120)
+        for _ in range(OUTCOME_WINDOW):
+            archive.record_outcome(s, False)
+        for _ in range(OUTCOME_WINDOW):
+            archive.record_outcome(s, True)
+        self.assertGreater(archive.success_rate(cell_of(s.position)), 0.9,
+                           "a window of 20 should have forgotten the early failures")
+
+    def test_coverage_sampling_is_unchanged_and_is_the_default(self):
+        self.assertEqual(StartArchive().sampling, "coverage")
+        with self.assertRaises(ValueError):
+            StartArchive(sampling="whatever")
+
+    def test_sampling_does_not_count_a_use(self):
+        """A stale entry that never replays must not be recorded as having been tried."""
+        archive = self.archive()
+        for _ in range(20):
+            archive.sample()
+        self.assertEqual(archive.uses, {})
+        archive.record_use(start(10, 80, 120))
+        self.assertEqual(archive.uses, {cell_of((80, 120)): 1})
+
+    def test_outcomes_survive_a_save_and_load(self):
+        archive = self.archive()
+        s = start(10, 80, 120)
+        for i in range(5):
+            archive.record_outcome(s, i % 2 == 0)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "archive.json"
+            archive.save(path)
+            loaded = StartArchive.load(path, seed=0)
+        self.assertEqual(loaded.sampling, "success")
+        self.assertEqual(list(loaded.outcomes[cell_of((80, 120))]), [True, False, True, False, True])
+        self.assertEqual(loaded.success_rate(cell_of((80, 120))), archive.success_rate(cell_of((80, 120))))
+
+    def test_coverage_reports_where_the_learning_band_is(self):
+        archive = self.archive()
+        for _ in range(OUTCOME_WINDOW):
+            archive.record_outcome(start(10, 80, 120), True)
+        for i in range(OUTCOME_WINDOW):
+            archive.record_outcome(start(12, 96, 120), i % 2 == 0)
+        report = archive.coverage()
+        self.assertEqual((report["cells_mastered"], report["cells_learning"]), (1, 1))
+        self.assertEqual(report["nearest_x_mastered"], 80)
+        self.assertEqual(report["sampling"], "success")
 
 
 if __name__ == "__main__":

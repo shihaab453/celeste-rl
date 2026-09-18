@@ -50,6 +50,16 @@ class SupervisedPPO(PPO):
         self.fault_stats = {"accepted_transitions": 0, "discarded_transitions": 0, "discarded_rollouts": 0,
                             "faults": []}
 
+    # SB3's own training statistics, captured after each update. Without these, "is there a gradient at all"
+    # cannot be answered from a run's records, which cost this project six diagnostics to notice.
+    TRAIN_STATS = ("explained_variance", "clip_fraction", "approx_kl", "entropy_loss", "policy_gradient_loss",
+                   "value_loss")
+
+    def train(self) -> None:
+        super().train()
+        recorded = self.logger.name_to_value
+        self.last_train_stats = {name: recorded.get(f"train/{name}") for name in self.TRAIN_STATS}
+
     def _excluded_save_params(self) -> list[str]:
         # The fault hook usually holds a game process handle; it belongs to the running session, not the checkpoint.
         return [*super()._excluded_save_params(), "on_fault"]

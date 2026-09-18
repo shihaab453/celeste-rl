@@ -5,7 +5,9 @@ A run directory holds everything needed to audit or resume the run:
   manifest.json      config, git state, runtime manifest, schema versions; status and fault statistics, rewritten
                      at every rollout boundary and at the end
   progress.csv       one row per accepted rollout: accepted steps, episodes and endings, success rate, returns,
-                     reward components, how far the episodes got, environment steps per second
+                     reward components, how far the episodes got, SB3's training statistics for the most recent
+                     update (explained variance, clip fraction, approximate KL, the three losses), and
+                     environment steps per second
   episodes.jsonl     one line per finished episode from an accepted rollout: length, ending, return, components,
                      and its progress record
   evaluations.jsonl  one line per evaluation: the checkpoint measured and its hash, stochastic success rate,
@@ -49,7 +51,7 @@ from celeste_rl.endings import SUCCESS
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.schema import MENU_INPUTS
-from celeste_rl.starts import StartArchive
+from celeste_rl.starts import SAMPLING, StartArchive
 from celeste_rl.training.policy import CelestePolicy, policy_kwargs
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 
@@ -83,6 +85,9 @@ class TrainConfig:
     varied_starts: bool = False
     canonical_fraction: float = 0.25  # the share of training episodes that still begin at the canonical start
     max_start_frames: int = 600  # a start costing more than a third of the deadline to reach is not archived
+    # "coverage" spreads starts evenly; "success" is a reverse curriculum that concentrates on cells the agent
+    # clears about half the time, so competence moves backwards from the exit.
+    start_sampling: str = "coverage"
     max_consecutive_discards: int = 3
     checkpoint_every: int = 50_000  # accepted steps
     eval_every: int = 250_000  # accepted steps; 0 disables
@@ -103,6 +108,8 @@ class TrainConfig:
             problems.append(f"canonical_fraction must be between 0 and 1, got {self.canonical_fraction}")
         if self.max_start_frames <= 0:
             problems.append(f"max_start_frames must be greater than 0, got {self.max_start_frames}")
+        if self.start_sampling not in SAMPLING:
+            problems.append(f"start_sampling must be one of {SAMPLING}, got {self.start_sampling!r}")
         if problems:
             raise ValueError("; ".join(problems))
 
@@ -121,7 +128,8 @@ def build_environment(bridge, config: TrainConfig, run_dir: Path) -> CelesteRoom
         stored = Path(run_dir) / "archive.json"
         archive = (StartArchive.load(stored, seed=config.seed) if stored.exists() else
                    StartArchive(canonical_fraction=config.canonical_fraction,
-                                max_frames=config.max_start_frames, seed=config.seed))
+                                max_frames=config.max_start_frames, seed=config.seed,
+                                sampling=config.start_sampling))
     return CelesteRoomEnv(bridge, disabled_inputs=config.disabled_inputs, reward_config=reward,
                           start_sampler=None if archive is None else archive.sample, archive=archive)
 
@@ -264,6 +272,8 @@ class RunRecorder(BaseCallback):
                                                "return": episode["return"], "components": dict(episode["components"]),
                                                "start": info.get("start", "canonical"),
                                                "start_frames": info.get("start_frames", 0),
+                                               "start_cell": info.get("start_cell"),
+                                               "start_problem": info.get("start_problem"),
                                                **episode["progress"]})
                 del self._running[index]
         return True
@@ -299,8 +309,19 @@ class RunRecorder(BaseCallback):
             # What the start archive holds and how much of this rollout came from it (starts-v1).
             "episodes_from_archive": sum(1 for e in episodes if e.get("start") == "archive"),
             "archive_cells": len(self.env.archive) if self.env.archive is not None else "",
+            # The reverse curriculum's diagnostic: where the band the agent is currently learning sits, and
+            # whether it is moving backwards from the exit.
+            **({f"archive_{name}": self.env.archive.coverage()[name]
+                for name in ("cells_learning", "cells_mastered", "nearest_x_mastered")}
+               if self.env.archive is not None else
+               {f"archive_{name}": "" for name in ("cells_learning", "cells_mastered", "nearest_x_mastered")}),
             "archive_furthest_x": (self.env.archive.coverage()["furthest_x"] or "")
             if self.env.archive is not None else "",
+            # SB3's statistics for the most recent completed update. on_rollout_end runs before this rollout's
+            # update, so a row carries the update that followed the previous rollout: one row of lag out of
+            # hundreds, which does not matter for reading a trend but does matter for reading a single row.
+            **{name: getattr(self.model, "last_train_stats", {}).get(name, "")
+               for name in SupervisedPPO.TRAIN_STATS},
             "env_steps_per_second": self.config.n_steps / seconds if seconds > 0 else "",
             "discarded_rollouts": self.model.fault_stats["discarded_rollouts"],
             # Process health for long runs (for example the game's memory); the keys must not change during a run.

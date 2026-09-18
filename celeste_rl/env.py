@@ -30,12 +30,12 @@ from gymnasium import spaces
 
 from celeste_rl.actions import apply_disabled, disabled_mask, parse_line, to_line, to_parts
 from celeste_rl.bridge import BridgeError
-from celeste_rl.endings import EndingFault, RoomTask, classify
+from celeste_rl.endings import SUCCESS, EndingFault, RoomTask, classify
 from celeste_rl.observation import ObservationBuilder, SchemaViolation, observation_space
 from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
 from celeste_rl.schema import ACT_VERSION, ACTION_INPUTS, FINGERPRINT, MENU_INPUTS, OBS_VERSION
-from celeste_rl.starts import Start, StartArchive
+from celeste_rl.starts import Start, StartArchive, cell_of
 
 # The canonical start: TAS frame 300 of the episode prefix, room 1, standing at (19, 144) with one dash.
 CANONICAL_START = {"room": "1", "position": (19, 144), "dashes": 1}
@@ -79,6 +79,8 @@ class CelesteRoomEnv(gym.Env):
         # entry is made of, so it is kept whenever an archive is attached and left empty otherwise.
         self._lines: list[str] = []
         self._start_kind, self._start_frames = "canonical", 0
+        self._start: Start | None = None
+        self._start_problem: str | None = None
 
     def _info(self, **extra) -> dict:
         return {
@@ -91,6 +93,8 @@ class CelesteRoomEnv(gym.Env):
             # On every step, not only at reset, so a run's records can say which start each episode came from.
             "start": self._start_kind,
             "start_frames": self._start_frames,
+            "start_cell": None if self._start is None else cell_of(self._start.position),
+            "start_problem": self._start_problem,
             **extra,
         }
 
@@ -191,12 +195,18 @@ class CelesteRoomEnv(gym.Env):
         used = start if problem is None else None
         self._elapsed = used.frames if used is not None else 0
         self._lines = list(used.lines) if (used is not None and self.archive is not None) else []
+        self._start, self._start_problem = used, problem
         self._start_kind = "archive" if used is not None else "canonical"
         self._start_frames = used.frames if used is not None else 0
+        # Counted here rather than when the start was sampled, so an entry that no longer replays is not
+        # recorded as having been tried. This assumes the sampler draws from `archive`, which is how a training
+        # run is wired; an evaluation sampling held-out starts passes no archive and records nothing.
+        if used is not None and self.archive is not None:
+            self.archive.record_use(used)
         self._potential_value = self._start_potential(observation.state)
         self._ready = True
-        return obs, self._info(start_problem=problem, frame=observation.tas_frame,
-                               reset_events=observation.events, potential=self._potential_value,
+        return obs, self._info(frame=observation.tas_frame, reset_events=observation.events,
+                               potential=self._potential_value,
                                player=self._player_facts(observation.state, observation.extras))
 
     def step(self, action):
@@ -229,6 +239,8 @@ class CelesteRoomEnv(gym.Env):
         components = reward_components(ending, self.reward_config, elapsed, shaping)
         self._ready = not terminated
         player = self._player_facts(observation.state, observation.extras)
+        if terminated and self._start is not None and self.archive is not None:
+            self.archive.record_outcome(self._start, ending == SUCCESS)
         if self.archive is not None:
             self._lines.append(to_line(applied))
             if player is not None and self.archive.would_keep((player["x"], player["y"]), len(self._lines)):
