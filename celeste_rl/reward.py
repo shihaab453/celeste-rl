@@ -15,10 +15,12 @@
      happens, so the early-death gradient of rew-v1 is gone. This keeps D5 (time still costs from the first
      frame) and adds no survival bonus: surviving longer is worth nothing by itself, it only stops costing
      extra to die sooner. Reported as its own component.
-  2. *Progress shaping.* A potential-based term over `celeste_rl.potential`, scale 0.2, computed by the
-     environment and passed in here. Potential-based shaping leaves the optimal policy unchanged, and with a
-     terminal potential of 0 an episode's shaping sums to exactly `-scale * potential(start)`, a constant per
-     start, so it cannot change which ending is preferred.
+  2. *Progress shaping.* A potential-based term over `celeste_rl.potential`, computed by the environment and
+     passed in here. Potential-based shaping leaves the optimal policy unchanged, and with a terminal potential
+     of 0 an episode's shaping sums to exactly `-scale * potential(start)`, a constant per start, so it cannot
+     change which ending is preferred. `shaping_scale` is a declared run parameter recorded in each run's
+     manifest, first used at 0.2: it sets how loud the progress signal is per step, never which ending wins,
+     so changing it does not need a new reward tag.
 
   Shipping the potential alone would leave the die-early gradient intact and waste a run; shipping the charge
   alone gives the agent no signal about where to go.

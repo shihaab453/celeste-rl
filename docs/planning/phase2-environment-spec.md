@@ -240,12 +240,13 @@ reward = +1 on success                      (once)
        + -1 on death, restart, left_level, wrong_room or timeout
        + -(1,800 - t)/60,000 on those same failures at frame t   (the unspent deadline)
        + -1/60,000 every step, including the final step
-       + 0.2 * (potential(next) - potential(current)),  potential(terminal) = 0
+       + scale * (potential(next) - potential(current)),  potential(terminal) = 0
 ```
 
 - **The unspent-deadline charge.** Under `rew-v1` a failure at frame t costs `-1 - t/60,000`, so failing sooner pays slightly more (decision D5's known trade-off). Charging a failure for the deadline it did not use makes every failure total exactly **-1.03 whenever it happens**. The time cost still applies from the first frame, so D5 is kept, and there is no survival bonus: staying alive is worth nothing by itself, it only stops being cheaper to die early. The charge is reported as its own component, `unspent_deadline`.
 - **Progress shaping.** The potential is the spike-weighted breadth-first tile distance to the room's exit (`celeste_rl/potential.py`): cost 1 per tile, plus 8 for a cell within 2 tiles of a spike and 1 per tile of open air below it, normalised so the exit is 1. It was chosen offline, before any training, by replaying a recorded clear of room 1 and a recorded death (`scripts/potential_check.py`): it rises along the real solution and falls on the way into the spike pit. The plain tile distance was rejected because it pays the agent to walk into that pit; a fall-weighted variant was rejected because it rates the pit floor above the start ledge.
-- The potential is a function of the state alone, is computed outside the observation encoder, and never enters the observation. With gamma 1 and a terminal potential of 0, an episode's shaping sums to exactly `-0.2 * potential(start)`, a constant per start, so it cannot change which ending the agent prefers.
+- **The scale is a declared run parameter, not a constant of the reward.** Every run records the value it used in its manifest, the same way it records the learning rate or the entropy coefficient. The first runs used 0.2. Because a potential-based term telescopes to `-scale * potential(start)` over any complete episode, changing the scale changes how loud the progress signal is per step but never which ending is preferred, so it does not need a new reward tag. What the tag covers is the shape of the reward: its components and how each is computed.
+- The potential is a function of the state alone, is computed outside the observation encoder, and never enters the observation. With gamma 1 and a terminal potential of 0, an episode's shaping sums to exactly `-scale * potential(start)`, a constant per start, so it cannot change which ending the agent prefers.
 - Nothing here uses the recorded solution. A potential projected onto a recorded route is a demonstration method and belongs to Phase 3B.
 
 ## 9. Training integration (fixed now, built and smoke-tested in Phase 2)
