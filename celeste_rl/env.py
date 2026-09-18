@@ -78,6 +78,7 @@ class CelesteRoomEnv(gym.Env):
         # The input lines of the episode so far, including any replayed start prefix. This is what an archive
         # entry is made of, so it is kept whenever an archive is attached and left empty otherwise.
         self._lines: list[str] = []
+        self._start_kind, self._start_frames = "canonical", 0
 
     def _info(self, **extra) -> dict:
         return {
@@ -87,6 +88,9 @@ class CelesteRoomEnv(gym.Env):
             "schema_fingerprint": FINGERPRINT,
             "disabled_inputs": self.disabled_inputs,
             "elapsed": self._elapsed,
+            # On every step, not only at reset, so a run's records can say which start each episode came from.
+            "start": self._start_kind,
+            "start_frames": self._start_frames,
             **extra,
         }
 
@@ -187,11 +191,11 @@ class CelesteRoomEnv(gym.Env):
         used = start if problem is None else None
         self._elapsed = used.frames if used is not None else 0
         self._lines = list(used.lines) if (used is not None and self.archive is not None) else []
+        self._start_kind = "archive" if used is not None else "canonical"
+        self._start_frames = used.frames if used is not None else 0
         self._potential_value = self._start_potential(observation.state)
         self._ready = True
-        return obs, self._info(start="archive" if used is not None else "canonical",
-                               start_frames=used.frames if used is not None else 0,
-                               start_problem=problem, frame=observation.tas_frame,
+        return obs, self._info(start_problem=problem, frame=observation.tas_frame,
                                reset_events=observation.events, potential=self._potential_value,
                                player=self._player_facts(observation.state, observation.extras))
 

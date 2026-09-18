@@ -29,6 +29,7 @@ from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.reward import RewardConfig  # noqa: E402
+from celeste_rl.starts import StartArchive  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
 from celeste_rl.training.run import TrainConfig, train  # noqa: E402
 from celeste_rl.training.supervisor import TrainingAborted  # noqa: E402
@@ -42,8 +43,14 @@ def main() -> int:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     for item in fields(TrainConfig):
-        if item.name != "disabled_inputs":
-            parser.add_argument(f"--{item.name.replace('_', '-')}", type=type(item.default), default=None)
+        if item.name == "disabled_inputs":
+            continue
+        flag = f"--{item.name.replace('_', '-')}"
+        if isinstance(item.default, bool):
+            # type=bool would make "--varied-starts False" mean True, because bool("False") is True.
+            parser.add_argument(flag, action="store_true", default=None)
+        else:
+            parser.add_argument(flag, type=type(item.default), default=None)
     args = parser.parse_args()
 
     # TrainConfig refuses values that cannot run (a zero checkpoint interval hangs the scheduler); report that
@@ -73,7 +80,15 @@ def main() -> int:
     game = GameSession(args.game_dir)
     http = CelesteBridge(Path(run_dir) / "episode.tas")
     reward = RewardConfig(version=config.reward_version, gamma=config.gamma, shaping_scale=config.shaping_scale)
-    env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs, reward_config=reward)
+    archive = None
+    if config.varied_starts:
+        stored = Path(run_dir) / "archive.json"
+        archive = (StartArchive.load(stored, seed=config.seed) if stored.exists() else
+                   StartArchive(canonical_fraction=config.canonical_fraction,
+                                max_frames=config.max_start_frames, seed=config.seed))
+        print(f"Varied starts: archive {stored} with {len(archive)} cells")
+    env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs, reward_config=reward,
+                         start_sampler=archive.sample if archive else None, archive=archive)
     try:
         manifest = runtime.collect(args.game_dir, http._prefix_lines())
         problems = runtime.check(manifest, runtime.load_pins())

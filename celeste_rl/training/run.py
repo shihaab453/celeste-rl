@@ -12,6 +12,7 @@ A run directory holds everything needed to audit or resume the run:
                      clear times, progress, deterministic episode. The final policy is evaluated too.
   checkpoints/       latest.zip, previous.zip, best.zip, step_<accepted>.zip, aborted.zip; each written to a
                      temporary file and renamed, so a crash never leaves a half-written checkpoint
+  archive.json       with varied starts, the entry states the agent reached, rewritten at every checkpoint
 
 Everything counts accepted transitions only (SupervisedPPO rolls the step counter back on a discarded rollout):
 episodes that finish inside a discarded rollout are never written, and checkpoints and evaluations are scheduled on
@@ -72,6 +73,10 @@ class TrainConfig:
     # rew-v1 is the unshaped baseline; rew-v2 adds the unspent-deadline charge and progress shaping (Codex K1).
     reward_version: str = "rew-v1"
     shaping_scale: float = 0.2  # rew-v2 only
+    # starts-v1 (Codex K5, K10). Off by default, so the baseline and the shaped diagnostics stay reproducible.
+    varied_starts: bool = False
+    canonical_fraction: float = 0.25  # the share of training episodes that still begin at the canonical start
+    max_start_frames: int = 600  # a start costing more than a third of the deadline to reach is not archived
     max_consecutive_discards: int = 3
     checkpoint_every: int = 50_000  # accepted steps
     eval_every: int = 250_000  # accepted steps; 0 disables
@@ -88,6 +93,10 @@ class TrainConfig:
         problems = [f"{name} must be greater than 0, got {value}" for name, value in positive.items() if value <= 0]
         if self.eval_every < 0:
             problems.append(f"eval_every must be 0 (no evaluation) or greater, got {self.eval_every}")
+        if not 0.0 <= self.canonical_fraction <= 1.0:
+            problems.append(f"canonical_fraction must be between 0 and 1, got {self.canonical_fraction}")
+        if self.max_start_frames <= 0:
+            problems.append(f"max_start_frames must be greater than 0, got {self.max_start_frames}")
         if problems:
             raise ValueError("; ".join(problems))
 
@@ -141,7 +150,10 @@ def _best(episodes, field: str, pick=max):
 
 
 def run_episode(model: SupervisedPPO, env: CelesteRoomEnv, deterministic: bool) -> dict:
-    obs, info = env.reset()
+    """One evaluation episode. Always from the canonical start: a run that trains on varied starts is still
+    measured on the task it claims to solve, and an evaluation whose starts drift with the archive cannot be
+    compared with the runs before it."""
+    obs, info = env.reset(options={"canonical": True})
     total, components, length = 0.0, Counter(), 0
     progress = update_progress(new_progress(), info)
     while True:
@@ -225,6 +237,8 @@ class RunRecorder(BaseCallback):
             if done:
                 self._rollout.episodes.append({"ending": info["ending"], "length": episode["length"],
                                                "return": episode["return"], "components": dict(episode["components"]),
+                                               "start": info.get("start", "canonical"),
+                                               "start_frames": info.get("start_frames", 0),
                                                **episode["progress"]})
                 del self._running[index]
         return True
@@ -257,6 +271,11 @@ class RunRecorder(BaseCallback):
             "median_max_x": _median(episodes, "max_x"),
             "best_max_x": _best(episodes, "max_x"),
             "best_min_y": _best(episodes, "min_y", min),
+            # What the start archive holds and how much of this rollout came from it (starts-v1).
+            "episodes_from_archive": sum(1 for e in episodes if e.get("start") == "archive"),
+            "archive_cells": len(self.env.archive) if self.env.archive is not None else "",
+            "archive_furthest_x": (self.env.archive.coverage()["furthest_x"] or "")
+            if self.env.archive is not None else "",
             "env_steps_per_second": self.config.n_steps / seconds if seconds > 0 else "",
             "discarded_rollouts": self.model.fault_stats["discarded_rollouts"],
             # Process health for long runs (for example the game's memory); the keys must not change during a run.
@@ -277,6 +296,9 @@ class RunRecorder(BaseCallback):
             os.replace(latest, previous)
         _atomic_save(self.model, latest)
         _atomic_save(self.model, self.checkpoints / f"step_{steps:09d}.zip")
+        # The archive is the run's other learned artefact: losing it would throw away every deep excursion.
+        if self.env.archive is not None:
+            self.env.archive.save(self.run_dir / "archive.json")
         self.write_manifest("running")
 
     def _evaluate(self, steps: int) -> None:

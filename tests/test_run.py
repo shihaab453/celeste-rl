@@ -14,6 +14,7 @@ from pathlib import Path
 
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
+from celeste_rl.starts import Start, StartArchive
 from celeste_rl.training.run import PROGRESS_FIELDS, TrainConfig, new_progress, train, update_progress
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_training import EpochBridge
@@ -114,6 +115,46 @@ class RunTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             config(eval_every=-1)
         self.assertEqual(TrainConfig().eval_episodes, 50)  # Codex K7
+
+    def test_varied_starts_are_recorded_and_the_archive_is_saved(self):
+        """starts-v1: the archive is the run's other learned artefact, so it is saved with the checkpoints."""
+        archive = StartArchive(canonical_fraction=0.0, seed=0)
+        archive.offer(Start(("1,R", "1,R"), (19, 144), "1", 1))
+        env = CelesteRoomEnv(EpochBridge(), archive=archive, start_sampler=archive.sample)
+        train(config(eval_every=0), self.run_dir, env, PROVENANCE)
+        _, progress, episodes, _ = read(self.run_dir)
+
+        self.assertTrue((self.run_dir / "archive.json").exists())
+        reloaded = StartArchive.load(self.run_dir / "archive.json")
+        self.assertEqual(reloaded.starts, archive.starts)
+        for column in ("episodes_from_archive", "archive_cells", "archive_furthest_x"):
+            self.assertIn(column, progress[0])
+        self.assertTrue(all(e["start"] == "archive" for e in episodes), "every episode should use the archive here")
+        self.assertTrue(all(e["start_frames"] == 2 for e in episodes))
+
+    def test_a_run_without_varied_starts_writes_no_archive(self):
+        train(config(eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        _, progress, episodes, _ = read(self.run_dir)
+        self.assertFalse((self.run_dir / "archive.json").exists())
+        self.assertEqual(progress[0]["archive_cells"], "")
+        self.assertTrue(all(e["start"] == "canonical" and e["start_frames"] == 0 for e in episodes))
+
+    def test_evaluation_always_uses_the_canonical_start(self):
+        """A run that trains on varied starts is still measured on the task it claims to solve."""
+        archive = StartArchive(canonical_fraction=0.0, seed=0)
+        archive.offer(Start(("1,R", "1,R"), (19, 144), "1", 1))
+        env = CelesteRoomEnv(EpochBridge(), archive=archive, start_sampler=archive.sample)
+        train(config(), self.run_dir, env, PROVENANCE)
+        _, _, _, evaluations = read(self.run_dir)
+        for record in evaluations:
+            self.assertEqual(record["deterministic"]["length"], 74,
+                             "an evaluation episode should start canonically, so it dies where it always did")
+
+    def test_varied_start_settings_are_validated(self):
+        for field, value in (("canonical_fraction", 1.5), ("canonical_fraction", -0.1), ("max_start_frames", 0)):
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError) as caught:
+                config(**{field: value})
+            self.assertIn(field, str(caught.exception))
 
     def test_progress_records_say_how_far_each_episode_got(self):
         """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
