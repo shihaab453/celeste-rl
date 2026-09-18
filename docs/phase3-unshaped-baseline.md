@@ -179,3 +179,38 @@ Training refuses to start from a dirty working tree or a runtime that differs fr
 `config/pinned_runtime.json`, so a result can always name the code and the game build that produced it. Run
 outputs are kept out of version control; the records behind this report are the `manifest.json`, `progress.csv`,
 `episodes.jsonl` and `evaluations.jsonl` of each run directory.
+
+## Addendum, 2026-09-18: three things this report leaves out
+
+Nothing above is false, and the numbers are unchanged. But a day of follow-up experiments and an external
+review found three places where the report is overstated by omission, and it is better to say so here than to
+quietly rewrite the original.
+
+**1. "The failure is not capacity or features, so it is exploration and reward" leaves out the learner.**
+Section 7 draws that conclusion from the capacity check, and it excludes a third possibility that turned out to
+matter. The action space is 24 independent on or off inputs, and the action head's bias starts at zero, so
+every input starts at probability 0.5 and a fresh policy holds about **twelve buttons at once, every frame**. A
+recorded clear holds 2.31. The near-uniform policy the report describes is partly a property of how the policy
+is parameterised and initialised, not only of the reward it was given. The entropy bonus then keeps it there,
+because maximum entropy over 21 independent inputs is exactly that twelve-button behaviour.
+
+**2. The entropy figures in section 4 are measured on states the policy does not visit.** They come from 285
+observations along a recorded clear, and about two thirds of those are past x 140, which the policy in this
+campaign never reached. The figures are correct as stated, and they are not measured where the agent actually
+spends its time.
+
+**3. The description of the shaped reward in section 7 needs its other half.** The report says potential-based
+shaping "cannot change which ending the agent prefers", which is true and is the property that makes it safe.
+The consequence not stated is that the unspent-deadline charge, by making every failure cost the same whenever
+it happens, also removes any reason to prefer one failure to another. Measured afterwards: across 8,146
+episodes of shaped training, every failing episode from the canonical start returned the same number to six
+decimal places, and the critic learned the shaped value function to within 0.03, so the shaping term cancels in
+the temporal-difference error and contributes nothing to the policy gradient. With no successes to learn from
+either, there was nothing in those returns for the policy to improve on. That is a better account of why the
+shaped experiments were inert than anything in the original text.
+
+**What has happened since, in brief.** Starting episodes from states the agent had already reached produced
+the first clears of room 1, though never from the canonical start. Supervised cloning of seven independently
+searched routes then produced a policy that clears the room from the canonical start about 6% of the time. Both
+are demonstration-assisted or exploration-assisted results and neither changes the no-demonstration finding
+reported above, which stands: PPO with this reward, this observation and this budget did not clear room 1.

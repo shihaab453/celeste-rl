@@ -11,7 +11,7 @@ import unittest
 from collections import Counter
 from pathlib import Path
 
-from celeste_rl.starts import OUTCOME_WINDOW, Start, StartArchive, cell_of
+from celeste_rl.starts import MINIMUM_ATTEMPTS, OUTCOME_WINDOW, Start, StartArchive, cell_of
 
 
 def start(frames: int, x: float, y: float, room: str = "1") -> Start:
@@ -201,6 +201,23 @@ class ReverseCurriculumTests(unittest.TestCase):
         self.assertEqual(loaded.sampling, "success")
         self.assertEqual(list(loaded.outcomes[cell_of((80, 120))]), [True, False, True, False, True])
         self.assertEqual(loaded.success_rate(cell_of((80, 120))), archive.success_rate(cell_of((80, 120))))
+
+    def test_a_barely_tried_cell_is_not_counted_as_a_learning_cell(self):
+        """The metric flaw found in the curriculum run: one attempt and no successes estimates 0.33 and would
+        have been reported as a cell halfway to being learned."""
+        archive = self.archive()
+        archive.record_outcome(start(10, 80, 120), False)
+        report = archive.coverage()
+        self.assertEqual(report["cells_measured"], 1)
+        self.assertEqual((report["cells_tried_enough"], report["cells_learning"]), (0, 0))
+        for _ in range(MINIMUM_ATTEMPTS):
+            archive.record_outcome(start(10, 80, 120), True)
+        self.assertEqual(archive.coverage()["cells_tried_enough"], 1)
+
+    def test_sampling_still_favours_untried_cells(self):
+        """The minimum applies to the reported bands, not to sampling: an untried cell should be tried."""
+        archive = self.archive()
+        self.assertAlmostEqual(archive.weight((99, 99)), 0.25)
 
     def test_coverage_reports_where_the_learning_band_is(self):
         archive = self.archive()

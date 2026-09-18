@@ -53,12 +53,19 @@ class SupervisedPPO(PPO):
     # SB3's own training statistics, captured after each update. Without these, "is there a gradient at all"
     # cannot be answered from a run's records, which cost this project six diagnostics to notice.
     TRAIN_STATS = ("explained_variance", "clip_fraction", "approx_kl", "entropy_loss", "policy_gradient_loss",
-                   "value_loss")
+                   "value_loss", "advantage_std", "advantage_abs_mean")
 
     def train(self) -> None:
+        # Read before the update, because SB3 normalises advantages to unit variance inside each minibatch.
+        # That normalisation is why a policy with almost no signal still takes ordinary-sized steps and every
+        # other statistic looks healthy: the raw scale is the only number that distinguishes signal from
+        # rescaled noise, and nothing else records it.
+        advantages = self.rollout_buffer.advantages.flatten()
         super().train()
         recorded = self.logger.name_to_value
         self.last_train_stats = {name: recorded.get(f"train/{name}") for name in self.TRAIN_STATS}
+        self.last_train_stats["advantage_std"] = float(np.std(advantages))
+        self.last_train_stats["advantage_abs_mean"] = float(np.mean(np.abs(advantages)))
 
     def _excluded_save_params(self) -> list[str]:
         # The fault hook usually holds a game process handle; it belongs to the running session, not the checkpoint.

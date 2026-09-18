@@ -44,6 +44,10 @@ from celeste_rl.schema import CELL_SIZE
 CANONICAL_FRACTION = 0.25
 SAMPLING = ("coverage", "success")
 OUTCOME_WINDOW = 20  # how many recent attempts per cell the success rate is measured over
+# A cell with one attempt and no successes estimates (0 + 1) / (1 + 2) = 0.33 and would be counted as one the
+# agent is halfway to learning. The reported bands require this many attempts, so they describe measured cells
+# rather than barely-tried ones. Sampling deliberately does not: an unmeasured cell should still be tried.
+MINIMUM_ATTEMPTS = 5
 MINIMUM_WEIGHT = 0.01  # so a cell is never permanently excluded by a run of bad luck
 
 
@@ -170,6 +174,8 @@ class StartArchive:
     def coverage(self) -> dict:
         """What the archive holds, for a run's records."""
         frames = [s.frames for s in self.starts.values()]
+        measured = [cell for cell, recent in self.outcomes.items() if len(recent) >= MINIMUM_ATTEMPTS]
+        mastered = [cell for cell in measured if self.success_rate(cell) > 0.8]
         return {
             "cells": len(self.starts),
             "offered": self.offered,
@@ -183,12 +189,11 @@ class StartArchive:
             # The reverse curriculum's own diagnostic: cells the agent sometimes but not always clears are
             # where it is currently learning, and that band should move backwards from the exit.
             "cells_measured": len(self.outcomes),
-            "cells_learning": sum(1 for cell in self.outcomes if 0.2 <= self.success_rate(cell) <= 0.8),
-            "cells_mastered": sum(1 for cell in self.outcomes if self.success_rate(cell) > 0.8),
-            "furthest_x_mastered": max((self.starts[cell].position[0] for cell in self.outcomes
-                                        if self.success_rate(cell) > 0.8), default=None),
-            "nearest_x_mastered": min((self.starts[cell].position[0] for cell in self.outcomes
-                                       if self.success_rate(cell) > 0.8), default=None),
+            "cells_tried_enough": len(measured),
+            "cells_learning": sum(1 for cell in measured if 0.2 <= self.success_rate(cell) <= 0.8),
+            "cells_mastered": len(mastered),
+            "furthest_x_mastered": max((self.starts[cell].position[0] for cell in mastered), default=None),
+            "nearest_x_mastered": min((self.starts[cell].position[0] for cell in mastered), default=None),
         }
 
     def save(self, path: Path) -> None:
