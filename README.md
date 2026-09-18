@@ -6,7 +6,29 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Phase 0: a fast, verified interface between Python and the real game.** No agent has been trained yet. Before any learning happens, the environment has to be correct, fast enough to generate millions of frames, and stable enough to run unattended. That foundation is what this repository contains so far.
+**Room 1 of Chapter 1 is cleared from the canonical start 82.5% of the time** (165 of 200 episodes, 95%
+interval 76.6% to 87.1%), by a policy that was cloned from seven searched solutions and then improved by PPO
+well past them. Chapter 1 has 20 rooms; this is the first.
+
+Two experiment reports, and the negative one came first and matters as much:
+
+| Report | Result |
+|---|---|
+| [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%**, cloning alone **6%**, cloning then RL **82.5%** |
+
+The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
+that the result could be described honestly either way. That attempt failed, and the report says so and
+explains what was measured to work out why: the policy never left near-uniform play, the critic learned the
+shaped value function exactly, and the reward gave the policy gradient nothing to distinguish one failure from
+another.
+
+Success rates here are reported with confidence intervals, because a rate from a finite sample is not a point.
+
+### The interface underneath
+
+No learning happens until the environment is correct, fast enough for millions of frames, and stable enough to
+run unattended.
 
 | What | Result |
 |---|---|
@@ -16,7 +38,8 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 | Robustness | 13 live fault checks pass, including 100 rounds of replacing a client connection mid-reset and a client that stops reading replies |
 | Inputs | Input bindings checked in the game (30 of 30 checks), including both bindings for jump, dash, crouch dash and grab, dash-only and move-only directions, and pause-menu confirm and cancel |
 | Memory | Found and fixed a render target leak of 2 to 6 MB per reset (8 GB in 4 minutes); memory now stays flat |
-| Tests | 36 unit tests, plus live checks against the game |
+| Provenance | Every training run records its commit, the game build's file hashes and the schema version, and refuses to start if any of them drifts |
+| Tests | 233 unit tests, plus live checks against the game |
 
 ## How it works
 

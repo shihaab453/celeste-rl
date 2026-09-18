@@ -211,6 +211,11 @@ shaped experiments were inert than anything in the original text.
 
 **What has happened since, in brief.** Starting episodes from states the agent had already reached produced
 the first clears of room 1, though never from the canonical start. Supervised cloning of seven independently
-searched routes then produced a policy that clears the room from the canonical start about 6% of the time. Both
-are demonstration-assisted or exploration-assisted results and neither changes the no-demonstration finding
-reported above, which stands: PPO with this reward, this observation and this budget did not clear room 1.
+searched routes then produced a policy that clears the canonical start about 6% of the time, and PPO
+fine-tuning from that policy reached **82.5%**. That work is reported separately in
+[phase3b-demonstration-comparison.md](phase3b-demonstration-comparison.md).
+
+None of it changes the finding above, which stands: PPO with this reward, this observation and this budget did
+not clear room 1 without demonstrations. What the later work does establish is that the task was learnable by
+the same network, observation and action space all along, so the barrier here was neither capacity nor the
+environment.
