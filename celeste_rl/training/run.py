@@ -47,7 +47,9 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from celeste_rl.endings import SUCCESS
 from celeste_rl.env import CelesteRoomEnv
+from celeste_rl.reward import RewardConfig
 from celeste_rl.schema import MENU_INPUTS
+from celeste_rl.starts import StartArchive
 from celeste_rl.training.policy import policy_kwargs
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 
@@ -99,6 +101,25 @@ class TrainConfig:
             problems.append(f"max_start_frames must be greater than 0, got {self.max_start_frames}")
         if problems:
             raise ValueError("; ".join(problems))
+
+
+def build_environment(bridge, config: TrainConfig, run_dir: Path) -> CelesteRoomEnv:
+    """The training environment for a config, with its start archive when varied starts are on.
+
+    This lives here rather than in the launch script so it can be tested. The first version of it read
+    `archive.sample if archive else None`, and because StartArchive defines __len__, a newly created empty
+    archive is falsy: the environment was handed no sampler and every episode silently started canonically.
+    Hence the explicit `is None` checks below.
+    """
+    reward = RewardConfig(version=config.reward_version, gamma=config.gamma, shaping_scale=config.shaping_scale)
+    archive = None
+    if config.varied_starts:
+        stored = Path(run_dir) / "archive.json"
+        archive = (StartArchive.load(stored, seed=config.seed) if stored.exists() else
+                   StartArchive(canonical_fraction=config.canonical_fraction,
+                                max_frames=config.max_start_frames, seed=config.seed))
+    return CelesteRoomEnv(bridge, disabled_inputs=config.disabled_inputs, reward_config=reward,
+                          start_sampler=None if archive is None else archive.sample, archive=archive)
 
 
 def _atomic_save(model: SupervisedPPO, path: Path) -> None:

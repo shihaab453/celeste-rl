@@ -15,7 +15,14 @@ from pathlib import Path
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.starts import Start, StartArchive
-from celeste_rl.training.run import PROGRESS_FIELDS, TrainConfig, new_progress, train, update_progress
+from celeste_rl.training.run import (
+    PROGRESS_FIELDS,
+    TrainConfig,
+    build_environment,
+    new_progress,
+    train,
+    update_progress,
+)
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_training import EpochBridge
 
@@ -64,6 +71,41 @@ class ProgressRecordTests(unittest.TestCase):
 
     def test_fields_never_reported_stay_none(self):
         self.assertEqual(update_progress(new_progress(), self.info()), dict.fromkeys(PROGRESS_FIELDS))
+
+
+class BuildEnvironmentTests(unittest.TestCase):
+    """How a run's environment is assembled from its config."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.run_dir = Path(directory.name)
+
+    def test_varied_starts_off_means_no_archive_and_no_sampler(self):
+        env = build_environment(EpochBridge(), config(), self.run_dir)
+        self.assertIsNone(env.archive)
+        self.assertIsNone(env.start_sampler)
+
+    def test_a_new_empty_archive_still_gets_a_sampler(self):
+        """The bug this test exists for: StartArchive defines __len__, so an empty one is falsy, and
+        `archive.sample if archive else None` handed the environment no sampler at all. Every episode then
+        started canonically while the archive filled up unused."""
+        env = build_environment(EpochBridge(), config(varied_starts=True), self.run_dir)
+        self.assertIsNotNone(env.archive)
+        self.assertEqual(len(env.archive), 0)
+        self.assertIsNotNone(env.start_sampler, "an empty archive must still be sampled from")
+
+    def test_the_settings_reach_the_archive(self):
+        env = build_environment(EpochBridge(), config(varied_starts=True, canonical_fraction=0.5,
+                                                      max_start_frames=120), self.run_dir)
+        self.assertEqual((env.archive.canonical_fraction, env.archive.max_frames), (0.5, 120))
+
+    def test_an_existing_archive_is_loaded_rather_than_replaced(self):
+        archive = StartArchive(canonical_fraction=0.25, max_frames=600, seed=0)
+        archive.offer(Start(("1,R",), (27, 144), "1", 1))
+        archive.save(self.run_dir / "archive.json")
+        env = build_environment(EpochBridge(), config(varied_starts=True), self.run_dir)
+        self.assertEqual(len(env.archive), 1)
 
 
 class RunTests(unittest.TestCase):

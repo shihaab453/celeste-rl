@@ -26,12 +26,9 @@ sys.path.insert(0, str(REPO))
 
 from celeste_rl import runtime  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
-from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
-from celeste_rl.reward import RewardConfig  # noqa: E402
-from celeste_rl.starts import StartArchive  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
-from celeste_rl.training.run import TrainConfig, train  # noqa: E402
+from celeste_rl.training.run import TrainConfig, build_environment, train  # noqa: E402
 from celeste_rl.training.supervisor import TrainingAborted  # noqa: E402
 
 
@@ -79,16 +76,10 @@ def main() -> int:
 
     game = GameSession(args.game_dir)
     http = CelesteBridge(Path(run_dir) / "episode.tas")
-    reward = RewardConfig(version=config.reward_version, gamma=config.gamma, shaping_scale=config.shaping_scale)
-    archive = None
-    if config.varied_starts:
-        stored = Path(run_dir) / "archive.json"
-        archive = (StartArchive.load(stored, seed=config.seed) if stored.exists() else
-                   StartArchive(canonical_fraction=config.canonical_fraction,
-                                max_frames=config.max_start_frames, seed=config.seed))
-        print(f"Varied starts: archive {stored} with {len(archive)} cells")
-    env = CelesteRoomEnv(LockstepBridge(http), disabled_inputs=config.disabled_inputs, reward_config=reward,
-                         start_sampler=archive.sample if archive else None, archive=archive)
+    env = build_environment(LockstepBridge(http), config, Path(run_dir))
+    if env.archive is not None:
+        print(f"Varied starts: archive with {len(env.archive)} cells, "
+              f"{env.archive.canonical_fraction:.0%} of episodes still canonical")
     try:
         manifest = runtime.collect(args.game_dir, http._prefix_lines())
         problems = runtime.check(manifest, runtime.load_pins())
