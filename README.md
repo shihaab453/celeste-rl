@@ -6,16 +6,17 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is cleared from the canonical start 82.5% of the time** (165 of 200 episodes, 95%
-interval 76.6% to 87.1%), by a policy that was cloned from seven searched solutions and then improved by PPO
-well past them. Chapter 1 has 20 rooms; this is the first.
+**Room 1 of Chapter 1 is cleared from the canonical start on 82.5%, 98.0% and 98.5% of episodes** across three
+seeds, 200 evaluation episodes each, by policies cloned from seven searched solutions and then improved by PPO
+well past them. Every one of them clears the room faster than any demonstration it learned from. Chapter 1 has
+20 rooms; this is the first.
 
 Two experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%**, cloning alone **6%**, cloning then RL **82.5%** |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%**, cloning alone **6%**, cloning then RL **82.5% to 98.5%** over three seeds |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
