@@ -125,6 +125,9 @@ def record(env: CelesteRoomEnv, demos: list[dict]) -> tuple[Demonstrations, list
         obs_rows.extend(rows)
         actions.extend(taken)
         trajectory.extend([index] * len(taken))
+    if not obs_rows:
+        raise SystemExit(f"None of the {len(demos)} demonstrations replayed to a success, so there is nothing "
+                         "to clone. The routes no longer reproduce against this game build.")
     stacked = {key: np.stack([row[key] for row in obs_rows]) for key in OBS_KEYS}
     return Demonstrations(stacked, np.stack(actions), np.asarray(trajectory), provenance), provenance
 

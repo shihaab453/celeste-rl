@@ -67,11 +67,39 @@ def split_by_trajectory(data: Demonstrations, holdout: float, seed: int) -> tupl
         raise ValueError(f"need at least 2 demonstrations to hold one out, got {len(trajectories)}")
     order = np.random.default_rng(seed).permutation(trajectories)
     kept = max(1, round(len(trajectories) * holdout))
+    if kept >= len(trajectories):
+        raise ValueError(f"holdout {holdout} would keep back all {len(trajectories)} demonstrations, "
+                         "leaving nothing to train on")
     return data.subset(order[kept:]), data.subset(order[:kept])
 
 
+def persistence_baseline(data: Demonstrations) -> dict:
+    """What "repeat the previous frame's action" scores on these frames.
+
+    This is the baseline that matters and the always-zero one flatters. obs-v1 carries the last four applied
+    actions, so a policy can read its previous action straight out of its own input: any cloned policy that
+    does not beat this has learned nothing a lookup could not do. Real play holds a button for many frames at a
+    time, so persistence is strong, and on held-out routes it beat the first cloned policy this project trained
+    on both measures.
+    """
+    previous = np.zeros_like(data.actions)
+    previous[1:] = data.actions[:-1]
+    # The first frame of each trajectory has no predecessor, so it predicts nothing held.
+    continues = np.zeros(len(data), dtype=bool)
+    continues[1:] = data.trajectory[1:] == data.trajectory[:-1]
+    previous[~continues] = 0
+    enabled = np.array([name not in MENU_INPUTS for name in ACTION_INPUTS])
+    correct = (previous == data.actions)[:, enabled]
+    return {"persistence_input_accuracy": round(float(correct.mean()), 4),
+            "persistence_frame_accuracy": round(float(correct.all(axis=1).mean()), 4)}
+
+
 def accuracy(policy, data: Demonstrations, batch_size: int = 512) -> dict:
-    """How often the policy's most likely action matches the demonstration, on these frames."""
+    """How often the policy's most likely action matches the demonstration, on these frames.
+
+    Reported against two baselines, because one of them is easy to beat and the other is not: pressing nothing
+    at all, and repeating the previous frame's action.
+    """
     enabled = th.as_tensor([name not in MENU_INPUTS for name in ACTION_INPUTS])
     targets = th.as_tensor(data.actions).float()
     correct = []
@@ -91,6 +119,7 @@ def accuracy(policy, data: Demonstrations, batch_size: int = 512) -> dict:
         "frame_accuracy": round(correct[:, enabled].all(dim=1).float().mean().item(), 4),
         "always_zero_input_accuracy": round(zeros.mean().item(), 4),
         "always_zero_frame_accuracy": round(zeros.all(dim=1).float().mean().item(), 4),
+        **persistence_baseline(data),
         "inputs_per_frame": round(data.inputs_per_frame(), 2),
     }
 

@@ -1,7 +1,10 @@
 """Search for a legal input sequence that leaves the first room, for use as a fixed test trace.
 
-This is a test-fixture generator, not a learning method: it uses exact savestate replays and a map of
-the room, which a policy never sees. It is a small Go-Explore-style search:
+This is a test-fixture generator, not a learning method: it uses exact savestate replays and the room's
+whole tile map at once. A policy does see local geometry (obs-v1 carries a 32 by 32 cell grid around the
+player), so the map is not privileged information in itself; what it never gets is the whole room, the
+breadth-first distances computed over it, or the ability to jump back to a saved state. It is a small
+Go-Explore-style search:
 
 1. Compute each open tile's distance to the room's exits by breadth-first search over the tile map
    from the episode start (spike tiles count as walls). This ignores Celeste's movement physics; it

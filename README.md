@@ -6,17 +6,20 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is cleared from the canonical start on 82.5%, 98.0% and 98.5% of episodes** across three
-seeds, 200 evaluation episodes each, by policies cloned from seven searched solutions and then improved by PPO
-well past them. Every one of them clears the room faster than any demonstration it learned from. Chapter 1 has
-20 rooms; this is the first.
+**Room 1 of Chapter 1 is cleared from the canonical start on at least 82.5% of episodes on every seed tried**
+(82.5%, 98.0% and 98.5% over 200 episodes each), by a policy cloned from five searched solutions and then
+improved by PPO well past them, across three PPO seeds sharing one cloned policy.
+
+That is one fixed start state in a deterministic game, so it measures robustness around a single route rather
+than the ability to play the room. The project's own generalisation criterion, 99% over 200 held-out entry
+states, has not been attempted. Chapter 1 has 20 rooms; this is the first.
 
 Two experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%**, cloning alone **6%**, cloning then RL **82.5% to 98.5%** over three seeds |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%** (0 of 420, under 0.9%), cloning alone **6%** (3 of 50, 2.1% to 16.2%), cloning then RL **82.5% to 98.5%** |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
@@ -115,9 +118,18 @@ Do not use `uv sync` or `uv run` in this repository: uv's project mode manages a
 
 ## Next
 
-1. Finish the Phase 0 checks: pinned runtime validation (settings, versions, binary hashes) and crash recovery.
-2. Phase 1: implement and study PPO on a small problem.
-3. Phase 2: a Gymnasium environment on top of the lockstep bridge, with observation, reward and episode rules.
-4. Phase 3: a documented attempt at clearing the first room without demonstrations.
+Phases 0 to 3B are done: the interface, a PPO implementation studied on CartPole, the environment, the
+no-demonstration attempt and the demonstration-assisted comparison.
+
+1. **Held-out entry states.** The only result so far is from one fixed start. A generator of reachable entry
+   states, frozen before training and never sampled for training, is what turns "clears room 1 from the start
+   position" into "can play room 1", and it is the project's own criterion for the phase.
+2. **A critic warm-up.** Two fine-tuning seeds of three lost 200,000 transitions to an early collapse whose
+   cause is not established. Training the value head before allowing policy updates both tests the explanation
+   and removes the cost.
+3. **How much of the demonstration set is needed.** The cloned policy scores below a repeat-your-last-action
+   baseline on held-out routes, so it is not clear the five routes taught the room rather than shaping the
+   action distribution. If one route is enough, twenty rooms is a minute of search each.
+4. **Room 2**, and whether any of this transfers.
 
 The full plan is in [`docs/planning/roadmap.md`](docs/planning/roadmap.md).

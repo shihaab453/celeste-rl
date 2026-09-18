@@ -55,6 +55,10 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
     parser.add_argument("--episodes", type=int, default=200)
+    parser.add_argument("--seed", type=int, default=0,
+                        help="the evaluation's own sampling seed; without it every run of this script replays "
+                             "the same episodes, because loading a checkpoint re-seeds the global generators "
+                             "from the seed that checkpoint was saved with")
     parser.add_argument("--reward-version", default="rew-v2")
     parser.add_argument("--shaping-scale", type=float, default=2.0)
     parser.add_argument("--allow-dirty", action="store_true")
@@ -81,7 +85,11 @@ def main() -> int:
             print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
             return 2
         model = SupervisedPPO.load(args.checkpoint, env=env, device="cpu")
-        print(f"{args.checkpoint} at {model.num_timesteps:,} accepted steps, {args.episodes} episodes")
+        # SB3's load re-seeds torch, numpy and python from the checkpoint's saved seed, so without this every
+        # evaluation of a given checkpoint draws the identical episode stream however many times it is run.
+        model.set_random_seed(args.seed)
+        print(f"{args.checkpoint} at {model.num_timesteps:,} accepted steps, {args.episodes} episodes, "
+              f"sampling seed {args.seed}")
         episodes = []
         for index in range(args.episodes):
             episodes.append(run_episode(model, env, deterministic=False))
@@ -108,7 +116,9 @@ def main() -> int:
         "success_length": {"median": statistics.median(e["length"] for e in successes),
                            "min": min(e["length"] for e in successes),
                            "max": max(e["length"] for e in successes)} if successes else None,
-        "median_max_x": statistics.median(e["max_x"] for e in episodes if e["max_x"] is not None),
+        "evaluation_seed": args.seed,
+        "median_max_x": (statistics.median(x for x in (e["max_x"] for e in episodes) if x is not None)
+                         if any(e["max_x"] is not None for e in episodes) else None),
         "deterministic": deterministic,
     }
     (output_dir / "results.json").write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")

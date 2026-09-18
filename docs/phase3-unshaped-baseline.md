@@ -210,9 +210,9 @@ either, there was nothing in those returns for the policy to improve on. That is
 shaped experiments were inert than anything in the original text.
 
 **What has happened since, in brief.** Starting episodes from states the agent had already reached produced
-the first clears of room 1, though never from the canonical start. Supervised cloning of seven independently
+the first clears of room 1, though never from the canonical start. Supervised cloning of five independently
 searched routes then produced a policy that clears the canonical start about 6% of the time, and PPO
-fine-tuning from that policy reached **82.5%**. That work is reported separately in
+fine-tuning from that policy reached **82.5% to 98.5% across three seeds**. That work is reported separately in
 [phase3b-demonstration-comparison.md](phase3b-demonstration-comparison.md).
 
 None of it changes the finding above, which stands: PPO with this reward, this observation and this budget did
