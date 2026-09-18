@@ -8,6 +8,8 @@ from __future__ import annotations
 import copy
 import tempfile
 import unittest
+import unittest.mock
+from types import SimpleNamespace
 import zipfile
 from pathlib import Path
 
@@ -40,6 +42,13 @@ def fake_game(directory: Path) -> Path:
 
 
 class RuntimeManifestTests(unittest.TestCase):
+    @staticmethod
+    def patched_git(status: str):
+        def run(args, **kwargs):
+            stdout = status if "status" in args else "0" * 40 + "\n"
+            return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+        return unittest.mock.patch.object(runtime.subprocess, "run", run)
+
     def setUp(self):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
@@ -93,6 +102,58 @@ class RuntimeManifestTests(unittest.TestCase):
         state = runtime.git_state()
         self.assertEqual(len(state["commit"]), 40)
         self.assertIsInstance(state["uncommitted_changes"], bool)
+        self.assertIsNone(state["git_error"])
+
+    def test_changed_paths_keep_their_first_character(self):
+        """A porcelain line begins with two status columns, and for a modified file the first is a space."""
+        with self.patched_git(status=" M celeste_rl/runtime.py\n?? scripts/new.py\n"):
+            state = runtime.git_state()
+        self.assertEqual(state["changed_paths"], ["celeste_rl/runtime.py", "scripts/new.py"])
+        self.assertTrue(state["uncommitted_changes"])
+
+
+class GitFailsClosedTests(unittest.TestCase):
+    """Codex J3: when git cannot answer, nothing may look attributable."""
+
+    @staticmethod
+    def failing_git(returncode=128, stderr="fatal: not a git repository", stdout=""):
+        def run(args, **kwargs):
+            return SimpleNamespace(returncode=returncode, stdout=stdout, stderr=stderr)
+        return unittest.mock.patch.object(runtime.subprocess, "run", run)
+
+    def test_a_git_failure_reports_no_commit_and_blocks(self):
+        with self.failing_git():
+            state = runtime.git_state()
+        self.assertIsNone(state["commit"])
+        self.assertTrue(state["uncommitted_changes"])
+        self.assertIn("not a git repository", state["git_error"])
+        self.assertFalse(runtime.attributable(state, []))
+        self.assertIn("Git could not describe", runtime.refusal(state))
+
+    def test_git_missing_entirely_is_the_same(self):
+        def run(args, **kwargs):
+            raise FileNotFoundError("git")
+        with unittest.mock.patch.object(runtime.subprocess, "run", run):
+            state = runtime.git_state()
+        self.assertIsNone(state["commit"])
+        self.assertIsNotNone(runtime.refusal(state))
+
+    def test_an_answer_that_is_not_a_commit_id_is_refused(self):
+        with self.failing_git(returncode=0, stdout="HEAD\n"):
+            state = runtime.git_state()
+        self.assertIsNone(state["commit"])
+        self.assertIn("not a commit id", state["git_error"])
+
+    def test_an_exploratory_run_may_still_proceed(self):
+        with self.failing_git():
+            state = runtime.git_state()
+        self.assertIsNone(runtime.refusal(state, allow_dirty=True))
+
+    def test_a_clean_tree_is_attributable_and_not_refused(self):
+        state = {"commit": "a" * 40, "uncommitted_changes": False, "changed_paths": [], "git_error": None}
+        self.assertTrue(runtime.attributable(state, []))
+        self.assertIsNone(runtime.refusal(state))
+        self.assertFalse(runtime.attributable(state, ["a pin differs"]))
 
 
 if __name__ == "__main__":

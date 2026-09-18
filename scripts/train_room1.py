@@ -46,22 +46,28 @@ def main() -> int:
             parser.add_argument(f"--{item.name.replace('_', '-')}", type=type(item.default), default=None)
     args = parser.parse_args()
 
-    if args.resume:
-        run_dir = args.resume
-        stored = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))["config"]
-        config = TrainConfig(**{**stored, "disabled_inputs": tuple(stored["disabled_inputs"])})
-        overrides = {k: v for k, v in vars(args).items() if k in stored and v is not None}
-        if overrides:
-            parser.error(f"a resumed run keeps its config; remove {sorted(overrides)}")
-    else:
-        values = {item.name: getattr(args, item.name) for item in fields(TrainConfig)
-                  if item.name != "disabled_inputs" and getattr(args, item.name) is not None}
-        config = TrainConfig(**values)
-        run_dir = args.run_dir or REPO / "runs" / "train" / f"{datetime.now():%Y%m%d-%H%M%S}-seed{config.seed}"
+    # TrainConfig refuses values that cannot run (a zero checkpoint interval hangs the scheduler); report that
+    # as a usage error rather than a traceback.
+    try:
+        if args.resume:
+            run_dir = args.resume
+            stored = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))["config"]
+            config = TrainConfig(**{**stored, "disabled_inputs": tuple(stored["disabled_inputs"])})
+            overrides = {k: v for k, v in vars(args).items() if k in stored and v is not None}
+            if overrides:
+                parser.error(f"a resumed run keeps its config; remove {sorted(overrides)}")
+        else:
+            values = {item.name: getattr(args, item.name) for item in fields(TrainConfig)
+                      if item.name != "disabled_inputs" and getattr(args, item.name) is not None}
+            config = TrainConfig(**values)
+            run_dir = args.run_dir or REPO / "runs" / "train" / f"{datetime.now():%Y%m%d-%H%M%S}-seed{config.seed}"
+    except ValueError as error:
+        parser.error(str(error))
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
 
     game = GameSession(args.game_dir)
@@ -76,7 +82,7 @@ def main() -> int:
             if not args.allow_runtime_mismatch:
                 return 2
         provenance = {**git, "runtime": manifest, "runtime_problems": problems,
-                      "attributable": not git["uncommitted_changes"] and not problems}
+                      "attributable": runtime.attributable(git, problems)}
         print(f"Run {run_dir} ({'resuming' if args.resume else 'new'}), config {asdict(config)}")
         try:
             model = train(config, Path(run_dir), env, provenance, on_fault=game.on_fault, resume=bool(args.resume),

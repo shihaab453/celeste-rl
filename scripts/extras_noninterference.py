@@ -84,8 +84,9 @@ def main() -> int:
     args = parser.parse_args()
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
     output_dir = REPO / "runs" / "extras-noninterference" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
@@ -123,7 +124,7 @@ def main() -> int:
     passed = all(c["identical"] and c["extras_delivered_correctly"] for c in comparisons.values())
     results = {
         **git,
-        "attributable": not git["uncommitted_changes"] and not problems,
+        "attributable": runtime.attributable(git, problems),
         "runtime": manifest,
         "runtime_problems": problems,
         "args": {**vars(args), "game_dir": str(args.game_dir)},

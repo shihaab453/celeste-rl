@@ -136,8 +136,9 @@ def main() -> int:
     args = parser.parse_args()
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
     output_dir = REPO / "runs" / "crash-recovery" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
@@ -148,7 +149,7 @@ def main() -> int:
         print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
         return 2
     provenance = {**git, "runtime": manifest, "runtime_problems": problems,
-                  "attributable": not git["uncommitted_changes"] and not problems}
+                  "attributable": runtime.attributable(git, problems)}
     config = TrainConfig(total_timesteps=4096, n_steps=512, batch_size=256, n_epochs=2, checkpoint_every=1024,
                          eval_every=0)
     results = {**{k: v for k, v in provenance.items() if k != "runtime"}, "runtime": manifest,

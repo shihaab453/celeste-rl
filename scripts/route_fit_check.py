@@ -218,8 +218,9 @@ def main() -> int:
     args = parser.parse_args()
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
 
     args.output_root = REPO / "runs" / "route-fit" / datetime.now().strftime("%Y%m%d-%H%M%S")

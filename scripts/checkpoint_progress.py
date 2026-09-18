@@ -102,8 +102,9 @@ def main() -> int:
     args = parser.parse_args()
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
 
     checkpoint_dir = args.run_dir / "checkpoints"
@@ -129,7 +130,7 @@ def main() -> int:
             print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
             return 2
         results["runtime"], results["runtime_problems"] = manifest, problems
-        results["attributable"] = not git["uncommitted_changes"] and not problems
+        results["attributable"] = runtime.attributable(git, problems)
 
         untrained = SupervisedPPO("MultiInputPolicy", env, policy_kwargs=policy_kwargs(), n_steps=64, batch_size=64,
                                   device="cpu", seed=config.seed)

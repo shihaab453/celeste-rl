@@ -8,7 +8,8 @@ A run directory holds everything needed to audit or resume the run:
                      reward components, how far the episodes got, environment steps per second
   episodes.jsonl     one line per finished episode from an accepted rollout: length, ending, return, components,
                      and its progress record
-  evaluations.jsonl  one line per evaluation: stochastic success rate, clear times, progress, deterministic episode
+  evaluations.jsonl  one line per evaluation: the checkpoint measured and its hash, stochastic success rate,
+                     clear times, progress, deterministic episode. The final policy is evaluated too.
   checkpoints/       latest.zip, previous.zip, best.zip, step_<accepted>.zip, aborted.zip; each written to a
                      temporary file and renamed, so a crash never leaves a half-written checkpoint
 
@@ -31,6 +32,7 @@ sampling at one start, not generalisation over starts (held-out entry states are
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import time
@@ -73,7 +75,21 @@ class TrainConfig:
     max_consecutive_discards: int = 3
     checkpoint_every: int = 50_000  # accepted steps
     eval_every: int = 250_000  # accepted steps; 0 disables
-    eval_episodes: int = 20
+    # 50, not 20 (Codex K7): 20 episodes cannot show a success rate below 5%, and the rates worth catching
+    # early are smaller than that.
+    eval_episodes: int = 50
+
+    def __post_init__(self):
+        """Refuse a configuration that cannot run (Codex J10). A checkpoint interval of 0 never advances the
+        scheduler and hangs the run; 0 evaluation episodes make every success rate 0 out of 0."""
+        positive = {"total_timesteps": self.total_timesteps, "n_steps": self.n_steps,
+                    "batch_size": self.batch_size, "n_epochs": self.n_epochs,
+                    "checkpoint_every": self.checkpoint_every, "eval_episodes": self.eval_episodes}
+        problems = [f"{name} must be greater than 0, got {value}" for name, value in positive.items() if value <= 0]
+        if self.eval_every < 0:
+            problems.append(f"eval_every must be 0 (no evaluation) or greater, got {self.eval_every}")
+        if problems:
+            raise ValueError("; ".join(problems))
 
 
 def _atomic_save(model: SupervisedPPO, path: Path) -> None:
@@ -168,16 +184,18 @@ class RunRecorder(BaseCallback):
         self.next_eval = config.eval_every if config.eval_every > 0 else None
         self.best: tuple | None = None
         self.accepted_episodes = 0
+        self.last_eval_steps: int | None = None
 
     # Scheduling state that must survive a resume.
     def state(self) -> dict:
         return {"next_checkpoint": self.next_checkpoint, "next_eval": self.next_eval, "best": self.best,
-                "accepted_episodes": self.accepted_episodes}
+                "accepted_episodes": self.accepted_episodes, "last_eval_steps": self.last_eval_steps}
 
     def load_state(self, state: dict) -> None:
         self.next_checkpoint, self.next_eval = state["next_checkpoint"], state["next_eval"]
         self.best = tuple(state["best"]) if state["best"] is not None else None
         self.accepted_episodes = state["accepted_episodes"]
+        self.last_eval_steps = state.get("last_eval_steps")
 
     def _on_rollout_start(self) -> None:
         if self._in_rollout:
@@ -262,12 +280,21 @@ class RunRecorder(BaseCallback):
         self.write_manifest("running")
 
     def _evaluate(self, steps: int) -> None:
+        # The evaluated weights go on disk before the episodes run, and the record names their file and its
+        # hash (Codex J4), so an evaluation can always be tied to the checkpoint it measured.
+        checkpoint = self.checkpoints / f"step_{steps:09d}.zip"
+        if not checkpoint.exists():
+            _atomic_save(self.model, checkpoint)
+        digest = hashlib.sha256(checkpoint.read_bytes()).hexdigest()
+        self.last_eval_steps = steps
         stochastic = [run_episode(self.model, self.env, deterministic=False) for _ in range(self.config.eval_episodes)]
         deterministic = run_episode(self.model, self.env, deterministic=True)
         successes = [e["length"] for e in stochastic if e["ending"] == SUCCESS]
         median_potential = _median(stochastic, "max_potential")
         record = {
             "accepted_steps": steps,
+            "checkpoint": checkpoint.name,
+            "checkpoint_sha256": digest,
             "stochastic_episodes": len(stochastic),
             "stochastic_success_rate": len(successes) / len(stochastic) if stochastic else 0.0,
             "stochastic_endings": dict(Counter(e["ending"] for e in stochastic)),
@@ -360,5 +387,10 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
         write_manifest("crashed")
         raise
     recorder._checkpoint(model.num_timesteps)
+    # The policy a run ends with is the one that would be used, and until now it was never measured: the last
+    # scheduled evaluation ran before the final updates (Codex J4). Skipped only if one already ran at exactly
+    # these steps, so a run that ends on an evaluation boundary is not evaluated twice.
+    if config.eval_every > 0 and recorder.last_eval_steps != model.num_timesteps:
+        recorder._evaluate(model.num_timesteps)
     write_manifest("finished")
     return model

@@ -43,7 +43,9 @@ def main() -> int:
     git = runtime.git_state()
     running = game_process.running_game_pids(args.game_dir)
     problems = []
-    if git["uncommitted_changes"]:
+    if git["git_error"]:
+        problems.append(f"git could not describe the tree: {git['git_error']}")
+    elif git["uncommitted_changes"]:
         problems.append("uncommitted changes: a campaign result must name its commit")
     if running:
         problems.append(f"a game copy is already running (PID {', '.join(map(str, running))})")

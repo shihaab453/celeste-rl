@@ -158,16 +158,57 @@ def check(manifest: dict, pins: dict | None) -> list[str]:
     return problems
 
 
+class GitUnavailable(RuntimeError):
+    """Git could not answer, so the working tree cannot be described."""
+
+
 def git_state() -> dict:
-    """The commit a run used and whether the working tree differed from it."""
-    git = lambda *a: subprocess.run(["git", *a], cwd=REPO, capture_output=True, text=True).stdout.strip()
-    status = git("status", "--porcelain")
-    return {"commit": git("rev-parse", "HEAD"), "uncommitted_changes": bool(status),
-            "changed_paths": [line[3:] for line in status.splitlines()][:50]}
+    """The commit a run used and whether the working tree differed from it.
+
+    Fails closed (Codex J3). If git is missing, errors, or answers with something that is not a commit id, the
+    state reports no commit, uncommitted changes and the error. A failure that looked clean would let a run
+    claim a commit it was never built from, which is worse than refusing to start.
+    """
+    def git(*args) -> str:
+        result = subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise GitUnavailable(f"git {' '.join(args)} failed ({result.returncode}): "
+                                 f"{result.stderr.strip() or 'no error output'}")
+        return result.stdout
+
+    try:
+        # Not stripped: a porcelain line starts with its two status columns, and the first one is often a space.
+        status = git("status", "--porcelain")
+        commit = git("rev-parse", "HEAD").strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise GitUnavailable(f"git rev-parse HEAD gave {commit!r}, which is not a commit id")
+    except (GitUnavailable, OSError) as error:
+        return {"commit": None, "uncommitted_changes": True, "changed_paths": [], "git_error": str(error)}
+    changed = [line[3:] for line in status.splitlines() if line.strip()]
+    return {"commit": commit, "uncommitted_changes": bool(changed), "changed_paths": changed[:50],
+            "git_error": None}
 
 
 DIRTY_MESSAGE = ("The working tree has uncommitted changes, so these results could not be attributed to a commit. "
                  "Commit first, or pass --allow-dirty for an exploratory run.")
+
+
+def refusal(state: dict, allow_dirty: bool = False) -> str | None:
+    """Why a live script must not start, or None. Every script that records provenance uses this, so a broken
+    git and a dirty tree are refused the same way and say which one happened."""
+    if allow_dirty:
+        return None
+    if state.get("git_error"):
+        return ("Git could not describe the working tree, so nothing here could be attributed to a commit:\n  "
+                + state["git_error"] + "\nFix git, or pass --allow-dirty for an exploratory run.")
+    if state["uncommitted_changes"]:
+        return DIRTY_MESSAGE + "\n  " + "\n  ".join(state["changed_paths"])
+    return None
+
+
+def attributable(state: dict, problems: list) -> bool:
+    """A result is attributable when git named the commit, the tree was clean and the runtime matched the pins."""
+    return bool(state.get("commit")) and not state["uncommitted_changes"] and not problems
 
 
 def load_pins(path: Path = PINS_PATH) -> dict | None:

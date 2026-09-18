@@ -6,6 +6,7 @@ Run from the repo root:
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import tempfile
 import unittest
@@ -84,6 +85,36 @@ class RunTests(unittest.TestCase):
             unshaped = sum(value for name, value in episode["components"].items() if name != "shaping")
             self.assertAlmostEqual(unshaped, -1.03, places=9)
 
+    def test_every_evaluation_names_the_checkpoint_it_measured(self):
+        """Codex J4: an evaluation is only evidence if you can say which weights produced it."""
+        train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        _, _, _, evaluations = read(self.run_dir)
+
+        for record in evaluations:
+            path = self.run_dir / "checkpoints" / record["checkpoint"]
+            self.assertTrue(path.exists(), record["checkpoint"])
+            self.assertEqual(record["checkpoint_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertEqual(record["checkpoint"], f"step_{record['accepted_steps']:09d}.zip")
+
+    def test_the_final_policy_is_evaluated_once_and_not_twice(self):
+        """The last scheduled evaluation runs before the final updates, so the policy a run ends with was never
+        measured. Evaluating it again when a run ends exactly on an evaluation boundary would double-count."""
+        train(config(eval_every=80), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        _, _, _, evaluations = read(self.run_dir)
+        steps = [e["accepted_steps"] for e in evaluations]
+        self.assertEqual(steps[-1], 160)
+        self.assertEqual(len(steps), len(set(steps)), f"an evaluation was repeated: {steps}")
+
+    def test_a_configuration_that_cannot_run_is_refused(self):
+        """Codex J10: a zero checkpoint interval never advances the scheduler and hangs the run."""
+        for field in ("checkpoint_every", "eval_episodes", "total_timesteps", "n_steps"):
+            with self.subTest(field=field), self.assertRaises(ValueError) as caught:
+                config(**{field: 0})
+            self.assertIn(field, str(caught.exception))
+        with self.assertRaises(ValueError):
+            config(eval_every=-1)
+        self.assertEqual(TrainConfig().eval_episodes, 50)  # Codex K7
+
     def test_progress_records_say_how_far_each_episode_got(self):
         """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
         train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
@@ -119,13 +150,15 @@ class RunTests(unittest.TestCase):
         self.assertEqual(sum(int(row["episodes"]) for row in progress), len(episodes))
 
         checkpoints = self.run_dir / "checkpoints"
+        # 96 is there because an evaluation writes the weights it measured before measuring them (Codex J4).
         self.assertEqual(sorted(p.name for p in checkpoints.glob("step_*.zip")),
-                         ["step_000000064.zip", "step_000000128.zip", "step_000000160.zip"])
+                         ["step_000000064.zip", "step_000000096.zip", "step_000000128.zip", "step_000000160.zip"])
         for name in ("latest.zip", "previous.zip", "best.zip"):
             self.assertTrue((checkpoints / name).exists(), name)
         self.assertEqual(list(checkpoints.glob("*.tmp*")), [])
 
-        self.assertEqual([e["accepted_steps"] for e in evaluations], [96])
+        # 96 was scheduled; 160 is the final policy, which no scheduled evaluation ever reached (Codex J4).
+        self.assertEqual([e["accepted_steps"] for e in evaluations], [96, 160])
         self.assertEqual(evaluations[0]["stochastic_episodes"], 2)
         self.assertEqual(evaluations[0]["deterministic"]["ending"], "death")
         loaded = SupervisedPPO.load(checkpoints / "latest.zip", device="cpu")

@@ -554,8 +554,9 @@ def main() -> int:
         parser.error(f"unknown probes {sorted(unknown)}")
 
     git = runtime.git_state()
-    if git["uncommitted_changes"] and not args.allow_dirty:
-        print(runtime.DIRTY_MESSAGE + "\n  " + "\n  ".join(git["changed_paths"]))
+    refusal = runtime.refusal(git, args.allow_dirty)
+    if refusal:
+        print(refusal)
         return 2
     output_dir = REPO / "runs" / "env-probes" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
@@ -596,7 +597,7 @@ def main() -> int:
         session.close()
         save()
     passed = all(p["passed"] for p in results["probes"].values())
-    attributable = not results["uncommitted_changes"] and not results["runtime_problems"]
+    attributable = runtime.attributable(results, results["runtime_problems"])
     results["attributable"] = attributable
     save()
     print(("All probes passed." if passed else "SOME PROBES FAILED.")
