@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import torch as th
+
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.starts import Start, StartArchive
@@ -23,6 +25,7 @@ from celeste_rl.training.run import (
     train,
     update_progress,
 )
+from celeste_rl.training.policy import CelestePolicy, policy_kwargs
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 from tests.test_training import EpochBridge
 
@@ -197,6 +200,22 @@ class RunTests(unittest.TestCase):
             with self.subTest(field=field, value=value), self.assertRaises(ValueError) as caught:
                 config(**{field: value})
             self.assertIn(field, str(caught.exception))
+
+    def test_a_run_can_start_from_another_policy_s_weights(self):
+        """Phase 3B fine-tuning: the policy is inherited, everything else starts fresh."""
+        donor = SupervisedPPO(CelestePolicy, CelesteRoomEnv(EpochBridge()), policy_kwargs=policy_kwargs(),
+                              n_steps=32, batch_size=32, device="cpu", seed=0)
+        with th.no_grad():
+            donor.policy.action_net.bias.fill_(1.25)
+        donor.save(self.run_dir.parent / "donor.zip")
+
+        model = train(config(init_from=str(self.run_dir.parent / "donor.zip"), eval_every=0),
+                      self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        manifest, _, _, _ = read(self.run_dir)
+        self.assertEqual(manifest["accepted_steps"], 160, "the step counter must not be inherited")
+        self.assertEqual(manifest["config"]["init_from"], str(self.run_dir.parent / "donor.zip"))
+        # The weights moved during training, but not back to a fresh policy's zero bias.
+        self.assertGreater(float(model.policy.action_net.bias.detach().mean()), 0.5)
 
     def test_progress_records_say_how_far_each_episode_got(self):
         """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""

@@ -82,6 +82,9 @@ class TrainConfig:
     # the 21 enabled inputs at once; -2.2 is 0.10 per input, about 2.3 at once, which is what real play looks
     # like. 0.0 reproduces every run before 2026-09-18.
     action_bias: float = 0.0
+    # Phase 3B: start from another checkpoint's policy weights, keeping this run's own counters and optimizer.
+    # Recorded here so a fine-tuned run's manifest names what it was started from.
+    init_from: str = ""
     varied_starts: bool = False
     canonical_fraction: float = 0.25  # the share of training episodes that still begin at the canonical start
     max_start_frames: int = 600  # a start costing more than a third of the deadline to reach is not archived
@@ -422,6 +425,11 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
             clip_range=config.clip_range, ent_coef=config.ent_coef, vf_coef=config.vf_coef,
             max_grad_norm=config.max_grad_norm, seed=config.seed, device=config.device,
             max_consecutive_discards=config.max_consecutive_discards)
+        if config.init_from:
+            # Policy weights only: the optimizer state, the step counter and the records all start fresh, so
+            # this is a new run that happens to begin from a trained policy rather than a resumed one.
+            donor = SupervisedPPO.load(Path(config.init_from), device=config.device)
+            model.policy.load_state_dict(donor.policy.state_dict())
         history = []
         previous = None
     model.on_fault = on_fault
