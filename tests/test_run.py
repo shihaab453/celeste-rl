@@ -217,6 +217,21 @@ class RunTests(unittest.TestCase):
         # The weights moved during training, but not back to a fresh policy's zero bias.
         self.assertGreater(float(model.policy.action_net.bias.detach().mean()), 0.5)
 
+    def test_init_from_does_not_steal_the_run_s_seed(self):
+        """SB3's load() re-seeds torch, numpy and python globally from the donor's saved seed, so without a
+        re-seed two fine-tuning runs with different --seed values produce byte-identical episodes."""
+        donor = SupervisedPPO(CelestePolicy, CelesteRoomEnv(EpochBridge()), policy_kwargs=policy_kwargs(),
+                              n_steps=32, batch_size=32, device="cpu", seed=0)
+        donor.save(self.run_dir.parent / "donor.zip")
+
+        draws = []
+        for seed in (1, 2):
+            directory = self.run_dir.parent / f"run{seed}"
+            train(config(seed=seed, init_from=str(self.run_dir.parent / "donor.zip"), eval_every=0,
+                         total_timesteps=32), directory, CelesteRoomEnv(EpochBridge()), PROVENANCE)
+            draws.append(th.randint(0, 10 ** 6, (3,)).tolist())
+        self.assertNotEqual(draws[0], draws[1], "two seeds must not share the donor's random stream")
+
     def test_progress_records_say_how_far_each_episode_got(self):
         """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
         train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)

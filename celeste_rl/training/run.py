@@ -430,6 +430,10 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
             # this is a new run that happens to begin from a trained policy rather than a resumed one.
             donor = SupervisedPPO.load(Path(config.init_from), device=config.device)
             model.policy.load_state_dict(donor.policy.state_dict())
+            # SB3's load() runs _setup_model(), which calls set_random_seed with the DONOR's saved seed and
+            # re-seeds torch, numpy and python globally. Without this line every fine-tuned run samples from
+            # the donor's stream whatever --seed says, and two different seeds produce byte-identical runs.
+            model.set_random_seed(config.seed)
         history = []
         previous = None
     model.on_fault = on_fault
