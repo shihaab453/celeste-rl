@@ -58,6 +58,9 @@ from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E40
 from celeste_rl.training.run import run_episode  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
 
+# Route seeds at or above this belong to the held-out set and must never be trained on.
+HELDOUT_FIRST_SEED = 100
+
 
 class SpacesOnly(gym.Env):
     """Enough environment for PPO to build a policy when there is no game to attach to."""
@@ -82,6 +85,11 @@ def collect_sources(args) -> list[dict]:
         route = json.loads(path.read_text(encoding="utf-8"))
         step = route.get("transition_step")
         if not step or len(route["actions"]) < step:
+            continue
+        # Seeds 100 and up belong to the held-out set (scripts/make_heldout_starts.py), which writes its
+        # routes into the same directory. Training on them would put the test set into the training set, and
+        # the mistake would be invisible: the clone would simply look better than it is.
+        if (route.get("seed") or 0) >= HELDOUT_FIRST_SEED:
             continue
         lines = [format_input_line(buttons) for buttons in route["actions"][:step]]
         found.append({"kind": "route", "name": path.parent.name, "lines": lines})
