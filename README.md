@@ -6,21 +6,21 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is cleared from the canonical start on about 98% of episodes when the method works, and
-it fails outright about one run in four.** Four PPO fine-tuning runs from one cloned policy gave 98.5%, 98.0%,
-84% and **0%**: three learned to clear the room and one collapsed to standing still and never recovered. The
-variance is not understood.
+**Room 1 of Chapter 1 is cleared from 80% of entry states the policy has never seen** (357 of 447 episodes
+over three checkpoints, 149 held-out states each, 95% interval 75.9% to 83.3%). Those states come from searches
+seeded separately from the demonstrations and span the room, so this is the room being played rather than one
+route being repeated.
 
-Those are also all from one fixed start state in a deterministic game, so they measure robustness around a
-single route rather than the ability to play the room. The project's own generalisation criterion, 99% over 200
-held-out entry states, has machinery but no result yet. Chapter 1 has 20 rooms; this is the first.
+Getting there needed training on varied starting states. Training only from the canonical start reaches about
+98% *on that start* and only 65% on held-out states, because optimising one start overtrains to it. Chapter 1
+has 20 rooms; this is the first.
 
 Two experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | RL alone **0%** (0 of 420, under 0.9%), cloning alone **6%** (3 of 50, 2.1% to 16.2%), cloning then RL **0% to 98.5%** over four runs |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | On held-out entry states: RL alone **untested** (it never cleared the room), cloning then RL **65%** from canonical starts and **80%** with varied starts |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and

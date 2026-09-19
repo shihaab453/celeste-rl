@@ -1,14 +1,12 @@
 # Phase 3B: room 1 with demonstrations
 
-**Result: about 98% success from the canonical start when the method works, and it fails outright roughly one
-run in four.** Four PPO fine-tuning runs from the same cloned policy produced 98.5%, 98.0%, 84% and **0%**. The
-unshaped no-demonstration baseline reported in [phase3-unshaped-baseline.md](phase3-unshaped-baseline.md)
-scored 0 clears in 420 evaluation episodes, which bounds its rate below about 0.9%, so even the failing
-fine-tuning run is not worse than the baseline; it is simply no better.
+**Result: 80% of held-out entry states cleared** (357 of 447 episodes, 95% interval 75.9% to 83.3%), by
+policies fine-tuned with varied starting states. Fine-tuning from the canonical start alone reaches 65% on the
+same held-out states (291 of 447, 60.6% to 69.4%) while scoring about 98% on the canonical start itself. The
+unshaped no-demonstration baseline never cleared the room at all.
 
-The spread is the most important thing in this report and it is not understood. An earlier version of this
-document reported "at least 82.5% on every seed" from three runs. A fourth run, made to put all seeds on one
-commit, collapsed to standing still and never recovered.
+Section 7 is the one that matters: **measuring the canonical start was actively misleading**, and two policies
+that looked equally good on it differ by 25 points on the room.
 
 This is the demonstration-assisted comparison the roadmap calls for when the no-demonstration budget is spent
 without a clear. It does not replace that result, and it is not the same claim: this policy was shown solutions
@@ -24,7 +22,11 @@ pinned hashes.
 | RL only, `rew-v1` | **0%** (0 of 420) | 0% to 0.9% | 3 seeds x 2,000,896 transitions |
 | RL only, `rew-v2` matched to the fine-tune | **0%** (0 of 250) | 0% to 1.5% | 1 seed x 501,760 transitions |
 | Cloning only | **6%** (3 of 50) | 2.1% to 16.2% | 5 demonstrations trained on, 2 held out |
-| Cloning then RL | **0% to 98.5%** | see per-run table | the same clone plus 4 x 501,760 transitions |
+| Cloning then RL, canonical starts | **0% to 98.5%** | see per-run table | the same clone plus 501,760 transitions per run |
+| Cloning then RL, varied starts | 62% to 96% | see section 5b | the same again |
+
+Those are all canonical-start numbers and section 5b shows they are the wrong measure. On 149 held-out entry
+states the same policies score **65.1%** (canonical-start training) and **79.9%** (varied-start training).
 
 Cloning alone clears the room rarely. RL alone never clears it, under either reward. Cloning followed by RL
 clears it nearly always on two seeds of three.
@@ -115,6 +117,10 @@ on the demonstrated path, so its first mistake puts it somewhere no demonstratio
 PPO initialised from the cloned policy's weights (`rew-v2`, shaping scale 2.0, canonical starts, 501,760
 transitions). The step counter, optimizer state and records all start fresh; only the weights are inherited.
 
+This section covers the first four runs, which is all there was when it was written. Twelve further runs are in
+section 5b, and they revise two of its conclusions: the collapse is rarer than four runs suggested, and the
+canonical success rates below are not the number to judge a policy by.
+
 Success rate during training, 50 episodes at each point:
 
 | accepted steps | seed 0 (`e3df073`) | seed 1 | seed 2 | seed 0 (`35faa14`) |
@@ -176,11 +182,10 @@ solutions faster than the ones it was given.
 
 **It does not establish:**
 
-- **Generalisation.** Every episode here begins at the same canonical start, and the game is deterministic, so
-  a stochastic success rate measures how robust the policy's own sampling is around one route rather than
-  whether it can play the room. **There is no test set anywhere in this experiment.** The roadmap's Phase 3
-  criterion is 99% on 200 held-out reachable entry states from a generator frozen before training; that
-  generator does not exist yet and this report makes no claim about it.
+- **The roadmap's criterion, as written.** It asks for 99% on 200 held-out entry states. The frozen set has
+  149 states, not 200, and the best arm reaches 80%. Both gaps are real. (The criterion also cannot be
+  demonstrated as written: 200 of 200 has a 95% Wilson lower bound of 98.1%, so 200 episodes can never show a
+  rate above 99% with confidence. It needs restating as an interval.)
   (A note for when it is built: 200 of 200 successes has a Wilson lower bound of about 98.1%, so 200 episodes
   can never demonstrate a rate above 99% with confidence. The criterion needs restating as an interval before
   any run is judged against it.)
@@ -198,6 +203,67 @@ solutions faster than the ones it was given.
 - **That the demonstrations taught the room.** The clone is below a persistence baseline on held-out routes
   (section 3), so what PPO started from was closer to a usefully-shaped action distribution than to a policy
   that knows the route. How much of the seven is needed is untested: one route might be enough.
+
+## 5b. The overnight campaign: held-out states, and the zero-gradient trap
+
+Twelve fine-tuning runs from the same cloned policy, declared in `config/campaign-finetune-variance.json`
+before any of them started, with the analysis fixed in advance. Arm A is fine-tuning from the canonical start.
+Arm B adds varied starting states drawn from the reached-state archive. Six runs each, alternating, so an
+interruption would leave balanced pairs.
+
+### What the canonical start was hiding
+
+| checkpoint | canonical start | 149 held-out entry states |
+|---|---|---|
+| seed 1 | 98.0% | 59.7% |
+| seed 2 | 98.5% | 84.6% |
+| seed 0 (`e3df073`) | 82.5% | 68.5% |
+
+Every policy scores lower on the room than on the start it was tuned against, by 14 to 38 points, and **not by
+a consistent amount**. Seeds 1 and 2 look identical on the canonical start and are 25 points apart on the room.
+Seed 1 clears 100% from states near the exit and 25 to 31% from the early room: it learned the back half. One
+fixed start could not have shown any of this.
+
+### Varied starts, measured on the room
+
+| arm | held-out success | 95% interval |
+|---|---|---|
+| A, canonical starts | 291/447 = **65.1%** | 60.6% to 69.4% |
+| B, varied starts | 357/447 = **79.9%** | 75.9% to 83.3% |
+
+Three checkpoints per arm, 149 states each. Every individual B run (78.5%, 82.6%, 78.5%) beats every individual
+A run (62.4%, 62.4%, 70.5%).
+
+**B looks worse on the canonical start**, with finals of 0.62 and 0.68 among its six against four A runs at
+0.92 to 0.94. Training on varied starts costs a little on the one start the canonical arm overtrains to, and
+buys the room.
+
+### The zero-gradient trap, and its removal
+
+The trap signature was declared in advance as a rollout with `advantage_std` below 0.02 and more than 80%
+timeouts.
+
+| arm | runs showing the signature | lowest `advantage_std` |
+|---|---|---|
+| A | **5 of 6** | 0.0056 to 0.0144 |
+| B | **0 of 6** | 0.031 to 0.073 |
+
+Fisher's exact on 5 of 6 against 0 of 6 is about 0.015. The mechanism is the Phase 3 finding reproducing inside
+fine-tuning: `rew-v2` makes every failure return the same number, so a policy that stops succeeding has no
+return variance, no advantage and no gradient, and only the entropy bonus moves it. Escape is a random walk,
+which is why in the runs that recovered the deaths climb back before any success does. Varied starts break it
+because episodes from different states end differently, so returns differ.
+
+### What did not replicate
+
+**The collapse is rarer than this report previously claimed.** No run in either arm collapsed under the
+declared definition. Pooling the six new A runs with the four earlier gives **1 collapse in 10**, 95% interval
+2% to 40%, not the "one run in four" this document said after four runs. One A run came close, finishing at 2%
+after 137,000 steps in the trap, and is classed partial.
+
+So the night removed the mechanism and could not show that removing it prevents collapses, because collapses
+turned out to be too rare for twelve runs to compare. The plan said in advance that six against six could not
+reach significance on that comparison, and it did not.
 
 ## 6. A note on the seeds and the evaluation stream
 
