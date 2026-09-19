@@ -125,9 +125,30 @@ def main() -> int:
               "against the current set; delete it deliberately if that is what you mean to do.")
         return 2
 
-    game = GameSession(args.game_dir)
     output_dir = REPO / "runs" / "heldout-starts" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
+
+    # The searches run before this script takes the game. Each child launches its own copy, and the launch
+    # guard refuses while another game-copy process is alive, so holding the ports here makes every search
+    # fail and the whole set come back empty.
+    routes = list(args.routes or [])
+    if not routes:
+        print(f"Searching for {args.searches} fresh routes, seeds {FIRST_SEED} upwards")
+        for offset in range(args.searches):
+            found = search(FIRST_SEED + offset, args.game_dir, args.search_minutes)
+            if found:
+                print(f"  seed {FIRST_SEED + offset}: {found.name}")
+                routes.append(found)
+    # Any held-out route already on disk counts, so an interrupted build can be continued.
+    existing = [p for p in sorted((REPO / "runs" / "routes").glob("2026*")) if (p / "route.json").exists()
+                and (json.loads((p / "route.json").read_text(encoding="utf-8")).get("seed") or 0) >= FIRST_SEED]
+    routes = sorted(set(routes) | set(existing))
+    if not routes:
+        print("No routes found, so no held-out starts.")
+        return 1
+    print(f"{len(routes)} held-out routes (seeds {FIRST_SEED} and up)")
+
+    game = GameSession(args.game_dir)
     http = CelesteBridge(output_dir / "episode.tas")
     env = CelesteRoomEnv(LockstepBridge(http))
     try:
@@ -135,18 +156,6 @@ def main() -> int:
         if problems and not args.allow_runtime_mismatch:
             print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
             return 2
-
-        routes = list(args.routes or [])
-        if not routes:
-            print(f"Searching for {args.searches} fresh routes, seeds {FIRST_SEED} upwards")
-            for offset in range(args.searches):
-                found = search(FIRST_SEED + offset, args.game_dir, args.search_minutes)
-                if found:
-                    print(f"  seed {FIRST_SEED + offset}: {found.name}")
-                    routes.append(found)
-        if not routes:
-            print("No routes found, so no held-out starts.")
-            return 1
 
         chosen = candidates(routes, args.states, args.earliest, args.spacing)
         print(f"\n{len(chosen)} candidate states from {len(routes)} routes; validating each by replay")
