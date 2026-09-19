@@ -1,12 +1,16 @@
 # Phase 3B: room 1 with demonstrations
 
-**Result: 80% of held-out entry states cleared** (357 of 447 episodes, 95% interval 75.9% to 83.3%), by
-policies fine-tuned with varied starting states. Fine-tuning from the canonical start alone reaches 65% on the
-same held-out states (291 of 447, 60.6% to 69.4%) while scoring about 98% on the canonical start itself. The
-unshaped no-demonstration baseline never cleared the room at all.
+**Result: demonstration-assisted policies clear room 1, but the held-out generalisation rate is not yet
+established.** The first held-out evaluation recorded 357 successes in 447 episodes for selected varied-start
+checkpoints and 291 in 447 for selected canonical-start checkpoints. Review found that the frozen artifact has
+125 unique states from 5 unique routes, not 149 states from 6 routes: two seed-100 route files and their 24
+sampled prefixes are exact duplicates. The same correlated states were then pooled across checkpoints, and the
+checkpoint subset was not declared before the campaign. The earlier 79.9% headline and its binomial interval
+are therefore withdrawn. The unshaped no-demonstration baseline still never cleared the room at all.
 
-Section 7 is the one that matters: **measuring the canonical start was actively misleading**, and two policies
-that looked equally good on it differ by 25 points on the room.
+Section 5b remains an important diagnostic: **measuring only the canonical start was misleading**, and two
+policies that looked equally good there differed by 25 points on the preliminary state set. A corrected frozen
+set and a predeclared evaluation of every matched checkpoint are still needed.
 
 This is the demonstration-assisted comparison the roadmap calls for when the no-demonstration budget is spent
 without a clear. It does not replace that result, and it is not the same claim: this policy was shown solutions
@@ -25,8 +29,9 @@ pinned hashes.
 | Cloning then RL, canonical starts | **0% to 98.5%** | see per-run table | the same clone plus 501,760 transitions per run |
 | Cloning then RL, varied starts | 62% to 96% | see section 5b | the same again |
 
-Those are all canonical-start numbers and section 5b shows they are the wrong measure. On 149 held-out entry
-states the same policies score **65.1%** (canonical-start training) and **79.9%** (varied-start training).
+Those are all canonical-start numbers and do not measure generalisation over the room. Section 5b records a
+preliminary held-out diagnostic, but duplicate states, route clustering, and post-campaign checkpoint selection
+mean its 65.1% and 79.9% scores are not valid arm-level estimates.
 
 Cloning alone clears the room rarely. RL alone never clears it, under either reward. Cloning followed by RL
 clears it nearly always on two seeds of three.
@@ -176,19 +181,16 @@ correlation entirely.
 ## 5. What this does and does not establish
 
 **It establishes** that the task is learnable by this network, this observation and this action space, and that
-the barrier in the no-demonstration branch was neither capacity nor the environment. Given episodes whose
-returns differ, PPO improves on what it was shown by a wide margin, on every seed tried, and arrives at
-solutions faster than the ones it was given.
+the barrier in the no-demonstration branch was neither capacity nor the environment. PPO can improve on what
+it was shown by a wide margin and can arrive at solutions faster than the ones it was given. It does not do so
+on every run.
 
 **It does not establish:**
 
-- **The roadmap's criterion, as written.** It asks for 99% on 200 held-out entry states. The frozen set has
-  149 states, not 200, and the best arm reaches 80%. Both gaps are real. (The criterion also cannot be
-  demonstrated as written: 200 of 200 has a 95% Wilson lower bound of 98.1%, so 200 episodes can never show a
-  rate above 99% with confidence. It needs restating as an interval.)
-  (A note for when it is built: 200 of 200 successes has a Wilson lower bound of about 98.1%, so 200 episodes
-  can never demonstrate a rate above 99% with confidence. The criterion needs restating as an interval before
-  any run is judged against it.)
+- **A corrected held-out generalisation rate.** The first frozen artifact has 149 entries but only 125 unique
+  states from 5 unique routes. Its route prefixes are correlated, and an ordinary binomial interval does not
+  describe uncertainty over reachable room states. The roadmap asks for 200 held-out states and also needs its
+  99% threshold restated as an interval: even 200 of 200 has a 95% Wilson lower bound of about 98.1%.
 - **Reproducibility.** Fine-tuning is *not* reproducible in outcome: four runs from one cloned policy gave 0%
   to 98.5%. Each individual run is exactly reproducible given its commit and seed, which
   `scripts/reproduce_check.py` verifies, but the method's outcome is not.
@@ -204,41 +206,49 @@ solutions faster than the ones it was given.
   (section 3), so what PPO started from was closer to a usefully-shaped action distribution than to a policy
   that knows the route. How much of the seven is needed is untested: one route might be enough.
 
-## 5b. The overnight campaign: held-out states, and the zero-gradient trap
+## 5b. The overnight campaign: preliminary held-out diagnostics and the low-signal regime
 
 Twelve fine-tuning runs from the same cloned policy, declared in `config/campaign-finetune-variance.json`
-before any of them started, with the analysis fixed in advance. Arm A is fine-tuning from the canonical start.
-Arm B adds varied starting states drawn from the reached-state archive. Six runs each, alternating, so an
-interruption would leave balanced pairs.
+before any of them started. Arm A is fine-tuning from the canonical start. Arm B adds varied starting states
+drawn with success-weighted sampling from the reached-state archive. Six runs each, alternating, so an
+interruption would leave balanced pairs. The training plan was fixed in advance; the later choice of three
+checkpoints per arm for held-out evaluation was not.
 
 ### What the canonical start was hiding
 
-| checkpoint | canonical start | 149 held-out entry states |
+| checkpoint | canonical start | preliminary 149-entry artifact |
 |---|---|---|
 | seed 1 | 98.0% | 59.7% |
 | seed 2 | 98.5% | 84.6% |
 | seed 0 (`e3df073`) | 82.5% | 68.5% |
 
-Every policy scores lower on the room than on the start it was tuned against, by 14 to 38 points, and **not by
-a consistent amount**. Seeds 1 and 2 look identical on the canonical start and are 25 points apart on the room.
-Seed 1 clears 100% from states near the exit and 25 to 31% from the early room: it learned the back half. One
-fixed start could not have shown any of this.
+Every policy scores lower on this diagnostic artifact than on the start it was tuned against, by 14 to 38
+points, and **not by a consistent amount**. Seeds 1 and 2 look identical on the canonical start and are 25
+points apart on the artifact. Seed 1 clears 100% from recorded entries near the exit and 25 to 31% from the
+early room. One fixed start could not have shown that difference, even though the artifact cannot support a
+population estimate.
 
-### Varied starts, measured on the room
+### Preliminary selected-checkpoint comparison
 
-| arm | held-out success | 95% interval |
-|---|---|---|
-| A, canonical starts | 291/447 = **65.1%** | 60.6% to 69.4% |
-| B, varied starts | 357/447 = **79.9%** | 75.9% to 83.3% |
+| selected checkpoints | diagnostic score |
+|---|---|
+| A seeds 3, 5 and 7, canonical-start training | 291/447 = **65.1%** |
+| B seeds 4, 5 and 7, varied starts with success sampling | 357/447 = **79.9%** |
 
-Three checkpoints per arm, 149 states each. Every individual B run (78.5%, 82.6%, 78.5%) beats every individual
-A run (62.4%, 62.4%, 70.5%).
+Each checkpoint was evaluated on 149 entries, but 24 entries duplicate another route's prefixes exactly, so
+there are 125 unique states from 5 unique routes. Prefixes along a route are also correlated. The ordinary
+Wilson intervals previously printed here treated all 447 rows as independent and are withdrawn.
 
-**B looks worse on the canonical start**, with finals of 0.62 and 0.68 among its six against four A runs at
-0.92 to 0.94. Training on varied starts costs a little on the one start the canonical arm overtrains to, and
-buys the room.
+The selected B checkpoints scored 78.5%, 82.6% and 78.5%; the selected A checkpoints scored 62.4%, 62.4% and
+70.5%. But the subset was chosen after the campaign, is not seed-matched, and omits A seeds 4, 6 and 8 and B
+seeds 3, 6 and 8. This is promising diagnostic evidence, not an unbiased comparison of the two arms. Every
+matched checkpoint must be evaluated on the corrected frozen set before attributing a generalisation gain.
 
-### The zero-gradient trap, and its removal
+Across the canonical-start evaluations of all six training runs, B includes final rates of 62% and 68%, while
+four A runs reach 92% to 94%. That remains consistent with canonical training over-specialising to one start,
+but it does not quantify what is gained over the room.
+
+### The low-raw-advantage signature
 
 The trap signature was declared in advance as a rollout with `advantage_std` below 0.02 and more than 80%
 timeouts.
@@ -248,22 +258,34 @@ timeouts.
 | A | **5 of 6** | 0.0056 to 0.0144 |
 | B | **0 of 6** | 0.031 to 0.073 |
 
-Fisher's exact on 5 of 6 against 0 of 6 is about 0.015. The mechanism is the Phase 3 finding reproducing inside
-fine-tuning: `rew-v2` makes every failure return the same number, so a policy that stops succeeding has no
-return variance, no advantage and no gradient, and only the entropy bonus moves it. Escape is a random walk,
-which is why in the runs that recovered the deaths climb back before any success does. Varied starts break it
-because episodes from different states end differently, so returns differ.
+The 5 of 6 against 0 of 6 count is a real descriptive difference. The arms use the same six seeds, so the
+natural exact paired calculation is two-sided p = 0.0625, or one-sided p = 0.03125 if that direction had been
+predeclared. The previously reported unpaired Fisher value of about 0.015 ignores the matching and is not used
+as the significance claim here.
+
+`rew-v2` makes every completed failure have the same episode return, which can leave very little raw advantage
+variation in timeout-heavy rollouts. It does **not** follow that PPO has no policy gradient. The recorded
+`advantage_std` is measured before Stable-Baselines3 normalises advantages to unit variance within minibatches,
+and the signature rows have nonzero policy losses and KL movement. Equal episode totals also do not make every
+per-state GAE advantage equal. The evidence therefore supports a low-raw-signal regime, not an entropy-only
+random walk or literally zero gradient.
+
+Varied starts are a plausible reason the signature disappears, because episodes from different states create
+more varied outcomes. This campaign associates the varied-start intervention with the missing signature; it
+does not isolate that mechanism from success-weighted sampling or directly measure the quality of the
+normalised policy gradient.
 
 ### What did not replicate
 
 **The collapse is rarer than this report previously claimed.** No run in either arm collapsed under the
-declared definition. Pooling the six new A runs with the four earlier gives **1 collapse in 10**, 95% interval
-2% to 40%, not the "one run in four" this document said after four runs. One A run came close, finishing at 2%
-after 137,000 steps in the trap, and is classed partial.
+declared definition. The descriptive pooled count across the six new A runs and four earlier runs is **1
+collapse in 10**, not the "one run in four" this document said after four runs. One of the earlier runs used
+different reseeding behaviour, so a binomial interval over all ten is not presented. One A run came close,
+finishing at 2% after 137,000 steps in the low-signal regime, and is classed partial.
 
-So the night removed the mechanism and could not show that removing it prevents collapses, because collapses
-turned out to be too rare for twelve runs to compare. The plan said in advance that six against six could not
-reach significance on that comparison, and it did not.
+The signature was absent from the six B runs, but the campaign could not show that this prevents collapses,
+because collapses turned out to be too rare for twelve runs to compare. The plan said in advance that six
+against six could not reach significance on that comparison, and it did not.
 
 ## 6. A note on the seeds and the evaluation stream
 

@@ -18,7 +18,9 @@ Go-Explore-style search:
 Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/find_room_exit.py
 
-Writes runs/routes/<timestamp>/route.json with the per-frame inputs.
+Writes `<output-root>/<timestamp>/route.json` with the per-frame inputs. The default output root is
+`runs/routes`; held-out generation uses `runs/heldout-routes` so evaluation sources never share the
+demonstration namespace.
 """
 from __future__ import annotations
 
@@ -96,10 +98,11 @@ def main() -> int:
     parser.add_argument("--burst-frames", type=int, default=45)
     parser.add_argument("--max-minutes", type=float, default=15)
     parser.add_argument("--after-frames", type=int, default=90)
+    parser.add_argument("--output-root", type=Path, default=REPO / "runs" / "routes")
     args = parser.parse_args()
     rng = random.Random(args.seed)
 
-    output_dir = REPO / "runs" / "routes" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_dir = args.output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
     process = game_process.launch(args.game_dir, focus=False)
     bridge = LockstepBridge(CelesteBridge(output_dir / "episode.tas"))

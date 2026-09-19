@@ -6,29 +6,32 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is cleared from 80% of entry states the policy has never seen** (357 of 447 episodes
-over three checkpoints, 149 held-out states each, 95% interval 75.9% to 83.3%). Those states come from searches
-seeded separately from the demonstrations and span the room, so this is the room being played rather than one
-route being repeated.
+**Room 1 of Chapter 1 is clearable by demonstration-assisted policies, but its generalisation rate is not yet
+established.** Fine-tuning from one cloned policy produced canonical-start success rates from 0% to 98.5%.
+A first held-out evaluation appeared to favour varied-start training, 79.9% against 65.1% on the recorded
+entries, but review found that the test artifact contained only 125 unique states from 5 unique routes, not 149
+states from 6 routes. It also reused the same states across checkpoints and evaluated an undeclared subset of
+the trained policies. Those percentages are diagnostics, not estimates of performance over the room.
 
-Getting there needed training on varied starting states. Training only from the canonical start reaches about
-98% *on that start* and only 65% on held-out states, because optimising one start overtrains to it. Chapter 1
-has 20 rooms; this is the first.
+The fixed canonical start is still a poor measure of generalisation: two policies that scored 98.0% and 98.5%
+there scored 59.7% and 84.6% on the preliminary state set. A corrected frozen set and a predeclared evaluation
+of every matched checkpoint are the next steps. Chapter 1 has 20 rooms; this is the first.
 
 Two experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | On held-out entry states: RL alone **untested** (it never cleared the room), cloning then RL **65%** from canonical starts and **80%** with varied starts |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | Cloning then RL clears the canonical start on successful runs; preliminary held-out results favour varied starts, but the corrected generalisation measurement is pending |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
 explains what was measured to work out why: the policy never left near-uniform play, the critic learned the
-shaped value function exactly, and the reward gave the policy gradient nothing to distinguish one failure from
-another.
+shaped value function exactly, and the reward left very little raw advantage variation among failures. PPO
+normalises those advantages, so this is evidence of weak signal rather than literally zero policy gradient.
 
-Success rates here are reported with confidence intervals, because a rate from a finite sample is not a point.
+Confidence intervals are reported where their sampling assumptions are defensible. The corrected held-out
+evaluation will account for states clustered along routes rather than treating every prefix as independent.
 
 ### The interface underneath
 

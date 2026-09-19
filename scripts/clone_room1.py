@@ -4,6 +4,9 @@ Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/clone_room1.py
     .venv-rl/Scripts/python.exe scripts/clone_room1.py --dataset runs/clone/<run>/dataset.npz   # refit, no game
 
+Both modes require the explicit demonstration and held-out manifests. A dataset refit also requires the
+`dataset.manifest.json` written beside it, and verifies all three hashes before fitting.
+
 Three stages, and only the third answers the project's question.
 
 **Stage 1 (needs the game): record what the demonstrations saw.** A route is a list of input lines; cloning
@@ -47,9 +50,18 @@ from stable_baselines3 import PPO  # noqa: E402
 
 from celeste_rl import runtime  # noqa: E402
 from celeste_rl.actions import parse_line  # noqa: E402
-from celeste_rl.bridge import CelesteBridge, format_input_line  # noqa: E402
+from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.cloning import OBS_KEYS, Demonstrations, accuracy, clone, split_by_trajectory  # noqa: E402
+from celeste_rl.demonstrations import (  # noqa: E402
+    DemonstrationManifestError,
+    materialize_demonstrations,
+    reject_heldout_overlap,
+    validate_demonstration_manifest,
+    verify_dataset_manifest,
+    write_dataset_manifest,
+)
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
+from celeste_rl.heldout import HeldoutManifestError, validate_manifest as validate_heldout_manifest  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.observation import observation_space  # noqa: E402
 from celeste_rl.schema import ACTION_INPUTS  # noqa: E402
@@ -58,8 +70,8 @@ from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E40
 from celeste_rl.training.run import run_episode  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
 
-# Route seeds at or above this belong to the held-out set and must never be trained on.
-HELDOUT_FIRST_SEED = 100
+DEFAULT_DEMONSTRATIONS = REPO / "config" / "demonstrations.json"
+DEFAULT_HELDOUT = REPO / "config" / "heldout_starts.json"
 
 
 class SpacesOnly(gym.Env):
@@ -78,36 +90,18 @@ class SpacesOnly(gym.Env):
         raise RuntimeError("never stepped")
 
 
-def collect_sources(args) -> list[dict]:
-    """Every demonstration available, as input lines with their provenance."""
-    found = []
-    for path in sorted(REPO.glob("runs/routes/2026*/route.json")):
-        route = json.loads(path.read_text(encoding="utf-8"))
-        step = route.get("transition_step")
-        if not step or len(route["actions"]) < step:
-            continue
-        # Seeds 100 and up belong to the held-out set (scripts/make_heldout_starts.py), which writes its
-        # routes into the same directory. Training on them would put the test set into the training set, and
-        # the mistake would be invisible: the clone would simply look better than it is.
-        if (route.get("seed") or 0) >= HELDOUT_FIRST_SEED:
-            continue
-        lines = [format_input_line(buttons) for buttons in route["actions"][:step]]
-        found.append({"kind": "route", "name": path.parent.name, "lines": lines})
-    fixture = json.loads((REPO / "tests" / "fixtures" / "room1_exit_dash_route.json").read_text(encoding="utf-8"))
-    found.append({"kind": "route", "name": "fixture",
-                  "lines": [format_input_line(b) for b in fixture["actions"][:fixture["transition_step"]]]})
-    if not args.routes_only:
-        for path in sorted(REPO.glob("runs/demonstrations/*/demonstrations.json")):
-            for index, demo in enumerate(json.loads(path.read_text(encoding="utf-8"))["demonstrations"]):
-                found.append({"kind": "archive", "name": f"{path.parent.name}#{index}", "lines": demo["lines"]})
-    # Identical input sequences are one demonstration, however many places they came from.
-    unique, seen = [], set()
-    for demo in found:
-        key = tuple(demo["lines"])
-        if key not in seen:
-            seen.add(key)
-            unique.append(demo)
-    return unique
+def load_manifests(demonstrations_path: Path, heldout_path: Path, routes_only: bool) -> tuple[dict, list[dict], dict]:
+    """Validate both frozen manifests and reject content overlap before any game or model work."""
+    demonstrations_manifest = json.loads(demonstrations_path.read_text(encoding="utf-8"))
+    demonstration_entries = validate_demonstration_manifest(demonstrations_manifest)
+    if routes_only:
+        demonstration_entries = [entry for entry in demonstration_entries if entry["kind"] == "route"]
+    if len(demonstration_entries) < 2:
+        raise DemonstrationManifestError("fewer than two demonstrations remain after filtering")
+    heldout_manifest = json.loads(heldout_path.read_text(encoding="utf-8"))
+    heldout_entries = validate_heldout_manifest(heldout_manifest)
+    reject_heldout_overlap(demonstration_entries, heldout_entries)
+    return demonstrations_manifest, demonstration_entries, heldout_manifest
 
 
 def record(env: CelesteRoomEnv, demos: list[dict]) -> tuple[Demonstrations, list[dict]]:
@@ -155,7 +149,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
     parser.add_argument("--dataset", type=Path, help="refit these recorded pairs instead of replaying")
-    parser.add_argument("--routes-only", action="store_true", help="exclude the archive-extracted clears")
+    parser.add_argument("--demonstrations", type=Path, default=DEFAULT_DEMONSTRATIONS,
+                        help="explicit frozen demonstration-source manifest")
+    parser.add_argument("--heldout", type=Path, default=DEFAULT_HELDOUT,
+                        help="frozen held-out manifest used for the overlap check")
+    parser.add_argument("--routes-only", action="store_true",
+                        help="use only route entries declared in the demonstration manifest")
     parser.add_argument("--holdout", type=float, default=0.25)
     parser.add_argument("--epochs", type=int, default=300)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -172,17 +171,39 @@ def main() -> int:
     if refusal:
         print(refusal)
         return 2
+    try:
+        demonstrations_manifest, demonstration_entries, heldout_manifest = load_manifests(
+            args.demonstrations, args.heldout, args.routes_only)
+    except (OSError, json.JSONDecodeError, DemonstrationManifestError, HeldoutManifestError) as error:
+        print(f"Cannot establish demonstration/held-out separation: {error}")
+        return 2
     output_dir = REPO / "runs" / "clone" / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
-    results = {**git, "args": {k: str(v) for k, v in vars(args).items()}}
+    results = {
+        **git,
+        "args": {k: str(v) for k, v in vars(args).items()},
+        "manifests": {
+            "demonstrations": str(args.demonstrations),
+            "demonstrations_sha256": demonstrations_manifest["sha256"],
+            "heldout": str(args.heldout),
+            "heldout_sha256": heldout_manifest["sha256"],
+        },
+    }
 
     game = env = None
     try:
         if args.dataset:
-            data, results["provenance"] = load(args.dataset), [{"dataset": str(args.dataset)}]
+            audit = verify_dataset_manifest(args.dataset, demonstrations_manifest["sha256"],
+                                            heldout_manifest["sha256"])
+            declared_hashes = {entry["route_sha256"] for entry in demonstration_entries}
+            if not set(audit["demonstration_route_sha256s"]).issubset(declared_hashes):
+                raise DemonstrationManifestError(
+                    "dataset provenance contains a route absent from the demonstration manifest")
+            data = load(args.dataset)
+            results["provenance"] = [{"dataset": str(args.dataset), **audit}]
             print(f"Refitting {len(data)} frames from {args.dataset}")
         else:
-            demos = collect_sources(args)
+            demos = materialize_demonstrations(demonstration_entries, REPO)
             print(f"{len(demos)} demonstrations to replay")
             game = GameSession(args.game_dir)
             http = CelesteBridge(output_dir / "episode.tas")
@@ -195,7 +216,11 @@ def main() -> int:
             results["runtime_problems"] = problems
             results["attributable"] = runtime.attributable(git, problems)
             data, results["provenance"] = record(env, demos)
-            save(output_dir / "dataset.npz", data)
+            dataset = output_dir / "dataset.npz"
+            save(dataset, data)
+            used_hashes = [item["route_sha256"] for item in results["provenance"] if item["used"]]
+            results["dataset_manifest"] = write_dataset_manifest(
+                dataset, demonstrations_manifest["sha256"], heldout_manifest["sha256"], used_hashes)
 
         train, holdout = split_by_trajectory(data, args.holdout, args.seed)
         print(f"\n{len(data)} frames over {len(data.trajectories)} demonstrations: "
@@ -232,6 +257,9 @@ def main() -> int:
             print(f"  success rate {p['success_rate']:.0%} ({len(successes)}/{len(stochastic)}), "
                   f"median max x {p['median_max_x']}, best {p['best_max_x']}, "
                   f"deterministic {deterministic['ending']}")
+    except DemonstrationManifestError as error:
+        print(f"Cannot verify cloning dataset provenance: {error}")
+        return 2
     finally:
         if env is not None:
             env.close()

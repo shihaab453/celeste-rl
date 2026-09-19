@@ -10,10 +10,11 @@ reachable entry states**, from a generator frozen before training and never samp
 
 **How these differ from the training archive.** The archive in `celeste_rl/starts.py` holds states the agent
 itself reached while training, and training samples from it. These come from fresh runs of
-`scripts/find_room_exit.py`, a search that never runs during training, seeded so that they are not the routes
-the demonstrations came from, and they are sampled along the whole route rather than wherever a policy happened
-to get to. Nothing in the training path reads the file this writes. That separation is the entire point: a test
-set a policy can be trained toward is not a test set.
+`scripts/find_room_exit.py`, a search that never runs during training. Its routes are written to a dedicated
+held-out namespace, and their complete-route hashes are checked against the explicit demonstration manifest
+before cloning. They are sampled along the whole route rather than wherever a policy happened to get to.
+Nothing in the training path reads the file this writes. That separation is the entire point: a test set a
+policy can be trained toward is not a test set.
 
 **Reachable by construction.** A state is stored as the input lines that reach it from the canonical start, the
 same recipe form the archive uses, so replaying it is the proof that it is legal and reachable. Every candidate
@@ -26,7 +27,6 @@ measured against. **Regenerating it invalidates comparisons with anything measur
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import subprocess
 import sys
@@ -39,50 +39,137 @@ sys.path.insert(0, str(REPO))
 from celeste_rl import runtime  # noqa: E402
 from celeste_rl.actions import parse_line  # noqa: E402
 from celeste_rl.bridge import CelesteBridge, format_input_line  # noqa: E402
+from celeste_rl.demonstrations import route_sha256  # noqa: E402
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
+from celeste_rl.heldout import FORMAT_VERSION, freeze_entries, manifest_sha256, state_id  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.starts import Start  # noqa: E402
 from celeste_rl.training.game import GameSession  # noqa: E402
 
 DEFAULT_OUTPUT = REPO / "config" / "heldout_starts.json"
-# Seeds 0 to 6 produced the demonstrations. Held-out starts begin after them so the two sets never overlap.
+HELDOUT_ROUTES = REPO / "runs" / "heldout-routes"
+# This is only the deterministic search-seed starting point. Namespace and content hashes enforce separation.
 FIRST_SEED = 100
 
 
-def search(seed: int, game_dir: Path, minutes: float) -> Path | None:
-    """One fresh route from the Go-Explore style search, as a new runs/routes directory."""
-    before = {p.name for p in (REPO / "runs" / "routes").glob("*")}
+def load_route(path: Path) -> dict:
+    return json.loads((path / "route.json").read_text(encoding="utf-8"))
+
+
+def route_recipe(path: Path) -> tuple[str, ...] | None:
+    """The part of a successful route that can contribute held-out starts."""
+    route = load_route(path)
+    step = route.get("transition_step")
+    if not step or len(route.get("actions", [])) < step:
+        return None
+    return tuple(format_input_line(buttons) for buttons in route["actions"][:step])
+
+
+def existing_heldout_routes(routes_dir: Path) -> list[Path]:
+    """Completed search routes in the dedicated held-out directory."""
+    found = []
+    for path in sorted(routes_dir.glob("*")):
+        route_file = path / "route.json"
+        if not route_file.exists():
+            continue
+        found.append(path)
+    return found
+
+
+def unused_search_seeds(routes: list[Path], count: int) -> list[int]:
+    """Choose fresh seeds after an interrupted build without ever reusing one already on disk."""
+    used = set()
+    for path in routes:
+        seed = load_route(path).get("seed")
+        if isinstance(seed, int) and not isinstance(seed, bool):
+            used.add(seed)
+    chosen, seed = [], FIRST_SEED
+    while len(chosen) < count:
+        if seed not in used:
+            chosen.append(seed)
+        seed += 1
+    return chosen
+
+
+def unique_routes(routes: list[Path]) -> tuple[list[Path], list[Path]]:
+    """Keep one path for each distinct successful action trace."""
+    unique, duplicates, seen = [], [], set()
+    for path in sorted(set(routes)):
+        recipe = route_recipe(path)
+        if recipe is None:
+            continue
+        if recipe in seen:
+            duplicates.append(path)
+            continue
+        seen.add(recipe)
+        unique.append(path)
+    return unique, duplicates
+
+
+def require_minimum_routes(routes: list[Path], minimum: int) -> None:
+    if len(routes) < minimum:
+        raise ValueError(f"only {len(routes)} unique routes were produced; {minimum} required")
+
+
+def search_command(seed: int, game_dir: Path, minutes: float, routes_dir: Path) -> list[str]:
+    return [str(REPO / ".venv-rl" / "Scripts" / "python.exe"),
+            str(REPO / "scripts" / "find_room_exit.py"), "--seed", str(seed),
+            "--game-dir", str(game_dir), "--max-minutes", str(minutes),
+            "--output-root", str(routes_dir)]
+
+
+def search(seed: int, game_dir: Path, minutes: float, routes_dir: Path = HELDOUT_ROUTES) -> Path | None:
+    """One fresh route from the Go-Explore search, isolated under the held-out namespace."""
+    routes_dir.mkdir(parents=True, exist_ok=True)
+    before = {p.name for p in routes_dir.glob("*")}
     result = subprocess.run(
-        [str(REPO / ".venv-rl" / "Scripts" / "python.exe"), str(REPO / "scripts" / "find_room_exit.py"),
-         "--seed", str(seed), "--game-dir", str(game_dir), "--max-minutes", str(minutes)],
+        search_command(seed, game_dir, minutes, routes_dir),
         cwd=REPO, capture_output=True, text=True)
-    after = {p.name for p in (REPO / "runs" / "routes").glob("*")} - before
+    after = {p.name for p in routes_dir.glob("*")} - before
     if result.returncode != 0 or not after:
         print(f"  seed {seed}: no route ({result.returncode})")
         return None
-    folder = REPO / "runs" / "routes" / sorted(after)[-1]
+    folder = routes_dir / sorted(after)[-1]
     return folder if (folder / "route.json").exists() else None
 
 
-def candidates(routes: list[Path], wanted: int, earliest: int, spacing: int) -> list[dict]:
-    """Prefixes sampled along each route, spread over the whole room rather than bunched at one depth."""
-    picked = []
+def candidates(routes: list[Path], earliest: int, spacing: int) -> list[dict]:
+    """Every distinct sampled prefix, ordered across depths for later even selection."""
+    picked, seen = [], set()
     for path in routes:
-        route = json.loads((path / "route.json").read_text(encoding="utf-8"))
+        route = load_route(path)
         step = route.get("transition_step")
         if not step:
             continue
-        lines = [format_input_line(buttons) for buttons in route["actions"][:step]]
+        lines = list(route_recipe(path) or ())
+        complete_route_sha256 = route_sha256(lines)
         # Stop short of the transition: a start one frame from the exit tests nothing.
         for frame in range(earliest, max(earliest, step - spacing), spacing):
-            picked.append({"route": path.name, "seed": route.get("seed"), "frames": frame,
-                           "lines": lines[:frame]})
+            prefix = tuple(lines[:frame])
+            if prefix in seen:
+                continue
+            seen.add(prefix)
+            picked.append({"route": path.name, "route_sha256": complete_route_sha256,
+                           "seed": route.get("seed"), "frames": frame,
+                           "lines": list(prefix)})
     picked.sort(key=lambda c: (c["frames"], c["route"]))
-    if len(picked) <= wanted:
-        return picked
-    # Keep an even spread across depths rather than the first N, which would all be near the start.
-    stride = len(picked) / wanted
-    return [picked[int(i * stride)] for i in range(wanted)]
+    return picked
+
+
+def select_states(states: list[dict], wanted: int) -> list[dict]:
+    """Deduplicate validated states and select exactly `wanted`, evenly across route depths."""
+    unique, seen = [], set()
+    for state in sorted(states, key=lambda s: (s["frames"], s["route"])):
+        key = state_id(state)
+        if key not in seen:
+            seen.add(key)
+            unique.append(state)
+    if len(unique) < wanted:
+        raise ValueError(f"only {len(unique)} unique valid states were produced; {wanted} requested")
+    if len(unique) == wanted:
+        return unique
+    stride = len(unique) / wanted
+    return [unique[int(index * stride)] for index in range(wanted)]
 
 
 def validate(env: CelesteRoomEnv, candidate: dict) -> dict | None:
@@ -97,16 +184,21 @@ def validate(env: CelesteRoomEnv, candidate: dict) -> dict | None:
     player = info["player"] if info else None
     if player is None:
         return None
-    return {"route": candidate["route"], "search_seed": candidate["seed"], "frames": provisional.frames,
-            "position": [player["x"], player["y"]], "dashes": player["dashes"], "lines": list(candidate["lines"])}
+    return {"route": candidate["route"], "route_sha256": candidate["route_sha256"],
+            "search_seed": candidate["seed"], "frames": provisional.frames,
+            "room": "1", "position": [player["x"], player["y"]], "dashes": player["dashes"],
+            "lines": list(candidate["lines"])}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
-    parser.add_argument("--searches", type=int, default=6, help="fresh searches to run, seeded from 100")
+    parser.add_argument("--searches", type=int, default=6,
+                        help="fresh search attempts; seeds already present on disk are skipped")
     parser.add_argument("--search-minutes", type=float, default=10)
     parser.add_argument("--states", type=int, default=200)
+    parser.add_argument("--min-routes", type=int, default=10,
+                        help="minimum distinct complete-route hashes required before sampling states")
     parser.add_argument("--earliest", type=int, default=20, help="do not start an episode in its first frames")
     parser.add_argument("--spacing", type=int, default=12, help="frames between sampled states along a route")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
@@ -114,6 +206,16 @@ def main() -> int:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
+    if args.searches < 0:
+        parser.error("--searches must be non-negative")
+    if args.states <= 0:
+        parser.error("--states must be positive")
+    if args.min_routes <= 0:
+        parser.error("--min-routes must be positive")
+    if args.earliest < 0:
+        parser.error("--earliest must be non-negative")
+    if args.spacing <= 0:
+        parser.error("--spacing must be positive")
 
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
@@ -131,22 +233,39 @@ def main() -> int:
     # The searches run before this script takes the game. Each child launches its own copy, and the launch
     # guard refuses while another game-copy process is alive, so holding the ports here makes every search
     # fail and the whole set come back empty.
-    routes = list(args.routes or [])
-    if not routes:
-        print(f"Searching for {args.searches} fresh routes, seeds {FIRST_SEED} upwards")
-        for offset in range(args.searches):
-            found = search(FIRST_SEED + offset, args.game_dir, args.search_minutes)
+    if args.routes:
+        routes = list(args.routes)
+    else:
+        routes_dir = HELDOUT_ROUTES
+        routes = existing_heldout_routes(routes_dir)
+        seeds = unused_search_seeds(routes, args.searches)
+        if seeds:
+            print(f"Searching with {len(seeds)} unused held-out seeds: {', '.join(map(str, seeds))}")
+        for seed in seeds:
+            found = search(seed, args.game_dir, args.search_minutes, routes_dir)
             if found:
-                print(f"  seed {FIRST_SEED + offset}: {found.name}")
+                print(f"  seed {seed}: {found.name}")
                 routes.append(found)
-    # Any held-out route already on disk counts, so an interrupted build can be continued.
-    existing = [p for p in sorted((REPO / "runs" / "routes").glob("2026*")) if (p / "route.json").exists()
-                and (json.loads((p / "route.json").read_text(encoding="utf-8")).get("seed") or 0) >= FIRST_SEED]
-    routes = sorted(set(routes) | set(existing))
+
+    routes, duplicate_routes = unique_routes(routes)
+    if duplicate_routes:
+        print(f"Ignoring {len(duplicate_routes)} duplicate route trace(s): "
+              + ", ".join(path.name for path in duplicate_routes))
     if not routes:
         print("No routes found, so no held-out starts.")
         return 1
-    print(f"{len(routes)} held-out routes (seeds {FIRST_SEED} and up)")
+    print(f"{len(routes)} unique held-out routes")
+    try:
+        require_minimum_routes(routes, args.min_routes)
+    except ValueError as error:
+        print(f"{error}. Run more independent searches. Nothing was written.")
+        return 1
+
+    chosen = candidates(routes, args.earliest, args.spacing)
+    if len(chosen) < args.states:
+        print(f"Only {len(chosen)} unique candidate states are available; {args.states} requested. "
+              "Run more independent searches. Nothing was written.")
+        return 1
 
     game = GameSession(args.game_dir)
     http = CelesteBridge(output_dir / "episode.tas")
@@ -157,8 +276,7 @@ def main() -> int:
             print("Runtime differs from the pins:\n  " + "\n  ".join(problems))
             return 2
 
-        chosen = candidates(routes, args.states, args.earliest, args.spacing)
-        print(f"\n{len(chosen)} candidate states from {len(routes)} routes; validating each by replay")
+        print(f"\n{len(chosen)} unique candidate states from {len(routes)} routes; validating each by replay")
         states = []
         for index, candidate in enumerate(chosen, start=1):
             kept = validate(env, candidate)
@@ -170,25 +288,30 @@ def main() -> int:
         env.close()
         game.close()
 
-    if not states:
-        print("No candidate replayed successfully.")
+    try:
+        states = select_states(states, args.states)
+    except ValueError as error:
+        print(f"{error}. Run more independent searches. Nothing was written.")
         return 1
-    digest = hashlib.sha256(json.dumps([s["lines"] for s in states], sort_keys=True).encode()).hexdigest()
+    entries = freeze_entries(states)
+    digest = manifest_sha256(entries)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({
+        "format_version": FORMAT_VERSION,
         "generated": datetime.now().isoformat(timespec="seconds"),
         "commit": git["commit"],
-        "generator": "scripts/find_room_exit.py, fresh seeds from 100, sampled along the route",
+        "generator": "scripts/find_room_exit.py, isolated held-out route namespace, unique route hashes",
         "note": "Evaluation only. Nothing in the training path may read this file.",
-        "sha256": digest, "states": len(states),
-        "routes": sorted({s["route"] for s in states}),
-        "frames": {"min": min(s["frames"] for s in states), "max": max(s["frames"] for s in states)},
-        "entries": states,
+        "sha256": digest, "states": len(entries),
+        "routes": sorted({entry["route"] for entry in entries}),
+        "frames": {"min": min(entry["frames"] for entry in entries),
+                   "max": max(entry["frames"] for entry in entries)},
+        "entries": entries,
     }, indent=1), encoding="utf-8")
-    xs = sorted(s["position"][0] for s in states)
-    print(f"\n{len(states)} held-out starts written to {args.output}")
-    print(f"  sha256 {digest[:16]}, prefixes {min(s['frames'] for s in states)} to "
-          f"{max(s['frames'] for s in states)} frames")
+    xs = sorted(entry["position"][0] for entry in entries)
+    print(f"\n{len(entries)} held-out starts written to {args.output}")
+    print(f"  sha256 {digest[:16]}, prefixes {min(entry['frames'] for entry in entries)} to "
+          f"{max(entry['frames'] for entry in entries)} frames")
     print(f"  x from {xs[0]} to {xs[-1]}, median {xs[len(xs) // 2]}")
     return 0
 

@@ -40,6 +40,26 @@ sys.path.insert(0, str(REPO))
 from celeste_rl import game_process, runtime  # noqa: E402
 
 
+RESULT_SUMMARY_FIELDS = (
+    "checkpoint",
+    "checkpoint_sha256",
+    "heldout_set",
+    "heldout_sha256",
+    "heldout_format_version",
+    "heldout_states",
+    "repeats",
+    "deterministic",
+    "evaluation_seed",
+    "attempts",
+    "episodes",
+    "stale_starts",
+    "successes",
+    "success_rate",
+    "uncertainty",
+    "route_macro_success_rate",
+)
+
+
 def log(path: Path, message: str) -> None:
     line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {message}"
     print(line, flush=True)
@@ -58,24 +78,149 @@ def clear_game(game_dir: Path, logfile: Path) -> None:
     time.sleep(3)
 
 
+def _without_option(arguments: list[str], option: str) -> list[str]:
+    """Remove both ``--option value`` and ``--option=value`` forms."""
+    cleaned = []
+    index = 0
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == option:
+            if index + 1 >= len(arguments):
+                raise ValueError(f"{option} requires a value")
+            index += 2
+            continue
+        if argument.startswith(f"{option}="):
+            index += 1
+            continue
+        cleaned.append(argument)
+        index += 1
+    return cleaned
+
+
+def build_command(entry: dict, game_dir: Path, resume: bool = False) -> list[str]:
+    """Build one child command with the same game directory used by the process guard."""
+    declared = list(entry.get("command", []))
+    if not declared:
+        raise ValueError(f"campaign entry {entry.get('id', '<unknown>')} has no command")
+    if resume:
+        if Path(declared[0]).name.lower() != "train_room1.py":
+            raise ValueError(f"campaign entry {entry.get('id', '<unknown>')} does not support --resume")
+        child_arguments = [declared[0], "--resume", str(entry["run_dir"])]
+    else:
+        child_arguments = _without_option(declared, "--game-dir")
+    child_arguments.extend(["--game-dir", str(game_dir.resolve())])
+    return [str(REPO / ".venv-rl" / "Scripts" / "python.exe"), *child_arguments]
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _repo_path(path: Path, repo: Path) -> str:
+    try:
+        return path.relative_to(repo.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def result_artifact(stdout: str, repo: Path = REPO) -> dict | None:
+    """Capture the result and episode files announced by a held-out evaluation."""
+    announced = [line.split("Results:", 1)[1].strip()
+                 for line in stdout.splitlines() if line.strip().startswith("Results:")]
+    if not announced:
+        return None
+
+    repository = repo.resolve()
+    result_path = Path(announced[-1])
+    if not result_path.is_absolute():
+        result_path = repository / result_path
+    result_path = result_path.resolve()
+    if result_path.suffix.lower() != ".json":
+        result_path /= "results.json"
+
+    artifact = {"result_file": _repo_path(result_path, repository)}
+    try:
+        result_path.relative_to(repository)
+    except ValueError:
+        artifact["problem"] = "announced result is outside the repository"
+        return artifact
+    if not result_path.is_file():
+        artifact["problem"] = "announced result file does not exist"
+        return artifact
+
+    try:
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        artifact["problem"] = f"could not read announced result: {error}"
+        return artifact
+
+    artifact["result_sha256"] = _sha256(result_path)
+    artifact["summary"] = {field: result[field] for field in RESULT_SUMMARY_FIELDS if field in result}
+    episodes_file = result.get("episodes_file")
+    if episodes_file:
+        episodes_path = (result_path.parent / episodes_file).resolve()
+        artifact["episodes_file"] = _repo_path(episodes_path, repository)
+        try:
+            episodes_path.relative_to(repository)
+        except ValueError:
+            artifact["problem"] = "declared episode file is outside the repository"
+        else:
+            if episodes_path.is_file():
+                artifact["episodes_sha256"] = _sha256(episodes_path)
+            else:
+                artifact["problem"] = "declared episode file does not exist"
+    return artifact
+
+
 def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False) -> dict:
     """One run, bounded in time. Returns its outcome."""
-    command = [str(REPO / ".venv-rl" / "Scripts" / "python.exe"), *entry["command"]]
-    if resume:
-        command += ["--resume", entry["run_dir"]]
+    command = build_command(entry, game_dir, resume=resume)
     limit = entry.get("limit_minutes", 75) * 60
     started = time.time()
-    log(logfile, f"start {entry['id']}{' (resume)' if resume else ''}: {' '.join(entry['command'])}")
+    log(logfile, f"start {entry['id']}{' (resume)' if resume else ''}: {' '.join(command[1:])}")
     try:
         finished = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=limit)
-        code, tail = finished.returncode, (finished.stdout or "").strip().splitlines()[-3:]
+        code = finished.returncode
+        stdout = finished.stdout or ""
+        tail = stdout.strip().splitlines()[-3:]
     except subprocess.TimeoutExpired:
         log(logfile, f"  {entry['id']} exceeded {entry.get('limit_minutes', 75)} minutes and was killed")
         clear_game(game_dir, logfile)
-        return {"status": "timed_out", "seconds": round(time.time() - started)}
+        return {"status": "timed_out", "seconds": round(time.time() - started), "command": command[1:]}
     for line in tail:
         log(logfile, f"  | {line}")
-    return {"status": "ok" if code == 0 else f"exit_{code}", "seconds": round(time.time() - started)}
+    outcome = {"status": "ok" if code == 0 else f"exit_{code}",
+               "seconds": round(time.time() - started), "command": command[1:]}
+    artifact = result_artifact(stdout)
+    if artifact is not None:
+        outcome["artifact"] = artifact
+    return outcome
+
+
+def merge_attempts(first: dict, retry: dict) -> dict:
+    """Use the retry as the final outcome while retaining both attempts for audit."""
+    return {**retry, "seconds": first["seconds"] + retry["seconds"], "attempts": [first, retry]}
+
+
+def campaign_exit_code(results: list[dict]) -> int:
+    return 0 if all(result.get("status") == "ok" for result in results) else 1
+
+
+def reported_success_rate(record: dict):
+    training_rate = record.get("final_success_rate")
+    if training_rate is not None:
+        return training_rate
+    return record.get("artifact", {}).get("summary", {}).get("success_rate")
+
+
+def write_summary(path: Path, plan: dict, plan_hash: str, commit: str, results: list[dict]) -> None:
+    path.write_text(json.dumps(
+        {"plan": plan["name"], "plan_sha256": plan_hash, "commit": commit,
+         "definitions": plan.get("definitions"), "results": results}, indent=2, default=str), encoding="utf-8")
 
 
 def outcome_of(run_dir: Path) -> dict:
@@ -139,7 +284,8 @@ def main() -> int:
     for entry in plan["runs"]:
         if stop_at and datetime.now() + timedelta(minutes=entry.get("limit_minutes", 75)) > stop_at:
             log(logfile, f"skip {entry['id']}: cannot finish before the declared stop time")
-            results.append({**entry, "status": "skipped_out_of_time"})
+            results.append({**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None})
+            write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results)
             continue
         clear_game(args.game_dir, logfile)
         result = execute(entry, logfile, args.game_dir)
@@ -148,22 +294,19 @@ def main() -> int:
             log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
             clear_game(args.game_dir, logfile)
             retry = execute(entry, logfile, args.game_dir, resume=True)
-            result = {"status": f"{result['status']}_then_{retry['status']}",
-                      "seconds": result["seconds"] + retry["seconds"]}
+            result = merge_attempts(result, retry)
         record = {**entry, **result, **outcome_of(REPO / entry["run_dir"])}
         results.append(record)
         log(logfile, f"done {entry['id']}: {record['status']} in {record['seconds'] // 60} min, "
-                     f"final success {record.get('final_success_rate')}")
-        (output_dir / "summary.json").write_text(json.dumps(
-            {"plan": plan["name"], "plan_sha256": plan_hash, "commit": git["commit"],
-             "definitions": plan.get("definitions"), "results": results}, indent=2, default=str), encoding="utf-8")
+                     f"final success {reported_success_rate(record)}")
+        write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results)
 
     finished = [r for r in results if r.get("status") == "ok"]
     log(logfile, f"campaign finished: {len(finished)} of {len(plan['runs'])} runs completed")
     for record in results:
         log(logfile, f"  {record['id']:<24} {record.get('status'):<22} "
-                     f"success {record.get('final_success_rate')}")
-    return 0
+                     f"success {reported_success_rate(record)}")
+    return campaign_exit_code(results)
 
 
 if __name__ == "__main__":
