@@ -87,6 +87,11 @@ def _repo_path(value: str) -> Path:
     return path
 
 
+def same_repo_path(left: str, right: str) -> bool:
+    """Compare repository paths by identity, not by the slash style emitted on this platform."""
+    return _repo_path(left) == _repo_path(right)
+
+
 def _jsonl(path: Path) -> list[dict]:
     try:
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
@@ -124,7 +129,9 @@ def validate_run(plan_entry: dict, campaign_record: dict, campaign_commit: str, 
         "evaluation_seed": protocol["evaluation_seed"],
     }
     for field, value in expected.items():
-        if result.get(field) != value:
+        matches = (same_repo_path(result.get(field), value) if field in {"checkpoint", "heldout_set"}
+                   and isinstance(result.get(field), str) else result.get(field) == value)
+        if not matches:
             raise AnalysisError(f"{run_id} result {field} is {result.get(field)!r}; expected {value!r}")
     rows = _jsonl(episodes_path)
     expected_ids = set(heldout_by_id)

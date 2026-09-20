@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.analyze_heldout_ab import analyse, crossed_cluster_interval, exact_sign_flip_pvalue
+from scripts.analyze_heldout_ab import analyse, crossed_cluster_interval, exact_sign_flip_pvalue, same_repo_path
 
 
 class PairedInferenceTests(unittest.TestCase):
+    def test_repository_paths_compare_by_identity_across_slash_styles(self) -> None:
+        self.assertTrue(same_repo_path("runs/train/checkpoint.zip", r"runs\train\checkpoint.zip"))
+
     def test_six_differences_all_in_one_direction_reach_exact_minimum(self) -> None:
         self.assertEqual(exact_sign_flip_pvalue([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]), 0.03125)
 
