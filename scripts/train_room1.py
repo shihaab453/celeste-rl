@@ -1,7 +1,8 @@
-"""Train PPO on room 1 of Chapter 1 (Phase 3), or resume a run.
+"""Train PPO on one room of Chapter 1, or resume a run.
 
 Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/train_room1.py --seed 0
+    .venv-rl/Scripts/python.exe scripts/train_room1.py --seed 0 --task-definition config/room2.json
     .venv-rl/Scripts/python.exe scripts/train_room1.py --seed 0 --total-timesteps 20000 --eval-every 10000   # smoke run
     .venv-rl/Scripts/python.exe scripts/train_room1.py --resume runs/train/<run>
 

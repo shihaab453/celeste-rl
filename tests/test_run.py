@@ -110,6 +110,19 @@ class BuildEnvironmentTests(unittest.TestCase):
         env = build_environment(EpochBridge(), config(varied_starts=True), self.run_dir)
         self.assertEqual(len(env.archive), 1)
 
+    def test_a_later_room_definition_reaches_the_environment(self):
+        env = build_environment(EpochBridge(), config(task_definition="config/room2.json"), self.run_dir)
+
+        self.assertEqual((env.task.start_room, env.task.target_room), ("2", "3"))
+        self.assertEqual((env.task_start.room, env.task_start.position, env.task_start.frames),
+                         ("2", (261, 1), 286))
+
+    def test_later_room_archive_limit_excludes_the_task_setup_frames(self):
+        env = build_environment(EpochBridge(), config(task_definition="config/room2.json", varied_starts=True,
+                                                      max_start_frames=600), self.run_dir)
+
+        self.assertEqual(env.archive.max_frames, 886)
+
 
 class RunTests(unittest.TestCase):
     def setUp(self):

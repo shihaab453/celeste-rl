@@ -1,4 +1,4 @@
-"""Search for a legal input sequence that leaves the first room, for use as a fixed test trace.
+"""Search for a legal input sequence that reaches the target of one room task.
 
 This is a test-fixture generator, not a learning method: it uses exact savestate replays and the room's
 whole tile map at once. A policy does see local geometry (obs-v1 carries a 32 by 32 cell grid around the
@@ -17,6 +17,7 @@ Go-Explore-style search:
 
 Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/find_room_exit.py
+    .venv-rl/Scripts/python.exe scripts/find_room_exit.py --task-definition config/room2.json
 
 Writes `<output-root>/<timestamp>/route.json` with the per-frame inputs. The default output root is
 `runs/routes`; held-out generation uses `runs/heldout-routes` so evaluation sources never share the
@@ -37,8 +38,10 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from celeste_rl import game_process  # noqa: E402
+from celeste_rl.actions import parse_line, to_parts  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
+from celeste_rl.tasks import TaskDefinition, TaskDefinitionError, load_task_definition  # noqa: E402
 
 TILE = 8
 # Button combinations for random bursts: move, jump, dash in eight directions, grab/climb.
@@ -80,8 +83,9 @@ def exit_distances(rows: list[str], blocked: set[tuple[int, int]]) -> dict[tuple
 
 def player_tile(state: dict) -> tuple[int, int]:
     position = state["Player"]["Position"]
+    bounds = state["Level"]["Bounds"]
     # Position is the bottom centre of the hitbox; use a point inside the body.
-    return int(position["X"] // TILE), int((position["Y"] - 4) // TILE)
+    return int((position["X"] - bounds["X"]) // TILE), int((position["Y"] - 4 - bounds["Y"]) // TILE)
 
 
 def random_burst(rng: random.Random, frames: int) -> list[str]:
@@ -89,6 +93,30 @@ def random_burst(rng: random.Random, frames: int) -> list[str]:
     while len(actions) < frames:
         actions += [rng.choice(MACROS)] * rng.randint(1, 16)
     return actions[:frames]
+
+
+def reset_to_task(bridge: LockstepBridge, definition: TaskDefinition | None):
+    """Reset to the base savestate, replay a later room's start recipe, and verify the arrival."""
+    observation = bridge.reset()
+    if definition is None or definition.start is None:
+        return observation
+    start = definition.start
+    for line in start.lines:
+        observation = bridge.step(*to_parts(parse_line(line, canonical_only=True)))
+    state = observation.state
+    position = None if state is None else state["Player"]["Position"]
+    arrived = None if position is None else (position["X"], position["Y"])
+    dashes = None if observation.extras is None else observation.extras["player"]["Dashes"]
+    problems = []
+    if observation.room != start.room:
+        problems.append(f"room {observation.room!r}, expected {start.room!r}")
+    if arrived != start.position:
+        problems.append(f"position {arrived!r}, expected {start.position!r}")
+    if start.dashes is not None and dashes != start.dashes:
+        problems.append(f"dashes {dashes!r}, expected {start.dashes!r}")
+    if problems:
+        raise RuntimeError("task start no longer replays: " + "; ".join(problems))
+    return observation
 
 
 def main() -> int:
@@ -99,16 +127,23 @@ def main() -> int:
     parser.add_argument("--max-minutes", type=float, default=15)
     parser.add_argument("--after-frames", type=int, default=90)
     parser.add_argument("--output-root", type=Path, default=REPO / "runs" / "routes")
+    parser.add_argument("--task-definition", type=Path,
+                        help="hash-pinned later-room task whose canonical start is replayed before searching")
     args = parser.parse_args()
     rng = random.Random(args.seed)
+    try:
+        definition = load_task_definition(args.task_definition) if args.task_definition else None
+    except TaskDefinitionError as error:
+        parser.error(str(error))
 
     output_dir = args.output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
     process = game_process.launch(args.game_dir, focus=False)
     bridge = LockstepBridge(CelesteBridge(output_dir / "episode.tas"))
     try:
-        start = bridge.reset()
+        start = reset_to_task(bridge, definition)
         start_room = start.room
+        target_room = definition.task.target_room if definition is not None else None
         rows, blocked = tile_map(start.state)
         distance = exit_distances(rows, blocked)
         start_tile = player_tile(start.state)
@@ -127,7 +162,7 @@ def main() -> int:
             chosen[tile] = chosen.get(tile, 0) + 1
             prefix = archive[tile]
 
-            bridge.reset()
+            reset_to_task(bridge, definition)
             for buttons in prefix:
                 bridge.step(buttons)
             actions = list(prefix)
@@ -137,7 +172,8 @@ def main() -> int:
                 if observation.state is None:
                     break  # died
                 if observation.room != start_room:
-                    route = actions
+                    if target_room is None or observation.room == target_room:
+                        route = actions
                     break
                 reached = player_tile(observation.state)
                 if reached in distance and (reached not in archive or len(actions) < len(archive[reached])):
@@ -145,7 +181,8 @@ def main() -> int:
             rollouts += 1
             if rollouts % 50 == 0:
                 best = min(archive, key=lambda t: distance.get(t, 999))
-                print(f"  {rollouts} rollouts, {len(archive)} tiles, closest tile {best} at distance {distance[best]}")
+                print(f"  {rollouts} rollouts, {len(archive)} tiles, closest tile {best} "
+                      f"at distance {distance.get(best, 'outside map')}")
 
         if route is None:
             print("No exit found within the time limit.")
@@ -156,7 +193,7 @@ def main() -> int:
         # Continue in the new room: a dash first, so the trace has freeze frames, then survive.
         for attempt in range(500):
             extension = ["", "", "URX"] + random_burst(rng, args.after_frames - 3)
-            bridge.reset()
+            reset_to_task(bridge, definition)
             for buttons in route:
                 bridge.step(buttons)
             freeze_frames = 0
@@ -182,6 +219,7 @@ def main() -> int:
             "freeze_frames_after_transition": freeze_frames,
             "actions": full,
             "seed": args.seed,
+            "task_definition": str(args.task_definition) if args.task_definition else None,
         }, indent=1), encoding="utf-8")
         print(f"Route: {len(full)} frames, room {start_room} -> {observation.room} at step {transition_index}, "
               f"{freeze_frames} freeze frames after the transition")

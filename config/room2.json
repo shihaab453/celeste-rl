@@ -1,0 +1,12 @@
+{
+  "format_version": 1,
+  "name": "chapter-1-room-2",
+  "start_room": "2",
+  "target_room": "3",
+  "source_route": "tests/fixtures/room1_exit_dash_route.json",
+  "source_route_sha256": "3ac088282e6bce43054b80b9a52105ab30b0f7a007731c0bec7daa23941dcf30",
+  "prefix_frames": 286,
+  "position": [261, 1],
+  "dashes": 0,
+  "provenance": "First controllable Room 2 frame in the verified room1_exit_dash_route transition fixture."
+}

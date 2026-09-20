@@ -14,11 +14,11 @@ retries a step.
 What leaves the environment besides the observation (reward components, ending cause, events, applied action,
 frame) is returned in `info` and is never part of the observation.
 
-Starts: by default every episode begins at the canonical start. With a `start_sampler`, an episode may instead
-begin from a state the agent reached before, by resetting canonically and replaying that state's inputs. The
-replayed frames are not transitions and earn no reward; `elapsed` begins at the prefix length, so the 30 second
-deadline still covers the whole route. A stale entry that no longer reproduces falls back to the canonical
-start with the reason in `info`, because a bad recipe is not a bridge fault.
+Starts: the bridge always resets to the base Room 1 savestate. A later room may supply a `task_start` recipe
+that is replayed after every base reset. With a `start_sampler`, an episode may instead begin from a state the
+agent reached after that task start. Replayed setup frames are not transitions and earn no reward. `elapsed`
+counts from the task start, so a later room receives the full episode deadline. A stale sampled entry falls
+back to the task start with the reason in `info`; a stale task start is a bridge fault.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from gymnasium import spaces
 
 from celeste_rl.actions import apply_disabled, disabled_mask, parse_line, to_line, to_parts
 from celeste_rl.bridge import BridgeError
-from celeste_rl.endings import SUCCESS, EndingFault, RoomTask, classify
+from celeste_rl.endings import SUCCESS, WRONG_ROOM, EndingFault, RoomTask, classify
 from celeste_rl.observation import ObservationBuilder, SchemaViolation, observation_space
 from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
@@ -50,19 +50,21 @@ class CelesteRoomEnv(gym.Env):
 
     def __init__(self, bridge, disabled_inputs: Iterable[str] = MENU_INPUTS, task: RoomTask = RoomTask(),
                  reward_config: RewardConfig = RewardConfig(), start_sampler=None,
-                 archive: StartArchive | None = None):
+                 archive: StartArchive | None = None, task_start: Start | None = None):
         """`bridge` is a LockstepBridge (or anything with the same reset/step/close). `disabled_inputs` defaults to
         pause, quick restart and journal (decision D1); pass () to enable all 24 inputs.
 
-        `start_sampler` is called with no arguments at each reset and returns a `Start` to begin from, or None
-        for the canonical start. `archive` collects the states this environment reaches. They are separate so
-        that an evaluation can run held-out starts without writing to the archive it is measuring.
+        `task_start` is the canonical entry recipe for a task after Room 1. `start_sampler` is called with no
+        arguments at each reset and returns a `Start` to begin from, or None for the task start. `archive`
+        collects the states this environment reaches. They are separate so an evaluation can run held-out
+        starts without writing to the archive it is measuring.
         """
         self.bridge = bridge
         self.task = task
         self.reward_config = reward_config
         self.start_sampler = start_sampler
         self.archive = archive
+        self.task_start = task_start
         self.disabled_inputs = tuple(disabled_inputs)
         self._mask = disabled_mask(self.disabled_inputs)
         self.action_space = spaces.MultiBinary(len(ACTION_INPUTS))
@@ -109,7 +111,7 @@ class CelesteRoomEnv(gym.Env):
             player, level = extras.get("player", {}), extras.get("level", {})
             position = state.get("Player", {}).get("Position", {})
             checks = {
-                "room": (observation.room, self.task.start_room),
+                "room": (observation.room, CANONICAL_START["room"]),
                 "position": ((position.get("X"), position.get("Y")), CANONICAL_START["position"]),
                 "state": (player.get("State"), 0),
                 "in control": (player.get("InControl"), True),
@@ -155,7 +157,10 @@ class CelesteRoomEnv(gym.Env):
                 obs = self._builder.step(observation.state, observation.extras, applied, index)
             except (EndingFault, SchemaViolation) as error:
                 return observation, obs, f"frame {index} of the prefix could not be interpreted: {error}"
-            if ending is not None:
+            # A later task's canonical recipe crosses earlier room boundaries. Transitions are setup, not an
+            # ending, until the replay reaches the declared task start. Death, restart, leaving the level and
+            # exhausting the deadline still invalidate the recipe.
+            if ending is not None and ending not in (SUCCESS, WRONG_ROOM):
                 return observation, obs, f"the prefix ended the episode at frame {index} ({ending})"
         facts = self._player_facts(observation.state, observation.extras)
         if facts is None:
@@ -172,9 +177,11 @@ class CelesteRoomEnv(gym.Env):
     def reset(self, *, seed: int | None = None, options: dict | None = None):
         super().reset(seed=seed)
         self._ready = False
-        start = (options or {}).get("start")
-        if start is None and self.start_sampler is not None and not (options or {}).get("canonical"):
-            start = self.start_sampler()
+        options = options or {}
+        sampled = options.get("start")
+        if sampled is None and self.start_sampler is not None and not options.get("canonical"):
+            sampled = self.start_sampler()
+        start = sampled if sampled is not None else self.task_start
         problem = None
         try:
             observation = self.bridge.reset()
@@ -185,24 +192,33 @@ class CelesteRoomEnv(gym.Env):
                 if problem is None:
                     observation, obs = replayed, replayed_obs
                 else:
-                    # A stale entry is not a bridge fault: the bridge is fine, the recipe is not. Start
-                    # canonically instead and say so, so the caller can drop the entry.
+                    if sampled is None:
+                        raise BridgeFault(f"task start no longer replays: {problem}")
+                    # A stale sampled entry is not a bridge fault: the bridge is fine, the recipe is not.
+                    # Return to the task start and say so, so the caller can drop the sampled entry.
                     observation = self.bridge.reset()
                     self._check_start(observation)
                     obs = self._builder.reset(observation.state, observation.extras)
+                    start = self.task_start
+                    if start is not None:
+                        replayed, replayed_obs, fallback_problem = self._replay(start)
+                        if fallback_problem is not None:
+                            raise BridgeFault(f"task start no longer replays: {fallback_problem}")
+                        observation, obs = replayed, replayed_obs
         except (BridgeError, SchemaViolation) as error:
             raise BridgeFault(f"reset failed: {error}") from error
-        used = start if problem is None else None
-        self._elapsed = used.frames if used is not None else 0
-        self._lines = list(used.lines) if (used is not None and self.archive is not None) else []
-        self._start, self._start_problem = used, problem
-        self._start_kind = "archive" if used is not None else "canonical"
-        self._start_frames = used.frames if used is not None else 0
+        used_sample = sampled if problem is None else None
+        base_frames = self.task_start.frames if self.task_start is not None else 0
+        self._elapsed = max(0, used_sample.frames - base_frames) if used_sample is not None else 0
+        self._lines = list(start.lines) if (start is not None and self.archive is not None) else []
+        self._start, self._start_problem = used_sample, problem
+        self._start_kind = "archive" if used_sample is not None else "canonical"
+        self._start_frames = self._elapsed
         # Counted here rather than when the start was sampled, so an entry that no longer replays is not
         # recorded as having been tried. This assumes the sampler draws from `archive`, which is how a training
         # run is wired; an evaluation sampling held-out starts passes no archive and records nothing.
-        if used is not None and self.archive is not None:
-            self.archive.record_use(used)
+        if used_sample is not None and self.archive is not None:
+            self.archive.record_use(used_sample)
         self._potential_value = self._start_potential(observation.state)
         self._ready = True
         return obs, self._info(frame=observation.tas_frame, reset_events=observation.events,

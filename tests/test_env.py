@@ -322,6 +322,24 @@ class MovingBridge(ReplayBridge):
         return observation
 
 
+class Room2Bridge(ReplayBridge):
+    """Crosses 1 to 2 during a two-frame task-start replay, then moves inside Room 2."""
+
+    positions = ((261, 5), (261, 1), (269, -5))
+
+    def step(self, buttons="", dash_only="", move_only=""):
+        observation = super().step(buttons, dash_only, move_only)
+        room = "1" if self.index == 1 else "2"
+        observation.state["RoomName"] = room
+        x, y = self.positions[min(self.index, len(self.positions)) - 1]
+        observation.state["Player"]["Position"] = {"X": x, "Y": y}
+        observation.extras["player"]["Dashes"] = 0
+        events = ([{"type": "transition", "from": "1", "to": "2",
+                    "direction": {"X": 0, "Y": -1}}] if self.index == 1 else [])
+        return Observation(observation.episode_id, observation.step_id, observation.tas_frame, room,
+                           observation.state, observation.diagnostics, observation.extras, events)
+
+
 PATH = [(27, 144), (35, 144), (43, 140), (51, 136), (59, 132), (67, 128)]
 
 
@@ -392,6 +410,41 @@ class StartReplayTests(unittest.TestCase):
         env = CelesteRoomEnv(MovingBridge(PATH))
         _, info = env.reset(options={"start": prefix(2, PATH[1])})
         self.assertEqual((info["start"], info["start_frames"]), ("archive", 2))
+
+    def test_a_later_room_task_replays_its_start_without_spending_the_deadline(self):
+        bridge = Room2Bridge()
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        env = CelesteRoomEnv(bridge, task=RoomTask("2", "3"), task_start=task_start)
+
+        _, info = env.reset()
+
+        self.assertEqual((info["start"], info["start_frames"], info["elapsed"]), ("canonical", 0, 0))
+        self.assertEqual((info["player"]["x"], info["player"]["y"]), (261, 1))
+        self.assertEqual(len(bridge.sent), 2)
+
+    def test_a_later_room_archive_start_counts_only_frames_after_the_task_start(self):
+        bridge = Room2Bridge()
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        later = Start(("1,U", "1,U", "1,R"), (269, -5), "2", 0)
+        env = CelesteRoomEnv(bridge, task=RoomTask("2", "3"), task_start=task_start,
+                             start_sampler=lambda: later)
+
+        _, info = env.reset()
+
+        self.assertEqual((info["start"], info["start_frames"], info["elapsed"]), ("archive", 1, 1))
+
+    def test_a_stale_later_room_entry_falls_back_to_the_task_start(self):
+        bridge = Room2Bridge()
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        stale = Start(("1,U", "1,U", "1,R"), (300, -5), "2", 0)
+        env = CelesteRoomEnv(bridge, task=RoomTask("2", "3"), task_start=task_start,
+                             start_sampler=lambda: stale)
+
+        _, info = env.reset()
+
+        self.assertEqual((info["start"], info["elapsed"]), ("canonical", 0))
+        self.assertIn("arrived at", info["start_problem"])
+        self.assertEqual((info["player"]["x"], info["player"]["y"]), (261, 1))
 
 
 class ArchiveRecordingTests(unittest.TestCase):

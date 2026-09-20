@@ -47,7 +47,7 @@ run unattended.
 | Inputs | Input bindings checked in the game (30 of 30 checks), including both bindings for jump, dash, crouch dash and grab, dash-only and move-only directions, and pause-menu confirm and cancel |
 | Memory | Found and fixed a render target leak of 2 to 6 MB per reset (8 GB in 4 minutes); memory now stays flat |
 | Provenance | Every training run records its commit, the game build's file hashes and the schema version, and refuses to start if any of them drifts |
-| Tests | 281 unit tests, plus live checks against the game |
+| Tests | 282 unit tests, plus live checks against the game |
 
 ## How it works
 

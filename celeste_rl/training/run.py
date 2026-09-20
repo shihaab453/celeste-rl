@@ -52,6 +52,7 @@ from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.schema import MENU_INPUTS
 from celeste_rl.starts import SAMPLING, StartArchive
+from celeste_rl.tasks import load_task_definition
 from celeste_rl.training.policy import CelestePolicy, policy_kwargs
 from celeste_rl.training.supervisor import SupervisedPPO, TrainingAborted
 
@@ -61,6 +62,9 @@ class TrainConfig:
     """Starting values for the unshaped room 1 baseline, not tuned results."""
 
     seed: int = 0
+    # Empty is the original Room 1 to Room 2 task. Later rooms use a hash-pinned task definition whose start
+    # recipe is replayed from the base Room 1 savestate before each episode.
+    task_definition: str = ""
     total_timesteps: int = 2_000_000  # accepted transitions (roadmap campaign budget per seed)
     n_steps: int = 2048
     batch_size: int = 512
@@ -126,15 +130,21 @@ def build_environment(bridge, config: TrainConfig, run_dir: Path) -> CelesteRoom
     Hence the explicit `is None` checks below.
     """
     reward = RewardConfig(version=config.reward_version, gamma=config.gamma, shaping_scale=config.shaping_scale)
+    definition = load_task_definition(config.task_definition) if config.task_definition else None
+    task = definition.task if definition is not None else None
+    task_start = definition.start if definition is not None else None
     archive = None
     if config.varied_starts:
         stored = Path(run_dir) / "archive.json"
         archive = (StartArchive.load(stored, seed=config.seed) if stored.exists() else
                    StartArchive(canonical_fraction=config.canonical_fraction,
-                                max_frames=config.max_start_frames, seed=config.seed,
+                                max_frames=config.max_start_frames + (task_start.frames if task_start else 0),
+                                seed=config.seed,
                                 sampling=config.start_sampling))
+    kwargs = {"task": task} if task is not None else {}
     return CelesteRoomEnv(bridge, disabled_inputs=config.disabled_inputs, reward_config=reward,
-                          start_sampler=None if archive is None else archive.sample, archive=archive)
+                          start_sampler=None if archive is None else archive.sample, archive=archive,
+                          task_start=task_start, **kwargs)
 
 
 def _atomic_save(model: SupervisedPPO, path: Path) -> None:
