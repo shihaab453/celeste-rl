@@ -6,23 +6,23 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is clearable by demonstration-assisted policies, but its generalisation rate is not yet
-established.** Fine-tuning from one cloned policy produced canonical-start success rates from 0% to 98.5%.
-A first held-out evaluation appeared to favour varied-start training, 79.9% against 65.1% on the recorded
-entries, but review found that the test artifact contained only 125 unique states from 5 unique routes, not 149
-states from 6 routes. It also reused the same states across checkpoints and evaluated an undeclared subset of
-the trained policies. Those percentages are diagnostics, not estimates of performance over the room.
+**Room 1 of Chapter 1 is solved by the demonstration-assisted, varied-start method.** On a replacement frozen
+set of 200 unique states from 11 search-route clusters, six matched fine-tuning seeds achieved a 74.8%
+route-macro success rate with varied starts and 52.2% with canonical starts. The predeclared paired difference
+was **+22.6 percentage points**, with a crossed seed-route 95% bootstrap interval from +6.7 to +43.5 points and
+an exact two-sided paired sign-flip p-value of 0.03125. Varied starts won in all six matched seeds and on all
+eleven route-level descriptive comparisons.
 
-The fixed canonical start is still a poor measure of generalisation: two policies that scored 98.0% and 98.5%
-there scored 59.7% and 84.6% on the preliminary state set. A corrected frozen set and a predeclared evaluation
-of every matched checkpoint are the next steps. Chapter 1 has 20 rooms; this is the first.
+The fixed canonical start remains a poor measure of generalisation: two policies that scored 98.0% and 98.5%
+there scored 59.7% and 84.6% on the earlier diagnostic state set. The project now proceeds to Room 2. Chapter 1
+has 20 rooms; Room 1 is the first.
 
 Two experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | Cloning then RL clears the canonical start on successful runs; preliminary held-out results favour varied starts, but the corrected generalisation measurement is pending |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points** under the predeclared matched, route-cluster-aware analysis |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
@@ -30,8 +30,8 @@ explains what was measured to work out why: the policy never left near-uniform p
 shaped value function exactly, and the reward left very little raw advantage variation among failures. PPO
 normalises those advantages, so this is evidence of weak signal rather than literally zero policy gradient.
 
-Confidence intervals are reported where their sampling assumptions are defensible. The corrected held-out
-evaluation will account for states clustered along routes rather than treating every prefix as independent.
+Confidence intervals are reported where their sampling assumptions are defensible. The held-out comparison
+resamples matched training seeds and complete route clusters rather than treating every prefix as independent.
 
 ### The interface underneath
 
@@ -47,7 +47,7 @@ run unattended.
 | Inputs | Input bindings checked in the game (30 of 30 checks), including both bindings for jump, dash, crouch dash and grab, dash-only and move-only directions, and pause-menu confirm and cancel |
 | Memory | Found and fixed a render target leak of 2 to 6 MB per reset (8 GB in 4 minutes); memory now stays flat |
 | Provenance | Every training run records its commit, the game build's file hashes and the schema version, and refuses to start if any of them drifts |
-| Tests | 233 unit tests, plus live checks against the game |
+| Tests | 281 unit tests, plus live checks against the game |
 
 ## How it works
 
@@ -125,15 +125,14 @@ Do not use `uv sync` or `uv run` in this repository: uv's project mode manages a
 Phases 0 to 3B are done: the interface, a PPO implementation studied on CartPole, the environment, the
 no-demonstration attempt and the demonstration-assisted comparison.
 
-1. **Held-out entry states.** The only result so far is from one fixed start. A generator of reachable entry
-   states, frozen before training and never sampled for training, is what turns "clears room 1 from the start
-   position" into "can play room 1", and it is the project's own criterion for the phase.
-2. **A critic warm-up.** Two fine-tuning seeds of three lost 200,000 transitions to an early collapse whose
-   cause is not established. Training the value head before allowing policy updates both tests the explanation
-   and removes the cost.
-3. **How much of the demonstration set is needed.** The cloned policy scores below a repeat-your-last-action
-   baseline on held-out routes, so it is not clear the five routes taught the room rather than shaping the
-   action distribution. If one route is enough, twenty rooms is a minute of search each.
-4. **Room 2**, and whether any of this transfers.
+1. **Room 2.** Generalise task starts beyond the room 1 savestate, find independent Room 2 routes, then repeat
+   cloning, varied-start fine-tuning and frozen held-out evaluation without tuning against the test set.
+2. **Two-room retention.** Mix Rooms 1 and 2 during training and measure both separately, so learning Room 2
+   cannot silently destroy Room 1 competence.
+3. **How much of the demonstration set is needed.** The cloned Room 1 policy scores below a
+   repeat-your-last-action baseline on held-out routes. Reducing the route count is useful only after Room 2
+   establishes that the full method transfers.
+4. **Natural two-room play.** Evaluate one frozen checkpoint across the Room 1 to Room 2 transition without an
+   artificial reset, as Phase 4 requires.
 
 The full plan is in [`docs/planning/roadmap.md`](docs/planning/roadmap.md).
