@@ -1,0 +1,56 @@
+{
+  "format_version": 1,
+  "task": {
+    "name": "chapter-1-room-2",
+    "task_definition": "config/room2.json",
+    "task_definition_sha256": "979b68d1c068c88e0952a50a5b9f37b1cea0dc25e65aa517a9949c6d6d6d46bd",
+    "source_route_sha256": "3ac088282e6bce43054b80b9a52105ab30b0f7a007731c0bec7daa23941dcf30",
+    "start_room": "2",
+    "target_room": "3"
+  },
+  "sha256": "7ac3f4f0fa0c9c3f0def5470cd292e20dfd9fc6975570788a153fd326dc985df",
+  "demonstrations": [
+    {
+      "kind": "route",
+      "name": "20260920-021356",
+      "source": "runs/room2-routes/20260920-021356/route.json",
+      "route_sha256": "1705c0beac1a51cb66a54b45a0e8b5f6c8a5489ba0dfb847a216e58fffc70680"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-163841",
+      "source": "runs/room2-routes/20260922-163841/route.json",
+      "route_sha256": "84b1ba1a0ff435ea66b5472b4408e6c09310d6010f73140cbba5d176b94da6ae"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-164006",
+      "source": "runs/room2-routes/20260922-164006/route.json",
+      "route_sha256": "e1021b60ebe27a0547efc9760fc65b0d1c8ca18e07502d5d6fb9fb1c5f05ab77"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-164111",
+      "source": "runs/room2-routes/20260922-164111/route.json",
+      "route_sha256": "13906399ddd0b737d9a3dd558a67181a74a37614903361bea78700fa8f163a49"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-164552",
+      "source": "runs/room2-routes/20260922-164552/route.json",
+      "route_sha256": "ac5a74b9158a4a840b9dc7724c09413d68557ec2e338b0bca4ded659f8154b2c"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-164712",
+      "source": "runs/room2-routes/20260922-164712/route.json",
+      "route_sha256": "99c1ba1f7974d1ae92de71122c78fcc465dfb591d082f51c0df66d63b29c2400"
+    },
+    {
+      "kind": "route",
+      "name": "20260922-164815",
+      "source": "runs/room2-routes/20260922-164815/route.json",
+      "route_sha256": "eb52cf441a9431ac82802ae2ea2cc526b6e02715acf8dc5aaa23acf7f9d44674"
+    }
+  ]
+}
