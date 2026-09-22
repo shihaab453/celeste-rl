@@ -2,12 +2,15 @@
 
 Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/evaluate_heldout.py --checkpoint runs/train/<run>/checkpoints/latest.zip
+    .venv-rl/Scripts/python.exe scripts/evaluate_heldout.py --task-definition config/room2.json \
+        --starts config/heldout_starts-room2.json --checkpoint runs/train/<run>/checkpoints/latest.zip
 
 `scripts/evaluate_checkpoint.py` measures one start many times, which says how reliable a policy is around a
 single route. This measures many starts, which says whether it can play the room. They are different claims and
 the second is the one the roadmap asks for.
 
-Each held-out state is replayed from the canonical start and the policy then plays from there, once per state
+Each held-out state is replayed from the base savestate through the task start and the policy then plays from
+there, once per state
 by default, so the reported rate is over states rather than over repeats of one state. The frozen set's sha256
 is recorded next to the result, so a number always names the complete test set it was measured against.
 
@@ -15,8 +18,8 @@ States sampled along one route are correlated, and repeated policies evaluated o
 correlated. This script therefore reports descriptive totals and per-route summaries, not an ordinary binomial
 confidence interval. Cluster-aware uncertainty belongs in the analysis across routes and policy seeds.
 
-Results go to `runs/heldout-evaluation/<timestamp>/results.json`, with every attempted episode in
-`episodes.jsonl`.
+Room 1 results go to `runs/heldout-evaluation/<timestamp>/results.json`; named tasks add a task directory.
+Every attempted episode is written to `episodes.jsonl`.
 """
 from __future__ import annotations
 
@@ -39,10 +42,33 @@ from celeste_rl.heldout import HeldoutManifestError, validate_manifest  # noqa: 
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.reward import RewardConfig  # noqa: E402
 from celeste_rl.starts import Start  # noqa: E402
+from celeste_rl.tasks import (  # noqa: E402
+    TaskDefinition,
+    TaskDefinitionError,
+    resolve_task_definition,
+    task_identity,
+)
 from celeste_rl.training.game import GameSession  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
 
 DEFAULT_SET = REPO / "config" / "heldout_starts.json"
+
+
+def entry_start(entry: dict, definition: TaskDefinition) -> tuple[Start, int, tuple[float, float]]:
+    """Build a replayable start and fail closed on task-relative provenance mismatches."""
+    lines = tuple(entry["lines"])
+    setup = definition.start.lines if definition.start is not None else ()
+    if lines[:len(setup)] != tuple(setup):
+        raise HeldoutManifestError("held-out entry does not begin with the task-start recipe")
+    task_frames = entry.get("task_frames", len(lines) - len(setup))
+    if task_frames != len(lines) - len(setup):
+        raise HeldoutManifestError("held-out entry task_frames does not match its replay recipe")
+    if entry["room"] != definition.task.start_room:
+        raise HeldoutManifestError("held-out entry room does not match the task start room")
+    room_position = tuple(entry.get("room_position", entry["position"]))
+    if definition.start is not None and "room_position" not in entry:
+        raise HeldoutManifestError("later-room held-out entries must record room_position")
+    return Start(lines, tuple(entry["position"]), entry["room"], entry["dashes"]), task_frames, room_position
 
 
 def play(model, env: CelesteRoomEnv, start: Start, deterministic: bool) -> dict:
@@ -91,7 +117,9 @@ def route_summaries(episodes: list[dict]) -> dict[str, dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--starts", type=Path, default=DEFAULT_SET)
+    parser.add_argument("--task-definition", type=Path,
+                        help="hash-pinned room task; omit for the original Room 1 task")
+    parser.add_argument("--starts", type=Path)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
     parser.add_argument("--repeats", type=int, default=1, help="episodes per held-out state")
     parser.add_argument("--deterministic", action="store_true")
@@ -101,6 +129,15 @@ def main() -> int:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
+    try:
+        definition = resolve_task_definition(args.task_definition)
+        identity = task_identity(definition)
+    except TaskDefinitionError as error:
+        parser.error(str(error))
+    if args.starts is None:
+        if args.task_definition:
+            parser.error("--starts is required with --task-definition")
+        args.starts = DEFAULT_SET
     if args.repeats <= 0:
         parser.error("--repeats must be positive")
 
@@ -114,17 +151,22 @@ def main() -> int:
         return 2
     frozen = json.loads(args.starts.read_text(encoding="utf-8"))
     try:
-        entries = validate_manifest(frozen)
+        entries = validate_manifest(frozen, identity)
+        prepared = [entry_start(entry, definition) for entry in entries]
     except HeldoutManifestError as error:
         print(f"Invalid held-out set {args.starts}: {error}")
         return 2
 
-    output_dir = REPO / "runs" / "heldout-evaluation" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_root = REPO / "runs" / "heldout-evaluation"
+    if args.task_definition:
+        output_root /= definition.name
+    output_dir = output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
     checkpoint_sha256 = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
     game = GameSession(args.game_dir)
     http = CelesteBridge(output_dir / "episode.tas")
     env = CelesteRoomEnv(LockstepBridge(http),
+                         task=definition.task, task_start=definition.start,
                          reward_config=RewardConfig(version=args.reward_version, shaping_scale=args.shaping_scale))
     episodes = []
     try:
@@ -137,8 +179,8 @@ def main() -> int:
         print(f"{args.checkpoint} against {len(entries)} held-out starts "
               f"({args.repeats} episode(s) each), set {frozen['sha256'][:16]}")
         with (output_dir / "episodes.jsonl").open("w", encoding="utf-8") as episode_file:
-            for index, entry in enumerate(entries, start=1):
-                start = Start(tuple(entry["lines"]), tuple(entry["position"]), entry["room"], entry["dashes"])
+            for index, (entry, prepared_start) in enumerate(zip(entries, prepared), start=1):
+                start, task_frames, room_position = prepared_start
                 for repeat in range(args.repeats):
                     result = play(model, env, start, args.deterministic)
                     episode = {
@@ -146,14 +188,17 @@ def main() -> int:
                         "state_id": entry["state_id"],
                         "route": entry["route"],
                         "search_seed": entry["search_seed"],
-                        "start_frames": entry["frames"],
+                        "start_frames": task_frames,
+                        "start_replay_frames": entry["frames"],
                         "start_room": entry["room"],
                         "start_position": entry["position"],
                         "start_dashes": entry["dashes"],
-                        "start_x": entry["position"][0],
+                        "start_room_position": list(room_position),
+                        "start_x": room_position[0],
                         "repeat": repeat,
                         "checkpoint": str(args.checkpoint),
                         "checkpoint_sha256": checkpoint_sha256,
+                        "task": identity,
                     }
                     episodes.append(episode)
                     episode_file.write(json.dumps(episode, default=str) + "\n")
@@ -178,9 +223,11 @@ def main() -> int:
     route_rates = [route["success_rate"] for route in by_route.values() if route["success_rate"] is not None]
     results = {
         **git, "runtime_problems": problems, "attributable": runtime.attributable(git, problems),
+        "task": identity,
         "checkpoint": str(args.checkpoint),
         "checkpoint_sha256": checkpoint_sha256,
         "heldout_set": str(args.starts), "heldout_sha256": frozen["sha256"],
+        "heldout_file_sha256": hashlib.sha256(args.starts.read_bytes()).hexdigest(),
         "heldout_format_version": frozen["format_version"],
         "heldout_states": len(entries), "repeats": args.repeats,
         "deterministic": args.deterministic, "evaluation_seed": args.seed,
@@ -190,7 +237,8 @@ def main() -> int:
         "route_macro_success_rate": statistics.mean(route_rates) if route_rates else None,
         "by_route": by_route,
         "by_start_x": {k: {"successes": v[0], "episodes": v[1], "rate": round(v[0] / v[1], 3)}
-                       for k, v in sorted(by_depth.items())},
+                        for k, v in sorted(by_depth.items())},
+        "depth_coordinate": "room-local x",
     }
     (output_dir / "results.json").write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
     rate = f"{results['success_rate']:.1%}" if results["success_rate"] is not None else "n/a"

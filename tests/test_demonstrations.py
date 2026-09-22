@@ -18,6 +18,9 @@ from celeste_rl.demonstrations import (
     verify_dataset_manifest,
     write_dataset_manifest,
 )
+from celeste_rl.endings import RoomTask
+from celeste_rl.starts import Start
+from celeste_rl.tasks import TaskDefinition, task_identity, base_task_definition
 
 
 def entry(name: str, route: list[str], source: str | None = None) -> dict:
@@ -49,6 +52,14 @@ class DemonstrationManifestTests(unittest.TestCase):
         with self.assertRaisesRegex(DemonstrationManifestError, "duplicate route hash"):
             validate_demonstration_manifest(manifest(entries))
 
+    def test_manifest_task_identity_must_match(self) -> None:
+        entries = [entry("a", ["1,R"]), entry("b", ["1,L"])]
+        data = manifest(entries)
+        data["task"] = {**task_identity(base_task_definition()), "name": "not-room-1"}
+
+        with self.assertRaisesRegex(DemonstrationManifestError, "task identity does not match"):
+            validate_demonstration_manifest(data, task_identity(base_task_definition()))
+
     def test_overlap_is_content_based_not_seed_or_name_based(self) -> None:
         route_hash = route_sha256(["1,R", "1,J"])
         demonstrations = [{"route_sha256": route_hash, "name": "training", "search_seed": None}]
@@ -78,6 +89,47 @@ class DemonstrationManifestTests(unittest.TestCase):
             with self.assertRaisesRegex(DemonstrationManifestError, "does not match route_sha256"):
                 materialize_demonstrations([declared], repo)
 
+    def test_route_source_task_identity_must_match_the_manifest_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            source = repo / "runs" / "routes" / "a" / "route.json"
+            source.parent.mkdir(parents=True)
+            expected = task_identity(TaskDefinition(
+                "room-2", RoomTask("2", "3"), Start(("1,R",), (261, 1), "2", 0),
+                "config/room2.json", "a" * 64, "b" * 64))
+            source.write_text(json.dumps({
+                "task": {**expected, "task_definition_sha256": "c" * 64},
+                "task_definition": "config/room2.json",
+                "start_room": "2",
+                "next_room": "3",
+                "transition_step": 2,
+                "actions": ["R", "J"],
+            }), encoding="utf-8")
+            declared = entry("a", ["1,R", "1,J"])
+
+            with self.assertRaisesRegex(DemonstrationManifestError, "task identity does not match"):
+                materialize_demonstrations([declared], repo, expected)
+
+    def test_legacy_route_source_requires_matching_task_path_and_rooms(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            source = repo / "runs" / "routes" / "a" / "route.json"
+            source.parent.mkdir(parents=True)
+            expected = task_identity(TaskDefinition(
+                "room-2", RoomTask("2", "3"), Start(("1,R",), (261, 1), "2", 0),
+                "config/room2.json", "a" * 64, "b" * 64))
+            source.write_text(json.dumps({
+                "task_definition": "config/other.json",
+                "start_room": "2",
+                "next_room": "3",
+                "transition_step": 2,
+                "actions": ["R", "J"],
+            }), encoding="utf-8")
+            declared = entry("a", ["1,R", "1,J"])
+
+            with self.assertRaisesRegex(DemonstrationManifestError, "legacy task fields"):
+                materialize_demonstrations([declared], repo, expected)
+
 
 class DatasetManifestTests(unittest.TestCase):
     def test_dataset_and_both_source_manifest_hashes_are_verified(self) -> None:
@@ -104,6 +156,18 @@ class DatasetManifestTests(unittest.TestCase):
 
             with self.assertRaisesRegex(DemonstrationManifestError, "dataset_sha256"):
                 verify_dataset_manifest(dataset, "d" * 64, "e" * 64)
+
+    def test_dataset_task_identity_is_recorded_and_verified(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            dataset = Path(temporary) / "dataset.npz"
+            dataset.write_bytes(b"recorded observations")
+            identity = task_identity(base_task_definition())
+            written = write_dataset_manifest(
+                dataset, "d" * 64, "e" * 64, [route_sha256(["1,R"])], identity)
+
+            self.assertEqual(verify_dataset_manifest(dataset, "d" * 64, "e" * 64, identity), written)
+            with self.assertRaisesRegex(DemonstrationManifestError, "task identity does not match"):
+                verify_dataset_manifest(dataset, "d" * 64, "e" * 64, {**identity, "name": "other"})
 
 
 if __name__ == "__main__":

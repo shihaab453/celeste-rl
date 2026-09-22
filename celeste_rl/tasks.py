@@ -13,6 +13,7 @@ from celeste_rl.starts import Start
 REPO = Path(__file__).resolve().parents[1]
 FORMAT_VERSION = 1
 BASE_ROOM = "1"
+BASE_TASK_NAME = "chapter-1-room-1"
 
 
 class TaskDefinitionError(ValueError):
@@ -24,6 +25,9 @@ class TaskDefinition:
     name: str
     task: RoomTask
     start: Start | None = None
+    definition_path: str | None = None
+    definition_sha256: str | None = None
+    source_route_sha256: str | None = None
 
 
 def file_sha256(path: Path) -> str:
@@ -46,12 +50,82 @@ def _repo_path(value: str) -> Path:
     return path
 
 
+def base_task_definition() -> TaskDefinition:
+    """The original Room 1 task, which needs no replay recipe beyond the base savestate."""
+    return TaskDefinition(BASE_TASK_NAME, RoomTask())
+
+
+def resolve_task_definition(path: str | Path | None) -> TaskDefinition:
+    return load_task_definition(path) if path else base_task_definition()
+
+
+def task_identity(definition: TaskDefinition) -> dict:
+    """Stable task provenance carried by every later-room dataset and result."""
+    return {
+        "name": definition.name,
+        "task_definition": definition.definition_path,
+        "task_definition_sha256": definition.definition_sha256,
+        "source_route_sha256": definition.source_route_sha256,
+        "start_room": definition.task.start_room,
+        "target_room": definition.task.target_room,
+    }
+
+
+def canonical_task_identity(value: dict) -> dict:
+    if not isinstance(value, dict):
+        raise TaskDefinitionError("task identity must be an object")
+    required = ("name", "task_definition", "task_definition_sha256", "source_route_sha256",
+                "start_room", "target_room")
+    missing = [field for field in required if field not in value]
+    if missing:
+        raise TaskDefinitionError(f"task identity is missing {missing}")
+    for field in ("name", "start_room", "target_room"):
+        if not isinstance(value[field], str) or not value[field]:
+            raise TaskDefinitionError(f"task identity {field} must be a non-empty string")
+    path, definition_hash = value["task_definition"], value["task_definition_sha256"]
+    if (path is None) != (definition_hash is None):
+        raise TaskDefinitionError("task definition path and SHA-256 must either both be set or both be null")
+    if path is not None and (not isinstance(path, str) or not path):
+        raise TaskDefinitionError("task identity task_definition must be a non-empty string or null")
+    for field in ("task_definition_sha256", "source_route_sha256"):
+        digest = value[field]
+        if digest is not None and (not isinstance(digest, str) or len(digest) != 64
+                                   or any(character not in "0123456789abcdef" for character in digest)):
+            raise TaskDefinitionError(f"task identity {field} must be a lowercase SHA-256 or null")
+    if value["start_room"] == value["target_room"]:
+        raise TaskDefinitionError("task identity start_room and target_room must differ")
+    if value["start_room"] != BASE_ROOM:
+        if path is None:
+            raise TaskDefinitionError("a later-room task identity must name its task definition")
+        if value["source_route_sha256"] is None:
+            raise TaskDefinitionError("a later-room task identity must include its source-route SHA-256")
+    return {field: value[field] for field in required}
+
+
+def manifest_task_identity(manifest: dict) -> dict:
+    """Read explicit task provenance, treating legacy manifests as the original Room 1 task."""
+    if "task" not in manifest:
+        return task_identity(base_task_definition())
+    return canonical_task_identity(manifest["task"])
+
+
+def require_task_identity(manifest: dict, expected: dict, label: str) -> dict:
+    actual = manifest_task_identity(manifest)
+    canonical_expected = canonical_task_identity(expected)
+    if actual != canonical_expected:
+        differences = [field for field in canonical_expected if actual[field] != canonical_expected[field]]
+        raise TaskDefinitionError(f"{label} task identity does not match ({', '.join(differences)})")
+    return actual
+
+
 def load_task_definition(path: str | Path) -> TaskDefinition:
     """Load a room task and derive its canonical start from a hash-pinned route prefix."""
     definition_path = _repo_path(str(path))
     try:
+        relative_definition = definition_path.relative_to(REPO.resolve()).as_posix()
+        definition_hash = file_sha256(definition_path)
         data = json.loads(definition_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
+    except (OSError, ValueError, json.JSONDecodeError) as error:
         raise TaskDefinitionError(f"cannot read task definition {definition_path}: {error}") from error
     if data.get("format_version") != FORMAT_VERSION:
         raise TaskDefinitionError(f"unsupported task format {data.get('format_version')!r}")
@@ -65,7 +139,8 @@ def load_task_definition(path: str | Path) -> TaskDefinition:
     if source is None:
         if data["start_room"] != BASE_ROOM:
             raise TaskDefinitionError("a later room task needs a source route from the base savestate")
-        return TaskDefinition(data["name"], RoomTask(data["start_room"], data["target_room"]))
+        return TaskDefinition(data["name"], RoomTask(data["start_room"], data["target_room"]),
+                              definition_path=relative_definition, definition_sha256=definition_hash)
     source_path = _repo_path(source)
     if file_sha256(source_path) != data.get("source_route_sha256"):
         raise TaskDefinitionError("task source route does not match its declared SHA-256")
@@ -95,4 +170,5 @@ def load_task_definition(path: str | Path) -> TaskDefinition:
     except ValueError as error:
         raise TaskDefinitionError(f"task source route has an invalid action: {error}") from error
     start = Start(lines, tuple(position), data["start_room"], dashes)
-    return TaskDefinition(data["name"], RoomTask(data["start_room"], data["target_room"]), start)
+    return TaskDefinition(data["name"], RoomTask(data["start_room"], data["target_room"]), start,
+                          relative_definition, definition_hash, data["source_route_sha256"])

@@ -340,6 +340,20 @@ class Room2Bridge(ReplayBridge):
                            observation.state, observation.diagnostics, observation.extras, events)
 
 
+class Room3Bridge(Room2Bridge):
+    """Crosses from Room 2 to Room 3 on the first decision after the Room 2 task start."""
+
+    def step(self, buttons="", dash_only="", move_only=""):
+        observation = super().step(buttons, dash_only, move_only)
+        if self.index < 3:
+            return observation
+        observation.state["RoomName"] = "3"
+        events = ([{"type": "transition", "from": "2", "to": "3",
+                    "direction": {"X": 0, "Y": -1}}] if self.index == 3 else [])
+        return Observation(observation.episode_id, observation.step_id, observation.tas_frame, "3",
+                           observation.state, observation.diagnostics, observation.extras, events)
+
+
 PATH = [(27, 144), (35, 144), (43, 140), (51, 136), (59, 132), (67, 128)]
 
 
@@ -414,11 +428,12 @@ class StartReplayTests(unittest.TestCase):
     def test_a_later_room_task_replays_its_start_without_spending_the_deadline(self):
         bridge = Room2Bridge()
         task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
-        env = CelesteRoomEnv(bridge, task=RoomTask("2", "3"), task_start=task_start)
+        env = CelesteRoomEnv(bridge, task=RoomTask("2", "3", deadline_frames=1), task_start=task_start)
 
-        _, info = env.reset()
+        obs, info = env.reset()
 
         self.assertEqual((info["start"], info["start_frames"], info["elapsed"]), ("canonical", 0, 0))
+        self.assertEqual(obs["context"][0], 0.0)
         self.assertEqual((info["player"]["x"], info["player"]["y"]), (261, 1))
         self.assertEqual(len(bridge.sent), 2)
 
@@ -429,9 +444,10 @@ class StartReplayTests(unittest.TestCase):
         env = CelesteRoomEnv(bridge, task=RoomTask("2", "3"), task_start=task_start,
                              start_sampler=lambda: later)
 
-        _, info = env.reset()
+        obs, info = env.reset()
 
         self.assertEqual((info["start"], info["start_frames"], info["elapsed"]), ("archive", 1, 1))
+        self.assertAlmostEqual(obs["context"][0], 1 / DEADLINE_FRAMES)
 
     def test_a_stale_later_room_entry_falls_back_to_the_task_start(self):
         bridge = Room2Bridge()
@@ -445,6 +461,17 @@ class StartReplayTests(unittest.TestCase):
         self.assertEqual((info["start"], info["elapsed"]), ("canonical", 0))
         self.assertIn("arrived at", info["start_problem"])
         self.assertEqual((info["player"]["x"], info["player"]["y"]), (261, 1))
+
+    def test_a_terminal_target_room_prefix_falls_back_to_the_task_start(self):
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        terminal = Start(("1,U", "1,U", "1,R"), (269, -5), "3", 0)
+        env = CelesteRoomEnv(Room3Bridge(), task=RoomTask("2", "3"), task_start=task_start,
+                             start_sampler=lambda: terminal)
+
+        _, info = env.reset()
+
+        self.assertEqual((info["start"], info["elapsed"]), ("canonical", 0))
+        self.assertIn("ended the episode", info["start_problem"])
 
 
 class ArchiveRecordingTests(unittest.TestCase):
@@ -473,6 +500,18 @@ class ArchiveRecordingTests(unittest.TestCase):
         env.reset()
         env.step(noop())
         self.assertEqual(env._lines, [])
+
+    def test_a_terminal_target_room_state_is_not_added_to_the_archive(self):
+        archive = StartArchive(seed=0)
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        env = CelesteRoomEnv(Room3Bridge(), task=RoomTask("2", "3"), task_start=task_start, archive=archive)
+        env.reset()
+
+        _, _, terminated, _, info = env.step(noop())
+
+        self.assertTrue(terminated)
+        self.assertEqual(info["ending"], SUCCESS)
+        self.assertEqual(len(archive), 0)
 
 
 class RecordedEpisodeTests(unittest.TestCase):

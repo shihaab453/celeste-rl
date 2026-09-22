@@ -6,7 +6,8 @@ The long-term goal is an agent that clears the first room of Chapter 1 reliably,
 
 ## Status
 
-**Room 1 of Chapter 1 is solved by the demonstration-assisted, varied-start method.** On a replacement frozen
+**Demonstration-assisted varied-start training improves Room 1 generalisation, but has not yet met the declared
+99% reliability target.** On a replacement frozen
 set of 200 unique states from 11 search-route clusters, six matched fine-tuning seeds achieved a 74.8%
 route-macro success rate with varied starts and 52.2% with canonical starts. The predeclared paired difference
 was **+22.6 percentage points**, with a crossed seed-route 95% bootstrap interval from +6.7 to +43.5 points and
@@ -47,7 +48,7 @@ run unattended.
 | Inputs | Input bindings checked in the game (30 of 30 checks), including both bindings for jump, dash, crouch dash and grab, dash-only and move-only directions, and pause-menu confirm and cancel |
 | Memory | Found and fixed a render target leak of 2 to 6 MB per reset (8 GB in 4 minutes); memory now stays flat |
 | Provenance | Every training run records its commit, the game build's file hashes and the schema version, and refuses to start if any of them drifts |
-| Tests | 282 unit tests, plus live checks against the game |
+| Tests | 303 unit tests, plus live checks against the game |
 
 ## How it works
 

@@ -1,7 +1,9 @@
-"""Phase 3B: clone demonstrated play of room 1, then measure the cloned policy by playing it.
+"""Clone demonstrated play of one hash-pinned room task, then measure the cloned policy by playing it.
 
 Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/clone_room1.py
+    .venv-rl/Scripts/python.exe scripts/clone_room1.py --task-definition config/room2.json \
+        --demonstrations config/demonstrations-room2.json --heldout config/heldout_starts-room2.json
     .venv-rl/Scripts/python.exe scripts/clone_room1.py --dataset runs/clone/<run>/dataset.npz   # refit, no game
 
 Both modes require the explicit demonstration and held-out manifests. A dataset refit also requires the
@@ -11,13 +13,13 @@ Three stages, and only the third answers the project's question.
 
 **Stage 1 (needs the game): record what the demonstrations saw.** A route is a list of input lines; cloning
 needs the observation the policy would have had at each frame, so every demonstration is replayed through
-`CelesteRoomEnv` from the canonical start and its observations captured. A replay that does not end in
+`CelesteRoomEnv` from the task start and its observations captured. A replay that does not end in
 `success` is dropped with a note rather than trained on. The pairs are saved so later fits need no game.
 
 **Stage 2 (CPU): clone.** Whole demonstrations are held out, never frames (see `celeste_rl/cloning.py` for
 why). Held-out accuracy is reported against the always-zero baseline, because the inputs are sparse.
 
-**Stage 3 (needs the game): play.** The cloned policy runs the Phase 3 evaluation protocol from the canonical
+**Stage 3 (needs the game): play.** The cloned policy runs the evaluation protocol from the task's canonical
 start, stochastic and deterministic. **This is the number that matters.** Held-out accuracy says the policy
 predicts the right button most of the time; only playing says whether it clears the room, because a cloned
 policy's first mistake puts it in a state no demonstration visited and errors compound from there.
@@ -29,11 +31,12 @@ Demonstration sources are kept separate in the records, because they are not equ
 - `archive`: clears extracted from the training archives (`scripts/extract_demonstrations.py`), about 8.4
   inputs per frame, because they are the twelve-button policy's solutions.
 
-Results go to runs/clone/<timestamp>/.
+Room 1 results go to `runs/clone/<timestamp>/`; named tasks use `runs/clone/<task>/<timestamp>/`.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from datetime import datetime
@@ -65,6 +68,11 @@ from celeste_rl.heldout import HeldoutManifestError, validate_manifest as valida
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.observation import observation_space  # noqa: E402
 from celeste_rl.schema import ACTION_INPUTS  # noqa: E402
+from celeste_rl.tasks import (  # noqa: E402
+    TaskDefinitionError,
+    resolve_task_definition,
+    task_identity,
+)
 from celeste_rl.training.game import GameSession  # noqa: E402
 from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E402
 from celeste_rl.training.run import run_episode  # noqa: E402
@@ -90,16 +98,17 @@ class SpacesOnly(gym.Env):
         raise RuntimeError("never stepped")
 
 
-def load_manifests(demonstrations_path: Path, heldout_path: Path, routes_only: bool) -> tuple[dict, list[dict], dict]:
+def load_manifests(demonstrations_path: Path, heldout_path: Path, routes_only: bool,
+                   expected_task: dict) -> tuple[dict, list[dict], dict]:
     """Validate both frozen manifests and reject content overlap before any game or model work."""
     demonstrations_manifest = json.loads(demonstrations_path.read_text(encoding="utf-8"))
-    demonstration_entries = validate_demonstration_manifest(demonstrations_manifest)
+    demonstration_entries = validate_demonstration_manifest(demonstrations_manifest, expected_task)
     if routes_only:
         demonstration_entries = [entry for entry in demonstration_entries if entry["kind"] == "route"]
     if len(demonstration_entries) < 2:
         raise DemonstrationManifestError("fewer than two demonstrations remain after filtering")
     heldout_manifest = json.loads(heldout_path.read_text(encoding="utf-8"))
-    heldout_entries = validate_heldout_manifest(heldout_manifest)
+    heldout_entries = validate_heldout_manifest(heldout_manifest, expected_task)
     reject_heldout_overlap(demonstration_entries, heldout_entries)
     return demonstrations_manifest, demonstration_entries, heldout_manifest
 
@@ -148,10 +157,12 @@ def load(path: Path) -> Demonstrations:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
+    parser.add_argument("--task-definition", type=Path,
+                        help="hash-pinned room task; omit for the original Room 1 task")
     parser.add_argument("--dataset", type=Path, help="refit these recorded pairs instead of replaying")
-    parser.add_argument("--demonstrations", type=Path, default=DEFAULT_DEMONSTRATIONS,
+    parser.add_argument("--demonstrations", type=Path,
                         help="explicit frozen demonstration-source manifest")
-    parser.add_argument("--heldout", type=Path, default=DEFAULT_HELDOUT,
+    parser.add_argument("--heldout", type=Path,
                         help="frozen held-out manifest used for the overlap check")
     parser.add_argument("--routes-only", action="store_true",
                         help="use only route entries declared in the demonstration manifest")
@@ -166,6 +177,20 @@ def main() -> int:
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
 
+    try:
+        definition = resolve_task_definition(args.task_definition)
+        identity = task_identity(definition)
+    except TaskDefinitionError as error:
+        parser.error(str(error))
+    if args.demonstrations is None:
+        if args.task_definition:
+            parser.error("--demonstrations is required with --task-definition")
+        args.demonstrations = DEFAULT_DEMONSTRATIONS
+    if args.heldout is None:
+        if args.task_definition:
+            parser.error("--heldout is required with --task-definition")
+        args.heldout = DEFAULT_HELDOUT
+
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
     if refusal:
@@ -173,20 +198,28 @@ def main() -> int:
         return 2
     try:
         demonstrations_manifest, demonstration_entries, heldout_manifest = load_manifests(
-            args.demonstrations, args.heldout, args.routes_only)
-    except (OSError, json.JSONDecodeError, DemonstrationManifestError, HeldoutManifestError) as error:
+            args.demonstrations, args.heldout, args.routes_only, identity)
+        materialized_demonstrations = materialize_demonstrations(demonstration_entries, REPO, identity)
+    except (OSError, json.JSONDecodeError, DemonstrationManifestError, HeldoutManifestError,
+            TaskDefinitionError) as error:
         print(f"Cannot establish demonstration/held-out separation: {error}")
         return 2
-    output_dir = REPO / "runs" / "clone" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_root = REPO / "runs" / "clone"
+    if args.task_definition:
+        output_root /= definition.name
+    output_dir = output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
     results = {
         **git,
+        "task": identity,
         "args": {k: str(v) for k, v in vars(args).items()},
         "manifests": {
             "demonstrations": str(args.demonstrations),
             "demonstrations_sha256": demonstrations_manifest["sha256"],
+            "demonstrations_file_sha256": hashlib.sha256(args.demonstrations.read_bytes()).hexdigest(),
             "heldout": str(args.heldout),
             "heldout_sha256": heldout_manifest["sha256"],
+            "heldout_file_sha256": hashlib.sha256(args.heldout.read_bytes()).hexdigest(),
         },
     }
 
@@ -194,7 +227,7 @@ def main() -> int:
     try:
         if args.dataset:
             audit = verify_dataset_manifest(args.dataset, demonstrations_manifest["sha256"],
-                                            heldout_manifest["sha256"])
+                                            heldout_manifest["sha256"], identity)
             declared_hashes = {entry["route_sha256"] for entry in demonstration_entries}
             if not set(audit["demonstration_route_sha256s"]).issubset(declared_hashes):
                 raise DemonstrationManifestError(
@@ -203,11 +236,10 @@ def main() -> int:
             results["provenance"] = [{"dataset": str(args.dataset), **audit}]
             print(f"Refitting {len(data)} frames from {args.dataset}")
         else:
-            demos = materialize_demonstrations(demonstration_entries, REPO)
-            print(f"{len(demos)} demonstrations to replay")
+            print(f"{len(materialized_demonstrations)} demonstrations to replay")
             game = GameSession(args.game_dir)
             http = CelesteBridge(output_dir / "episode.tas")
-            env = CelesteRoomEnv(LockstepBridge(http))
+            env = CelesteRoomEnv(LockstepBridge(http), task=definition.task, task_start=definition.start)
             manifest = runtime.collect(args.game_dir, http._prefix_lines())
             problems = runtime.check(manifest, runtime.load_pins())
             if problems and not args.allow_runtime_mismatch:
@@ -215,12 +247,12 @@ def main() -> int:
                 return 2
             results["runtime_problems"] = problems
             results["attributable"] = runtime.attributable(git, problems)
-            data, results["provenance"] = record(env, demos)
+            data, results["provenance"] = record(env, materialized_demonstrations)
             dataset = output_dir / "dataset.npz"
             save(dataset, data)
             used_hashes = [item["route_sha256"] for item in results["provenance"] if item["used"]]
             results["dataset_manifest"] = write_dataset_manifest(
-                dataset, demonstrations_manifest["sha256"], heldout_manifest["sha256"], used_hashes)
+                dataset, demonstrations_manifest["sha256"], heldout_manifest["sha256"], used_hashes, identity)
 
         train, holdout = split_by_trajectory(data, args.holdout, args.seed)
         print(f"\n{len(data)} frames over {len(data.trajectories)} demonstrations: "

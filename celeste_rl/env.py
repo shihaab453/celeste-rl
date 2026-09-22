@@ -135,11 +135,14 @@ class CelesteRoomEnv(gym.Env):
         if state is None:
             return None
         position, speed = state["Player"]["Position"], state["Player"]["Speed"]
+        bounds = state.get("Level", {}).get("Bounds", {})
+        room_x = position["X"] - bounds.get("X", 0)
+        room_y = position["Y"] - bounds.get("Y", 0)
         player = extras.get("player", {}) if isinstance(extras, dict) else {}
-        return {"x": position["X"], "y": position["Y"], "speed_x": speed["X"], "speed_y": speed["Y"],
-                "dashes": player.get("Dashes")}
+        return {"x": position["X"], "y": position["Y"], "room_x": room_x, "room_y": room_y,
+                "speed_x": speed["X"], "speed_y": speed["Y"], "dashes": player.get("Dashes")}
 
-    def _replay(self, start: Start):
+    def _replay(self, start: Start, task_start_frames: int = 0):
         """Play a start's inputs from the canonical start. Returns (observation, obs, problem); problem is None
         on success and a short reason otherwise.
 
@@ -151,16 +154,18 @@ class CelesteRoomEnv(gym.Env):
         observation, obs = None, None
         for index, line in enumerate(start.lines, start=1):
             applied = apply_disabled(parse_line(line), self._mask)
+            elapsed = max(0, index - task_start_frames)
             try:
                 observation = self.bridge.step(*to_parts(applied))
-                ending = classify(observation.events, observation.state, index, self.task)
-                obs = self._builder.step(observation.state, observation.extras, applied, index)
+                ending = classify(observation.events, observation.state, elapsed, self.task)
+                obs = self._builder.step(observation.state, observation.extras, applied, elapsed)
             except (EndingFault, SchemaViolation) as error:
                 return observation, obs, f"frame {index} of the prefix could not be interpreted: {error}"
             # A later task's canonical recipe crosses earlier room boundaries. Transitions are setup, not an
             # ending, until the replay reaches the declared task start. Death, restart, leaving the level and
             # exhausting the deadline still invalidate the recipe.
-            if ending is not None and ending not in (SUCCESS, WRONG_ROOM):
+            setup_transition = index <= task_start_frames and ending in (SUCCESS, WRONG_ROOM)
+            if ending is not None and not setup_transition:
                 return observation, obs, f"the prefix ended the episode at frame {index} ({ending})"
         facts = self._player_facts(observation.state, observation.extras)
         if facts is None:
@@ -182,13 +187,14 @@ class CelesteRoomEnv(gym.Env):
         if sampled is None and self.start_sampler is not None and not options.get("canonical"):
             sampled = self.start_sampler()
         start = sampled if sampled is not None else self.task_start
+        base_frames = self.task_start.frames if self.task_start is not None else 0
         problem = None
         try:
             observation = self.bridge.reset()
             self._check_start(observation)
             obs = self._builder.reset(observation.state, observation.extras)
             if start is not None:
-                replayed, replayed_obs, problem = self._replay(start)
+                replayed, replayed_obs, problem = self._replay(start, base_frames)
                 if problem is None:
                     observation, obs = replayed, replayed_obs
                 else:
@@ -201,14 +207,13 @@ class CelesteRoomEnv(gym.Env):
                     obs = self._builder.reset(observation.state, observation.extras)
                     start = self.task_start
                     if start is not None:
-                        replayed, replayed_obs, fallback_problem = self._replay(start)
+                        replayed, replayed_obs, fallback_problem = self._replay(start, base_frames)
                         if fallback_problem is not None:
                             raise BridgeFault(f"task start no longer replays: {fallback_problem}")
                         observation, obs = replayed, replayed_obs
         except (BridgeError, SchemaViolation) as error:
             raise BridgeFault(f"reset failed: {error}") from error
         used_sample = sampled if problem is None else None
-        base_frames = self.task_start.frames if self.task_start is not None else 0
         self._elapsed = max(0, used_sample.frames - base_frames) if used_sample is not None else 0
         self._lines = list(start.lines) if (start is not None and self.archive is not None) else []
         self._start, self._start_problem = used_sample, problem
@@ -259,7 +264,8 @@ class CelesteRoomEnv(gym.Env):
             self.archive.record_outcome(self._start, ending == SUCCESS)
         if self.archive is not None:
             self._lines.append(to_line(applied))
-            if player is not None and self.archive.would_keep((player["x"], player["y"]), len(self._lines)):
+            if (not terminated and observation.room == self.task.start_room and player is not None
+                    and self.archive.would_keep((player["x"], player["y"]), len(self._lines))):
                 self.archive.offer(Start(tuple(self._lines), (player["x"], player["y"]), observation.room,
                                          player["dashes"]))
         info = self._info(ending=ending, events=observation.events, reward_components=components,

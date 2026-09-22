@@ -5,6 +5,8 @@ import hashlib
 import json
 from collections.abc import Iterable
 
+from celeste_rl.tasks import TaskDefinitionError, require_task_identity
+
 FORMAT_VERSION = 3
 
 
@@ -45,7 +47,7 @@ def canonical_entry(entry: dict) -> dict:
     if entry["frames"] != len(entry["lines"]):
         raise HeldoutManifestError(
             f"held-out entry says {entry['frames']} frames but contains {len(entry['lines'])} input lines")
-    return {
+    canonical = {
         "route": entry["route"],
         "route_sha256": entry["route_sha256"],
         "search_seed": entry["search_seed"],
@@ -55,6 +57,19 @@ def canonical_entry(entry: dict) -> dict:
         "dashes": entry["dashes"],
         "lines": list(entry["lines"]),
     }
+    if "task_frames" in entry:
+        task_frames = entry["task_frames"]
+        if (not isinstance(task_frames, int) or isinstance(task_frames, bool) or task_frames < 0
+                or task_frames > entry["frames"]):
+            raise HeldoutManifestError("held-out entry task_frames must be between zero and frames")
+        canonical["task_frames"] = task_frames
+    if "room_position" in entry:
+        room_position = entry["room_position"]
+        if (not isinstance(room_position, (list, tuple)) or len(room_position) != 2
+                or any(not isinstance(value, (int, float)) or isinstance(value, bool) for value in room_position)):
+            raise HeldoutManifestError("held-out entry room_position must contain two numbers")
+        canonical["room_position"] = list(room_position)
+    return canonical
 
 
 def state_id(entry: dict) -> str:
@@ -78,8 +93,13 @@ def freeze_entries(entries: Iterable[dict]) -> list[dict]:
     return frozen
 
 
-def validate_manifest(manifest: dict) -> list[dict]:
+def validate_manifest(manifest: dict, expected_task: dict | None = None) -> list[dict]:
     """Validate the version, complete-set hash, metadata, IDs, and uniqueness."""
+    if expected_task is not None:
+        try:
+            require_task_identity(manifest, expected_task, "held-out manifest")
+        except TaskDefinitionError as error:
+            raise HeldoutManifestError(str(error)) from error
     if manifest.get("format_version") != FORMAT_VERSION:
         raise HeldoutManifestError(
             f"held-out format {manifest.get('format_version')!r} is unsupported; regenerate format {FORMAT_VERSION}")
@@ -108,4 +128,11 @@ def validate_manifest(manifest: dict) -> list[dict]:
               "max": max(entry["frames"] for entry in entries)}
     if manifest.get("frames") != frames:
         raise HeldoutManifestError("held-out frame metadata does not match the entries")
+    task_frames = [entry.get("task_frames") for entry in entries]
+    if any(value is not None for value in task_frames):
+        if any(value is None for value in task_frames):
+            raise HeldoutManifestError("held-out task_frames must be present on every entry or none")
+        expected_task_frames = {"min": min(task_frames), "max": max(task_frames)}
+        if manifest.get("task_frames") != expected_task_frames:
+            raise HeldoutManifestError("held-out task-frame metadata does not match the entries")
     return entries

@@ -2,6 +2,9 @@
 
 Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/make_heldout_starts.py --searches 6 --states 200
+    .venv-rl/Scripts/python.exe scripts/make_heldout_starts.py --task-definition config/room2.json \
+        --demonstrations config/demonstrations-room2.json --routes-dir runs/room2-heldout-routes \
+        --output config/heldout_starts-room2.json
 
 Every result this project has reported comes from one fixed start in a deterministic game, so a success rate
 measures how robust a policy's own sampling is around a single route rather than whether it can play the room.
@@ -12,15 +15,17 @@ reachable entry states**, from a generator frozen before training and never samp
 itself reached while training, and training samples from it. These come from fresh runs of
 `scripts/find_room_exit.py`, a search that never runs during training. Its routes are written to a dedicated
 held-out namespace, and their complete-route hashes are checked against the explicit demonstration manifest
-before cloning. They are sampled along the whole route rather than wherever a policy happened to get to.
+during generation and again before cloning. They are sampled along the whole route rather than wherever a
+policy happened to get to.
 Nothing in the training path reads the file this writes. That separation is the entire point: a test set a
 policy can be trained toward is not a test set.
 
-**Reachable by construction.** A state is stored as the input lines that reach it from the canonical start, the
+**Reachable by construction.** A state is stored as the input lines that reach it from the base savestate, the
 same recipe form the archive uses, so replaying it is the proof that it is legal and reachable. Every candidate
-is replayed here and dropped unless it arrives where it says, alive and in room 1.
+is replayed here and dropped unless it arrives where it says, alive and in the task's start room.
 
-The result is written to `config/heldout_starts.json` and committed, so the set is fixed and auditable. It
+Room 1 defaults to `config/heldout_starts.json`; named tasks get their own output or an explicit `--output`.
+The result is committed so the set is fixed and auditable. It
 carries a sha256 over the states, which the evaluator records, so a number can always name the test set it was
 measured against. **Regenerating it invalidates comparisons with anything measured against the old one.**
 """
@@ -39,14 +44,28 @@ sys.path.insert(0, str(REPO))
 from celeste_rl import runtime  # noqa: E402
 from celeste_rl.actions import parse_line  # noqa: E402
 from celeste_rl.bridge import CelesteBridge, format_input_line  # noqa: E402
-from celeste_rl.demonstrations import route_sha256  # noqa: E402
+from celeste_rl.demonstrations import (  # noqa: E402
+    DemonstrationManifestError,
+    materialize_demonstrations,
+    reject_heldout_overlap,
+    route_sha256,
+    validate_demonstration_manifest,
+)
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.heldout import FORMAT_VERSION, freeze_entries, manifest_sha256, state_id  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.starts import Start  # noqa: E402
+from celeste_rl.tasks import (  # noqa: E402
+    TaskDefinition,
+    TaskDefinitionError,
+    canonical_task_identity,
+    resolve_task_definition,
+    task_identity,
+)
 from celeste_rl.training.game import GameSession  # noqa: E402
 
 DEFAULT_OUTPUT = REPO / "config" / "heldout_starts.json"
+DEFAULT_DEMONSTRATIONS = REPO / "config" / "demonstrations.json"
 HELDOUT_ROUTES = REPO / "runs" / "heldout-routes"
 # This is only the deterministic search-seed starting point. Namespace and content hashes enforce separation.
 FIRST_SEED = 100
@@ -56,9 +75,36 @@ def load_route(path: Path) -> dict:
     return json.loads((path / "route.json").read_text(encoding="utf-8"))
 
 
-def route_recipe(path: Path) -> tuple[str, ...] | None:
+def task_path(value: str) -> str:
+    path = Path(value)
+    if path.is_absolute():
+        try:
+            return path.resolve().relative_to(REPO.resolve()).as_posix()
+        except ValueError:
+            return path.as_posix()
+    return str(value).replace("\\", "/")
+
+
+def route_recipe(path: Path, definition: TaskDefinition | None = None) -> tuple[str, ...] | None:
     """The part of a successful route that can contribute held-out starts."""
     route = load_route(path)
+    if definition is not None and definition.definition_path is not None:
+        expected_identity = task_identity(definition)
+        if "task" in route:
+            try:
+                declared_identity = canonical_task_identity(route["task"])
+            except TaskDefinitionError as error:
+                raise ValueError(f"route {path.name} has invalid task identity: {error}") from error
+            if declared_identity != expected_identity:
+                raise ValueError(f"route {path.name} task identity does not match {definition.name}")
+        expected = task_path(definition.definition_path)
+        declared = task_path(str(route.get("task_definition") or ""))
+        if declared != expected:
+            raise ValueError(f"route {path.name} task definition {declared!r} does not match {expected!r}")
+        if (route.get("start_room"), route.get("next_room")) != (
+                definition.task.start_room, definition.task.target_room):
+            raise ValueError(f"route {path.name} does not match rooms "
+                             f"{definition.task.start_room}->{definition.task.target_room}")
     step = route.get("transition_step")
     if not step or len(route.get("actions", [])) < step:
         return None
@@ -91,11 +137,11 @@ def unused_search_seeds(routes: list[Path], count: int) -> list[int]:
     return chosen
 
 
-def unique_routes(routes: list[Path]) -> tuple[list[Path], list[Path]]:
+def unique_routes(routes: list[Path], definition: TaskDefinition | None = None) -> tuple[list[Path], list[Path]]:
     """Keep one path for each distinct successful action trace."""
     unique, duplicates, seen = [], [], set()
     for path in sorted(set(routes)):
-        recipe = route_recipe(path)
+        recipe = route_recipe(path, definition)
         if recipe is None:
             continue
         if recipe in seen:
@@ -111,19 +157,34 @@ def require_minimum_routes(routes: list[Path], minimum: int) -> None:
         raise ValueError(f"only {len(routes)} unique routes were produced; {minimum} required")
 
 
-def search_command(seed: int, game_dir: Path, minutes: float, routes_dir: Path) -> list[str]:
-    return [str(REPO / ".venv-rl" / "Scripts" / "python.exe"),
-            str(REPO / "scripts" / "find_room_exit.py"), "--seed", str(seed),
-            "--game-dir", str(game_dir), "--max-minutes", str(minutes),
-            "--output-root", str(routes_dir)]
+def reject_demonstration_routes(routes: list[Path], demonstrations: list[dict],
+                                definition: TaskDefinition) -> None:
+    """Reject evaluation routes whose complete task-relative transition trace appears in training data."""
+    heldout = []
+    for path in routes:
+        recipe = route_recipe(path, definition if definition.definition_path else None)
+        if recipe is not None:
+            heldout.append({"route_sha256": route_sha256(recipe)})
+    reject_heldout_overlap(demonstrations, heldout)
 
 
-def search(seed: int, game_dir: Path, minutes: float, routes_dir: Path = HELDOUT_ROUTES) -> Path | None:
+def search_command(seed: int, game_dir: Path, minutes: float, routes_dir: Path,
+                   task_definition: Path | None = None) -> list[str]:
+    command = [str(REPO / ".venv-rl" / "Scripts" / "python.exe"),
+               str(REPO / "scripts" / "find_room_exit.py"), "--seed", str(seed),
+               "--game-dir", str(game_dir), "--max-minutes", str(minutes)]
+    if task_definition is not None:
+        command += ["--task-definition", str(task_definition)]
+    return command + ["--output-root", str(routes_dir)]
+
+
+def search(seed: int, game_dir: Path, minutes: float, routes_dir: Path = HELDOUT_ROUTES,
+           task_definition: Path | None = None) -> Path | None:
     """One fresh route from the Go-Explore search, isolated under the held-out namespace."""
     routes_dir.mkdir(parents=True, exist_ok=True)
     before = {p.name for p in routes_dir.glob("*")}
     result = subprocess.run(
-        search_command(seed, game_dir, minutes, routes_dir),
+        search_command(seed, game_dir, minutes, routes_dir, task_definition),
         cwd=REPO, capture_output=True, text=True)
     after = {p.name for p in routes_dir.glob("*")} - before
     if result.returncode != 0 or not after:
@@ -133,33 +194,37 @@ def search(seed: int, game_dir: Path, minutes: float, routes_dir: Path = HELDOUT
     return folder if (folder / "route.json").exists() else None
 
 
-def candidates(routes: list[Path], earliest: int, spacing: int) -> list[dict]:
+def candidates(routes: list[Path], earliest: int, spacing: int,
+               definition: TaskDefinition | None = None) -> list[dict]:
     """Every distinct sampled prefix, ordered across depths for later even selection."""
+    definition = definition or resolve_task_definition(None)
+    setup = definition.start.lines if definition.start is not None else ()
     picked, seen = [], set()
     for path in routes:
         route = load_route(path)
         step = route.get("transition_step")
         if not step:
             continue
-        lines = list(route_recipe(path) or ())
-        complete_route_sha256 = route_sha256(lines)
+        relative_lines = list(route_recipe(path, definition if definition.definition_path else None) or ())
+        complete_route_sha256 = route_sha256(relative_lines)
         # Stop short of the transition: a start one frame from the exit tests nothing.
         for frame in range(earliest, max(earliest, step - spacing), spacing):
-            prefix = tuple(lines[:frame])
+            relative_prefix = tuple(relative_lines[:frame])
+            prefix = tuple(setup) + relative_prefix
             if prefix in seen:
                 continue
             seen.add(prefix)
             picked.append({"route": path.name, "route_sha256": complete_route_sha256,
-                           "seed": route.get("seed"), "frames": frame,
+                           "seed": route.get("seed"), "frames": len(prefix), "task_frames": frame,
                            "lines": list(prefix)})
-    picked.sort(key=lambda c: (c["frames"], c["route"]))
+    picked.sort(key=lambda c: (c["task_frames"], c["route"]))
     return picked
 
 
 def select_states(states: list[dict], wanted: int) -> list[dict]:
     """Deduplicate validated states and select exactly `wanted`, evenly across route depths."""
     unique, seen = [], set()
-    for state in sorted(states, key=lambda s: (s["frames"], s["route"])):
+    for state in sorted(states, key=lambda s: (s.get("task_frames", s["frames"]), s["route"])):
         key = state_id(state)
         if key not in seen:
             seen.add(key)
@@ -172,27 +237,43 @@ def select_states(states: list[dict], wanted: int) -> list[dict]:
     return [unique[int(index * stride)] for index in range(wanted)]
 
 
-def validate(env: CelesteRoomEnv, candidate: dict) -> dict | None:
-    """Replay a candidate and keep it only if it arrives alive in room 1, where it says it does."""
-    provisional = Start(tuple(candidate["lines"]), (0.0, 0.0), "1", None)
+def validate(env: CelesteRoomEnv, candidate: dict, definition: TaskDefinition) -> dict | None:
+    """Measure a task-relative prefix, then prove its complete base-savestate recipe replays exactly."""
+    setup_frames = definition.start.frames if definition.start is not None else 0
+    relative_lines = candidate["lines"][setup_frames:]
     env.reset(options={"canonical": True})
     info = None
-    for line in candidate["lines"]:
+    for line in relative_lines:
         _, _, terminated, _, info = env.step(parse_line(line))
         if terminated:
             return None
     player = info["player"] if info else None
     if player is None:
         return None
+    start = Start(tuple(candidate["lines"]), (player["x"], player["y"]),
+                  definition.task.start_room, player["dashes"])
+    _, replay = env.reset(options={"start": start})
+    replayed_player = replay["player"]
+    if (replay["start"] != "archive" or replay["elapsed"] != candidate["task_frames"]
+            or replayed_player is None
+            or (replayed_player["x"], replayed_player["y"]) != start.position
+            or replayed_player["dashes"] != start.dashes):
+        return None
     return {"route": candidate["route"], "route_sha256": candidate["route_sha256"],
-            "search_seed": candidate["seed"], "frames": provisional.frames,
-            "room": "1", "position": [player["x"], player["y"]], "dashes": player["dashes"],
+            "search_seed": candidate["seed"], "frames": start.frames,
+            "task_frames": candidate["task_frames"], "room": definition.task.start_room,
+            "position": [player["x"], player["y"]],
+            "room_position": [player["room_x"], player["room_y"]], "dashes": player["dashes"],
             "lines": list(candidate["lines"])}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
+    parser.add_argument("--task-definition", type=Path,
+                        help="hash-pinned room task; omit for the original Room 1 task")
+    parser.add_argument("--demonstrations", type=Path,
+                        help="frozen training manifest whose routes must not overlap this evaluation set")
     parser.add_argument("--searches", type=int, default=6,
                         help="fresh search attempts; seeds already present on disk are skipped")
     parser.add_argument("--search-minutes", type=float, default=10)
@@ -201,11 +282,28 @@ def main() -> int:
                         help="minimum distinct complete-route hashes required before sampling states")
     parser.add_argument("--earliest", type=int, default=20, help="do not start an episode in its first frames")
     parser.add_argument("--spacing", type=int, default=12, help="frames between sampled states along a route")
-    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--routes-dir", type=Path,
+                        help="dedicated search namespace; defaults to the Room 1 namespace or a task-named one")
     parser.add_argument("--routes", nargs="*", type=Path, help="use these route directories instead of searching")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
+    try:
+        definition = resolve_task_definition(args.task_definition)
+        identity = task_identity(definition)
+    except TaskDefinitionError as error:
+        parser.error(str(error))
+    safe_name = "".join(character if character.isalnum() or character in "-_" else "-"
+                        for character in definition.name).strip("-")
+    output = args.output or (DEFAULT_OUTPUT if args.task_definition is None else
+                             REPO / "config" / f"heldout_starts-{safe_name}.json")
+    routes_dir = args.routes_dir or (HELDOUT_ROUTES if args.task_definition is None else
+                                     REPO / "runs" / f"heldout-routes-{safe_name}")
+    if args.demonstrations is None:
+        if args.task_definition:
+            parser.error("--demonstrations is required with --task-definition")
+        args.demonstrations = DEFAULT_DEMONSTRATIONS
     if args.searches < 0:
         parser.error("--searches must be non-negative")
     if args.states <= 0:
@@ -222,12 +320,22 @@ def main() -> int:
     if refusal:
         print(refusal)
         return 2
-    if args.output.exists():
-        print(f"{args.output} already exists. Regenerating it would invalidate every comparison measured "
+    if output.exists():
+        print(f"{output} already exists. Regenerating it would invalidate every comparison measured "
               "against the current set; delete it deliberately if that is what you mean to do.")
         return 2
+    try:
+        demonstration_manifest = json.loads(args.demonstrations.read_text(encoding="utf-8"))
+        demonstration_entries = validate_demonstration_manifest(demonstration_manifest, identity)
+        materialize_demonstrations(demonstration_entries, REPO, identity)
+    except (OSError, json.JSONDecodeError, DemonstrationManifestError) as error:
+        print(f"Cannot verify demonstration separation: {error}")
+        return 2
 
-    output_dir = REPO / "runs" / "heldout-starts" / datetime.now().strftime("%Y%m%d-%H%M%S")
+    output_root = REPO / "runs" / "heldout-starts"
+    if args.task_definition:
+        output_root /= safe_name
+    output_dir = output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
 
     # The searches run before this script takes the game. Each child launches its own copy, and the launch
@@ -236,18 +344,22 @@ def main() -> int:
     if args.routes:
         routes = list(args.routes)
     else:
-        routes_dir = HELDOUT_ROUTES
         routes = existing_heldout_routes(routes_dir)
         seeds = unused_search_seeds(routes, args.searches)
         if seeds:
             print(f"Searching with {len(seeds)} unused held-out seeds: {', '.join(map(str, seeds))}")
         for seed in seeds:
-            found = search(seed, args.game_dir, args.search_minutes, routes_dir)
+            found = search(seed, args.game_dir, args.search_minutes, routes_dir, args.task_definition)
             if found:
                 print(f"  seed {seed}: {found.name}")
                 routes.append(found)
 
-    routes, duplicate_routes = unique_routes(routes)
+    try:
+        routes, duplicate_routes = unique_routes(routes, definition if args.task_definition else None)
+        reject_demonstration_routes(routes, demonstration_entries, definition)
+    except (ValueError, DemonstrationManifestError) as error:
+        print(f"Cannot use held-out routes: {error}")
+        return 2
     if duplicate_routes:
         print(f"Ignoring {len(duplicate_routes)} duplicate route trace(s): "
               + ", ".join(path.name for path in duplicate_routes))
@@ -261,7 +373,7 @@ def main() -> int:
         print(f"{error}. Run more independent searches. Nothing was written.")
         return 1
 
-    chosen = candidates(routes, args.earliest, args.spacing)
+    chosen = candidates(routes, args.earliest, args.spacing, definition)
     if len(chosen) < args.states:
         print(f"Only {len(chosen)} unique candidate states are available; {args.states} requested. "
               "Run more independent searches. Nothing was written.")
@@ -269,7 +381,7 @@ def main() -> int:
 
     game = GameSession(args.game_dir)
     http = CelesteBridge(output_dir / "episode.tas")
-    env = CelesteRoomEnv(LockstepBridge(http))
+    env = CelesteRoomEnv(LockstepBridge(http), task=definition.task, task_start=definition.start)
     try:
         problems = runtime.check(runtime.collect(args.game_dir, http._prefix_lines()), runtime.load_pins())
         if problems and not args.allow_runtime_mismatch:
@@ -279,7 +391,7 @@ def main() -> int:
         print(f"\n{len(chosen)} unique candidate states from {len(routes)} routes; validating each by replay")
         states = []
         for index, candidate in enumerate(chosen, start=1):
-            kept = validate(env, candidate)
+            kept = validate(env, candidate, definition)
             if kept:
                 states.append(kept)
             if index % 25 == 0:
@@ -295,24 +407,28 @@ def main() -> int:
         return 1
     entries = freeze_entries(states)
     digest = manifest_sha256(entries)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps({
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps({
         "format_version": FORMAT_VERSION,
         "generated": datetime.now().isoformat(timespec="seconds"),
         "commit": git["commit"],
         "generator": "scripts/find_room_exit.py, isolated held-out route namespace, unique route hashes",
         "note": "Evaluation only. Nothing in the training path may read this file.",
+        "task": identity,
         "sha256": digest, "states": len(entries),
         "routes": sorted({entry["route"] for entry in entries}),
         "frames": {"min": min(entry["frames"] for entry in entries),
-                   "max": max(entry["frames"] for entry in entries)},
+                    "max": max(entry["frames"] for entry in entries)},
+        "task_frames": {"min": min(entry["task_frames"] for entry in entries),
+                         "max": max(entry["task_frames"] for entry in entries)},
         "entries": entries,
     }, indent=1), encoding="utf-8")
-    xs = sorted(entry["position"][0] for entry in entries)
-    print(f"\n{len(entries)} held-out starts written to {args.output}")
-    print(f"  sha256 {digest[:16]}, prefixes {min(entry['frames'] for entry in entries)} to "
-          f"{max(entry['frames'] for entry in entries)} frames")
-    print(f"  x from {xs[0]} to {xs[-1]}, median {xs[len(xs) // 2]}")
+    xs = sorted(entry["room_position"][0] for entry in entries)
+    print(f"\n{len(entries)} held-out starts written to {output}")
+    print(f"  sha256 {digest[:16]}, task-relative prefixes "
+          f"{min(entry['task_frames'] for entry in entries)} to "
+          f"{max(entry['task_frames'] for entry in entries)} frames")
+    print(f"  room-local x from {xs[0]} to {xs[-1]}, median {xs[len(xs) // 2]}")
     return 0
 
 

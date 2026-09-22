@@ -8,7 +8,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from celeste_rl.tasks import TaskDefinitionError, load_task_definition
+from celeste_rl.tasks import (
+    TaskDefinitionError,
+    canonical_task_identity,
+    load_task_definition,
+    manifest_task_identity,
+    require_task_identity,
+    task_identity,
+)
 
 
 class TaskDefinitionTests(unittest.TestCase):
@@ -52,6 +59,10 @@ class TaskDefinitionTests(unittest.TestCase):
         self.assertEqual(definition.start.lines, ("1,R", "1,U,X"))
         self.assertEqual((definition.start.position, definition.start.room, definition.start.dashes),
                          ((261, 1), "2", 0))
+        identity = task_identity(definition)
+        self.assertEqual(identity["task_definition"], "task.json")
+        self.assertEqual(identity["source_route_sha256"], hashlib.sha256(self.route.read_bytes()).hexdigest())
+        self.assertEqual((identity["start_room"], identity["target_room"]), ("2", "3"))
 
     def test_source_route_hash_is_enforced(self) -> None:
         path = self.definition()
@@ -69,6 +80,25 @@ class TaskDefinitionTests(unittest.TestCase):
 
         with self.assertRaisesRegex(TaskDefinitionError, "needs a source route"):
             self.load(path)
+
+    def test_a_legacy_manifest_is_room_1_and_refuses_a_later_task(self) -> None:
+        definition = self.load(self.definition())
+
+        legacy = manifest_task_identity({})
+
+        self.assertEqual((legacy["start_room"], legacy["target_room"]), ("1", "2"))
+        with self.assertRaisesRegex(TaskDefinitionError, "task identity does not match"):
+            require_task_identity({}, task_identity(definition), "manifest")
+
+    def test_later_room_identity_requires_both_hash_pins(self) -> None:
+        definition = self.load(self.definition())
+        identity = task_identity(definition)
+
+        with self.assertRaisesRegex(TaskDefinitionError, "source-route SHA-256"):
+            canonical_task_identity({**identity, "source_route_sha256": None})
+        with self.assertRaisesRegex(TaskDefinitionError, "task definition"):
+            canonical_task_identity({**identity, "task_definition": None,
+                                     "task_definition_sha256": None})
 
 
 if __name__ == "__main__":

@@ -13,7 +13,10 @@ from celeste_rl.heldout import (
     state_id,
     validate_manifest,
 )
-from scripts.evaluate_heldout import route_summaries
+from scripts.evaluate_heldout import entry_start, route_summaries
+from celeste_rl.endings import RoomTask
+from celeste_rl.starts import Start
+from celeste_rl.tasks import TaskDefinition, base_task_definition, task_identity
 
 
 def entry(route: str = "route-a", seed: int = 100, line: str = "1,R") -> dict:
@@ -31,7 +34,7 @@ def entry(route: str = "route-a", seed: int = 100, line: str = "1,R") -> dict:
 
 def manifest(entries: list[dict]) -> dict:
     frozen = freeze_entries(entries)
-    return {
+    data = {
         "format_version": FORMAT_VERSION,
         "sha256": manifest_sha256(frozen),
         "states": len(frozen),
@@ -40,6 +43,10 @@ def manifest(entries: list[dict]) -> dict:
                    "max": max(item["frames"] for item in frozen)},
         "entries": frozen,
     }
+    task_frames = [item.get("task_frames") for item in frozen]
+    if any(value is not None for value in task_frames):
+        data["task_frames"] = {"min": min(task_frames), "max": max(task_frames)}
+    return data
 
 
 class ManifestTests(unittest.TestCase):
@@ -104,6 +111,65 @@ class ManifestTests(unittest.TestCase):
 
         with self.assertRaisesRegex(HeldoutManifestError, "does not match its state_id"):
             validate_manifest(tampered)
+
+    def test_task_relative_and_room_local_fields_round_trip(self):
+        source = {**entry(), "task_frames": 1, "room_position": [19.0, 152.0]}
+
+        validated = validate_manifest(manifest([source]))
+
+        self.assertEqual(validated[0]["task_frames"], 1)
+        self.assertEqual(validated[0]["room_position"], [19.0, 152.0])
+
+    def test_manifest_task_identity_must_match(self):
+        data = manifest([entry()])
+        data["task"] = {**task_identity(base_task_definition()), "name": "other"}
+
+        with self.assertRaisesRegex(HeldoutManifestError, "task identity does not match"):
+            validate_manifest(data, task_identity(base_task_definition()))
+
+    def test_entry_start_uses_task_relative_frames_and_room_local_position(self):
+        source = {**entry(), "task_frames": 1, "room_position": [19.0, 152.0]}
+
+        start, task_frames, room_position = entry_start(source, base_task_definition())
+
+        self.assertEqual(start.frames, 1)
+        self.assertEqual(task_frames, 1)
+        self.assertEqual(room_position, (19.0, 152.0))
+
+    def test_later_room_entry_requires_and_strips_the_pinned_setup_for_timing(self):
+        definition = TaskDefinition(
+            "room-2", RoomTask("2", "3"), Start(("1,R", "1,R"), (261, 1), "2", 0))
+        source = {
+            **entry(line="1,R"),
+            "frames": 3,
+            "task_frames": 1,
+            "room": "2",
+            "position": [340.0, 152.0],
+            "room_position": [20.0, 152.0],
+            "lines": ["1,R", "1,R", "1,R"],
+        }
+
+        start, task_frames, room_position = entry_start(source, definition)
+
+        self.assertEqual(start.frames, 3)
+        self.assertEqual(task_frames, 1)
+        self.assertEqual(room_position, (20.0, 152.0))
+
+    def test_later_room_entry_rejects_a_different_setup_recipe(self):
+        definition = TaskDefinition(
+            "room-2", RoomTask("2", "3"), Start(("1,R", "1,R"), (261, 1), "2", 0))
+        source = {
+            **entry(line="1,L"),
+            "frames": 3,
+            "task_frames": 1,
+            "room": "2",
+            "position": [340.0, 152.0],
+            "room_position": [20.0, 152.0],
+            "lines": ["1,L", "1,R", "1,R"],
+        }
+
+        with self.assertRaisesRegex(HeldoutManifestError, "task-start recipe"):
+            entry_start(source, definition)
 
 
 class RouteSummaryTests(unittest.TestCase):

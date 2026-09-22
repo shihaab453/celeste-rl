@@ -41,7 +41,13 @@ from celeste_rl import game_process  # noqa: E402
 from celeste_rl.actions import parse_line, to_parts  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
-from celeste_rl.tasks import TaskDefinition, TaskDefinitionError, load_task_definition  # noqa: E402
+from celeste_rl.tasks import (  # noqa: E402
+    TaskDefinition,
+    TaskDefinitionError,
+    base_task_definition,
+    load_task_definition,
+    task_identity,
+)
 
 TILE = 8
 # Button combinations for random bursts: move, jump, dash in eight directions, grab/climb.
@@ -51,11 +57,14 @@ MACROS = ["R", "L", "", "J", "RJ", "LJ", "RX", "LX", "UX", "URX", "ULX", "DRX", 
 
 def tile_map(state: dict) -> tuple[list[str], set[tuple[int, int]]]:
     rows = state["SolidsData"].split("\n")
+    bounds = state["Level"]["Bounds"]
     blocked = set()
     for spike in state["Spikes"]:
         b = spike["Bounds"]
-        for tx in range(int(b["X"] // TILE), int((b["X"] + b["W"] - 1) // TILE) + 1):
-            for ty in range(int(b["Y"] // TILE), int((b["Y"] + b["H"] - 1) // TILE) + 1):
+        for tx in range(int((b["X"] - bounds["X"]) // TILE),
+                        int((b["X"] + b["W"] - 1 - bounds["X"]) // TILE) + 1):
+            for ty in range(int((b["Y"] - bounds["Y"]) // TILE),
+                            int((b["Y"] + b["H"] - 1 - bounds["Y"]) // TILE) + 1):
                 blocked.add((tx, ty))
     return rows, blocked
 
@@ -86,6 +95,11 @@ def player_tile(state: dict) -> tuple[int, int]:
     bounds = state["Level"]["Bounds"]
     # Position is the bottom centre of the hitbox; use a point inside the body.
     return int((position["X"] - bounds["X"]) // TILE), int((position["Y"] - 4 - bounds["Y"]) // TILE)
+
+
+def live_in_room(observation, room: str) -> bool:
+    """Whether a continuation frame still has a player in the room it is meant to validate."""
+    return observation.state is not None and observation.room == room
 
 
 def random_burst(rng: random.Random, frames: int) -> list[str]:
@@ -135,6 +149,7 @@ def main() -> int:
         definition = load_task_definition(args.task_definition) if args.task_definition else None
     except TaskDefinitionError as error:
         parser.error(str(error))
+    identity = task_identity(definition or base_task_definition())
 
     output_dir = args.output_root / datetime.now().strftime("%Y%m%d-%H%M%S")
     output_dir.mkdir(parents=True)
@@ -154,6 +169,7 @@ def main() -> int:
         deadline = time.perf_counter() + args.max_minutes * 60
         rollouts = 0
         route = None
+        next_room = None
 
         while route is None and time.perf_counter() < deadline:
             # Prefer tiles close to the exit that have not been tried much.
@@ -174,6 +190,7 @@ def main() -> int:
                 if observation.room != start_room:
                     if target_room is None or observation.room == target_room:
                         route = actions
+                        next_room = observation.room
                     break
                 reached = player_tile(observation.state)
                 if reached in distance and (reached not in archive or len(actions) < len(archive[reached])):
@@ -201,7 +218,7 @@ def main() -> int:
             for buttons in extension:
                 observation = bridge.step(buttons)
                 freeze_frames += (observation.diagnostics or {}).get("freeze_timer", 0) > 0
-                if observation.state is None or observation.room == start_room:
+                if not live_in_room(observation, next_room):
                     survived = False
                     break
             if survived and freeze_frames > 0:
@@ -213,15 +230,16 @@ def main() -> int:
         full = route + extension
         (output_dir / "route.json").write_text(json.dumps({
             "start_room": start_room,
-            "next_room": observation.room,
+            "next_room": next_room,
             "transition_step": transition_index,
             "frames": len(full),
             "freeze_frames_after_transition": freeze_frames,
             "actions": full,
             "seed": args.seed,
             "task_definition": str(args.task_definition) if args.task_definition else None,
+            "task": identity,
         }, indent=1), encoding="utf-8")
-        print(f"Route: {len(full)} frames, room {start_room} -> {observation.room} at step {transition_index}, "
+        print(f"Route: {len(full)} frames, room {start_room} -> {next_room} at step {transition_index}, "
               f"{freeze_frames} freeze frames after the transition")
         print(f"Saved {output_dir / 'route.json'}")
         return 0

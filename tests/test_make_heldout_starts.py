@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from celeste_rl.demonstrations import route_sha256
+from celeste_rl.demonstrations import DemonstrationManifestError, route_sha256
+from celeste_rl.tasks import load_task_definition, task_identity
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -16,6 +17,7 @@ from make_heldout_starts import (  # noqa: E402
     candidates,
     existing_heldout_routes,
     require_minimum_routes,
+    reject_demonstration_routes,
     search_command,
     select_states,
     unique_routes,
@@ -31,6 +33,23 @@ def write_route(root: Path, name: str, seed: int, actions: list[str]) -> Path:
         "transition_step": len(actions),
         "actions": actions,
     }), encoding="utf-8")
+    return path
+
+
+def write_room2_route(root: Path, name: str, seed: int, actions: list[str], include_identity: bool = False) -> Path:
+    path = root / name
+    path.mkdir()
+    document = {
+        "seed": seed,
+        "start_room": "2",
+        "next_room": "3",
+        "task_definition": "config\\room2.json",
+        "transition_step": len(actions),
+        "actions": actions,
+    }
+    if include_identity:
+        document["task"] = task_identity(load_task_definition("config/room2.json"))
+    (path / "route.json").write_text(json.dumps(document), encoding="utf-8")
     return path
 
 
@@ -63,6 +82,12 @@ class RouteSelectionTests(unittest.TestCase):
 
         self.assertEqual(command[-2:], ["--output-root", str(routes_dir)])
         self.assertNotIn("runs/routes", " ".join(command).replace("\\", "/"))
+
+    def test_search_child_receives_the_task_definition(self):
+        command = search_command(100, Path("C:/game"), 5.0, Path("C:/routes"), Path("config/room2.json"))
+
+        self.assertIn("--task-definition", command)
+        self.assertEqual(command[command.index("--task-definition") + 1], "config\\room2.json")
 
     def test_identical_route_traces_are_kept_once(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -98,6 +123,51 @@ class RouteSelectionTests(unittest.TestCase):
             self.assertEqual(sum(len(key) == 1 for key in keys), 1)
             self.assertEqual(sum(len(key) == 2 for key in keys), 1)
             self.assertTrue(all(len(candidate["route_sha256"]) == 64 for candidate in picked))
+
+    def test_later_room_candidates_include_the_pinned_setup_prefix(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            route = write_room2_route(root, "room2", 100, ["R", "J", "R", "L"])
+            definition = load_task_definition("config/room2.json")
+
+            picked = candidates([route], earliest=1, spacing=1, definition=definition)
+
+            self.assertTrue(picked)
+            self.assertEqual(tuple(picked[0]["lines"][:definition.start.frames]), definition.start.lines)
+            self.assertEqual(picked[0]["task_frames"], 1)
+            self.assertEqual(picked[0]["frames"], definition.start.frames + 1)
+
+    def test_later_room_route_with_another_task_identity_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            route = write_room2_route(root, "room2", 100, ["R", "J"])
+            document = json.loads((route / "route.json").read_text(encoding="utf-8"))
+            document["task_definition"] = "config/other.json"
+            (route / "route.json").write_text(json.dumps(document), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "task definition"):
+                unique_routes([route], load_task_definition("config/room2.json"))
+
+    def test_later_room_route_with_another_task_hash_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            route = write_room2_route(root, "room2", 100, ["R", "J"], include_identity=True)
+            document = json.loads((route / "route.json").read_text(encoding="utf-8"))
+            document["task"]["task_definition_sha256"] = "0" * 64
+            (route / "route.json").write_text(json.dumps(document), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "task identity"):
+                unique_routes([route], load_task_definition("config/room2.json"))
+
+    def test_demonstration_route_cannot_enter_the_evaluation_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            route = write_room2_route(root, "room2", 100, ["R", "J"], include_identity=True)
+            definition = load_task_definition("config/room2.json")
+            demonstrations = [{"route_sha256": route_sha256(["1,R", "1,J"])}]
+
+            with self.assertRaisesRegex(DemonstrationManifestError, "overlap"):
+                reject_demonstration_routes([route], demonstrations, definition)
 
 
 class StateSelectionTests(unittest.TestCase):

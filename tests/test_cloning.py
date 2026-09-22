@@ -12,9 +12,14 @@ import torch as th
 from stable_baselines3 import PPO
 
 from celeste_rl.cloning import OBS_KEYS, Demonstrations, accuracy, clone, split_by_trajectory
+from celeste_rl.endings import RoomTask
+from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.observation import observation_space
 from celeste_rl.schema import ACTION_INPUTS, MENU_INPUTS
+from celeste_rl.starts import Start
 from celeste_rl.training.policy import CelestePolicy, policy_kwargs
+from scripts.clone_room1 import record
+from tests.test_env import Room3Bridge
 
 
 def demonstrations(count: int, frames: int, seed: int = 0) -> Demonstrations:
@@ -68,6 +73,18 @@ class AccuracyTests(unittest.TestCase):
 
 
 class CloneTests(unittest.TestCase):
+    def test_later_room_demonstration_replays_after_the_task_start(self):
+        task_start = Start(("1,U", "1,U"), (261, 1), "2", 0)
+        env = CelesteRoomEnv(Room3Bridge(), task=RoomTask("2", "3"), task_start=task_start)
+        demo = {"kind": "route", "name": "room2-clear", "route_sha256": "a" * 64,
+                "source": "route.json", "lines": ["1,R"]}
+
+        data, provenance = record(env, [demo])
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(provenance[0]["ending"], "success")
+        self.assertTrue(provenance[0]["used"])
+
     def test_fitting_improves_accuracy_on_the_frames_it_fits(self):
         data = demonstrations(3, 40)
         model = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=0)

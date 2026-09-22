@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from celeste_rl.bridge import format_input_line
+from celeste_rl.tasks import TaskDefinitionError, canonical_task_identity, require_task_identity
 
 DEMONSTRATION_FORMAT_VERSION = 1
 DATASET_FORMAT_VERSION = 1
@@ -69,7 +70,12 @@ def demonstration_manifest_sha256(entries: Iterable[dict]) -> str:
     return hashlib.sha256(_canonical_json(canonical).encode("utf-8")).hexdigest()
 
 
-def validate_demonstration_manifest(manifest: dict) -> list[dict]:
+def validate_demonstration_manifest(manifest: dict, expected_task: dict | None = None) -> list[dict]:
+    if expected_task is not None:
+        try:
+            require_task_identity(manifest, expected_task, "demonstration manifest")
+        except TaskDefinitionError as error:
+            raise DemonstrationManifestError(str(error)) from error
     if manifest.get("format_version") != DEMONSTRATION_FORMAT_VERSION:
         raise DemonstrationManifestError(
             f"demonstration format {manifest.get('format_version')!r} is unsupported; "
@@ -98,7 +104,36 @@ def _source_path(repo: Path, source: str) -> Path:
     return path
 
 
-def materialize_demonstrations(entries: Iterable[dict], repo: Path) -> list[dict]:
+def _normalise_task_path(value: str | None) -> str | None:
+    return None if not value else value.replace("\\", "/")
+
+
+def _require_route_task(document: dict, expected_task: dict, source: str) -> None:
+    """Verify a route's task, with a narrow fallback for routes created before full identities were recorded."""
+    try:
+        expected = canonical_task_identity(expected_task)
+        if "task" in document:
+            actual = canonical_task_identity(document["task"])
+            if actual != expected:
+                raise DemonstrationManifestError(f"demonstration source {source} task identity does not match")
+            return
+    except TaskDefinitionError as error:
+        raise DemonstrationManifestError(f"demonstration source {source} has invalid task identity: {error}") \
+            from error
+
+    # Old route artifacts predate the full identity object. Keep them usable only when their task path and
+    # room transition agree exactly. All newly generated routes carry and verify the complete hash-pinned form.
+    declared_path = _normalise_task_path(document.get("task_definition"))
+    expected_path = _normalise_task_path(expected["task_definition"])
+    if (declared_path != expected_path
+            or document.get("start_room") != expected["start_room"]
+            or document.get("next_room") != expected["target_room"]):
+        raise DemonstrationManifestError(
+            f"demonstration source {source} legacy task fields do not match the expected task")
+
+
+def materialize_demonstrations(entries: Iterable[dict], repo: Path,
+                               expected_task: dict | None = None) -> list[dict]:
     """Read only the explicitly declared sources and verify every complete-route hash."""
     demonstrations = []
     for entry in entries:
@@ -106,6 +141,8 @@ def materialize_demonstrations(entries: Iterable[dict], repo: Path) -> list[dict
         try:
             document = json.loads(source.read_text(encoding="utf-8"))
             if entry["kind"] == "route":
+                if expected_task is not None:
+                    _require_route_task(document, expected_task, entry["source"])
                 transition_step = document["transition_step"]
                 actions = document["actions"]
                 if (not isinstance(transition_step, int) or isinstance(transition_step, bool)
@@ -139,7 +176,7 @@ def dataset_manifest_path(dataset: Path) -> Path:
 
 
 def write_dataset_manifest(dataset: Path, demonstrations_sha256: str, heldout_sha256: str,
-                           route_hashes: Iterable[str]) -> dict:
+                           route_hashes: Iterable[str], task: dict | None = None) -> dict:
     if not _valid_sha256(demonstrations_sha256) or not _valid_sha256(heldout_sha256):
         raise DemonstrationManifestError("dataset source manifest hashes must be lowercase SHA-256 values")
     canonical_route_hashes = sorted(set(route_hashes))
@@ -152,11 +189,17 @@ def write_dataset_manifest(dataset: Path, demonstrations_sha256: str, heldout_sh
         "heldout_manifest_sha256": heldout_sha256,
         "demonstration_route_sha256s": canonical_route_hashes,
     }
+    if task is not None:
+        try:
+            manifest["task"] = canonical_task_identity(task)
+        except TaskDefinitionError as error:
+            raise DemonstrationManifestError(str(error)) from error
     dataset_manifest_path(dataset).write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
 
 
-def verify_dataset_manifest(dataset: Path, demonstrations_sha256: str, heldout_sha256: str) -> dict:
+def verify_dataset_manifest(dataset: Path, demonstrations_sha256: str, heldout_sha256: str,
+                            task: dict | None = None) -> dict:
     path = dataset_manifest_path(dataset)
     if not path.is_file():
         raise DemonstrationManifestError(f"dataset provenance manifest does not exist: {path}")
@@ -166,6 +209,11 @@ def verify_dataset_manifest(dataset: Path, demonstrations_sha256: str, heldout_s
         raise DemonstrationManifestError(f"dataset provenance manifest is invalid JSON: {path}") from error
     if manifest.get("format_version") != DATASET_FORMAT_VERSION:
         raise DemonstrationManifestError("unsupported dataset provenance manifest format")
+    if task is not None:
+        try:
+            require_task_identity(manifest, task, "dataset provenance")
+        except TaskDefinitionError as error:
+            raise DemonstrationManifestError(str(error)) from error
     checks = {
         "dataset_sha256": file_sha256(dataset),
         "demonstrations_manifest_sha256": demonstrations_sha256,
