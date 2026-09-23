@@ -43,7 +43,7 @@ Everything in this section is descriptive. It does not replace the predeclared a
 
 Training records, which never touch the held-out states, show that B seed 25 stopped clearing from the canonical start early in training. It cleared 2 of its first 36 canonical-start episodes (the first 50,000 accepted transitions) and 0 of the remaining 150. Of those 150, 65 timed out, 45 of them ending at world x 320 to 329, and 85 died further right, at world x 372 to 443. In the final fifth of training the other five B runs cleared 72% to 89% of their canonical-start episodes and the six A runs cleared 83% to 96%; B seed 25 cleared none of its 45.
 
-On the held-out set, 37 of B seed 25's 57 timeouts never got past world x 320 to 329, the same place where 45 of its 65 training timeouts ended. Its failures are concentrated in starts early in the room:
+On the held-out set, 37 of B seed 25's 57 timeouts ended at world x 320 to 329, the same place where 45 of its 65 training timeouts ended. Its failures are concentrated in starts early in the room:
 
 | Start depth, frames into Room 2 | States | A seed 25 | B seed 25 | A seeds 20-24 | B seeds 20-24 |
 |---|---:|---:|---:|---:|---:|
