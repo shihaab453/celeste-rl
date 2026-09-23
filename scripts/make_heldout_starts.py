@@ -6,6 +6,10 @@ Run from the repo root with the RL interpreter (Steam running, mod installed):
         --demonstrations config/demonstrations-room2.json --routes-dir runs/room2-heldout-routes \
         --output config/heldout_starts-room2.json
 
+A replacement set for a task that already has one names the old set with `--exclude-heldout` (repeatable), so
+no new route may repeat one of its complete routes, and starts its searches at `--first-seed` in a fresh
+namespace, so the seeded search does not simply rediscover the old routes.
+
 Every result this project has reported comes from one fixed start in a deterministic game, so a success rate
 measures how robust a policy's own sampling is around a single route rather than whether it can play the room.
 The roadmap's criterion for the phase is different and much harder: clear the room from **200 held-out
@@ -52,7 +56,14 @@ from celeste_rl.demonstrations import (  # noqa: E402
     validate_demonstration_manifest,
 )
 from celeste_rl.env import CelesteRoomEnv  # noqa: E402
-from celeste_rl.heldout import FORMAT_VERSION, freeze_entries, manifest_sha256, state_id  # noqa: E402
+from celeste_rl.heldout import (  # noqa: E402
+    FORMAT_VERSION,
+    HeldoutManifestError,
+    freeze_entries,
+    manifest_sha256,
+    state_id,
+    validate_manifest,
+)
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.starts import Start  # noqa: E402
 from celeste_rl.tasks import (  # noqa: E402
@@ -123,14 +134,14 @@ def existing_heldout_routes(routes_dir: Path) -> list[Path]:
     return found
 
 
-def unused_search_seeds(routes: list[Path], count: int) -> list[int]:
-    """Choose fresh seeds after an interrupted build without ever reusing one already on disk."""
+def unused_search_seeds(routes: list[Path], count: int, first_seed: int = FIRST_SEED) -> list[int]:
+    """Choose fresh seeds from `first_seed` on, never reusing one already on disk, even after an interruption."""
     used = set()
     for path in routes:
         seed = load_route(path).get("seed")
         if isinstance(seed, int) and not isinstance(seed, bool):
             used.add(seed)
-    chosen, seed = [], FIRST_SEED
+    chosen, seed = [], first_seed
     while len(chosen) < count:
         if seed not in used:
             chosen.append(seed)
@@ -158,15 +169,48 @@ def require_minimum_routes(routes: list[Path], minimum: int) -> None:
         raise ValueError(f"only {len(routes)} unique routes were produced; {minimum} required")
 
 
-def reject_demonstration_routes(routes: list[Path], demonstrations: list[dict],
-                                definition: TaskDefinition) -> None:
-    """Reject evaluation routes whose complete task-relative transition trace appears in training data."""
-    heldout = []
+def new_route_hashes(routes: list[Path], definition: TaskDefinition) -> list[dict]:
+    """The complete task-relative route hash of every successful route, with the route it came from."""
+    hashes = []
     for path in routes:
         recipe = route_recipe(path, definition if definition.definition_path else None)
         if recipe is not None:
-            heldout.append({"route_sha256": route_sha256(recipe)})
-    reject_heldout_overlap(demonstrations, heldout)
+            hashes.append({"route": path.name, "route_sha256": route_sha256(recipe)})
+    return hashes
+
+
+def reject_demonstration_routes(routes: list[Path], demonstrations: list[dict],
+                                definition: TaskDefinition) -> None:
+    """Reject evaluation routes whose complete task-relative transition trace appears in training data."""
+    reject_heldout_overlap(demonstrations, new_route_hashes(routes, definition))
+
+
+def excluded_heldout_routes(manifests: list[Path], identity: dict) -> tuple[list[dict], list[dict]]:
+    """The route hashes of earlier held-out sets, each manifest validated against the task first.
+
+    Returns ({route_sha256} per entry, provenance per manifest). Only the hashes are compared; no state is
+    replayed."""
+    excluded, provenance = [], []
+    for path in manifests:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise HeldoutManifestError(f"{path} is not a held-out manifest")
+        entries = validate_manifest(manifest, identity)
+        excluded += [{"route_sha256": entry["route_sha256"]} for entry in entries]
+        provenance.append({"path": task_path(str(path)), "sha256": manifest["sha256"],
+                           "routes": len({entry["route_sha256"] for entry in entries})})
+    return excluded, provenance
+
+
+def reject_excluded_heldout_routes(routes: list[Path], excluded: list[dict], definition: TaskDefinition) -> None:
+    """Reject new routes whose complete task-relative route hash belongs to an earlier held-out set."""
+    new = new_route_hashes(routes, definition)
+    try:
+        reject_heldout_overlap(excluded, new)
+    except DemonstrationManifestError:
+        excluded_hashes = {entry["route_sha256"] for entry in excluded}
+        repeated = sorted(entry["route"] for entry in new if entry["route_sha256"] in excluded_hashes)
+        raise ValueError("new route(s) repeat a route of an excluded held-out set: " + ", ".join(repeated)) from None
 
 
 def search_command(seed: int, game_dir: Path, minutes: float, routes_dir: Path,
@@ -274,8 +318,12 @@ def main() -> int:
                         help="hash-pinned room task; omit for the original Room 1 task")
     parser.add_argument("--demonstrations", type=Path,
                         help="frozen training manifest whose routes must not overlap this evaluation set")
+    parser.add_argument("--exclude-heldout", type=Path, action="append", default=[],
+                        help="an earlier held-out manifest for this task whose routes must not recur; repeatable")
     parser.add_argument("--searches", type=int, default=6,
                         help="fresh search attempts; seeds already present on disk are skipped")
+    parser.add_argument("--first-seed", type=int, default=FIRST_SEED,
+                        help="lowest search seed; seeds already present in the namespace are still skipped")
     parser.add_argument("--search-minutes", type=float, default=10)
     parser.add_argument("--states", type=int, default=200)
     parser.add_argument("--min-routes", type=int, default=10,
@@ -306,6 +354,8 @@ def main() -> int:
         args.demonstrations = DEFAULT_DEMONSTRATIONS
     if args.searches < 0:
         parser.error("--searches must be non-negative")
+    if args.first_seed < 0:
+        parser.error("--first-seed must be non-negative")
     if args.states <= 0:
         parser.error("--states must be positive")
     if args.min_routes <= 0:
@@ -331,6 +381,11 @@ def main() -> int:
     except (OSError, json.JSONDecodeError, DemonstrationManifestError) as error:
         print(f"Cannot verify demonstration separation: {error}")
         return 2
+    try:
+        excluded_routes, excluded_provenance = excluded_heldout_routes(args.exclude_heldout, identity)
+    except (OSError, json.JSONDecodeError, HeldoutManifestError) as error:
+        print(f"Cannot verify separation from an earlier held-out set: {error}")
+        return 2
 
     output_root = REPO / "runs" / "heldout-starts"
     if args.task_definition:
@@ -345,7 +400,7 @@ def main() -> int:
         routes = list(args.routes)
     else:
         routes = existing_heldout_routes(routes_dir)
-        seeds = unused_search_seeds(routes, args.searches)
+        seeds = unused_search_seeds(routes, args.searches, args.first_seed)
         if seeds:
             print(f"Searching with {len(seeds)} unused held-out seeds: {', '.join(map(str, seeds))}")
         for seed in seeds:
@@ -357,6 +412,7 @@ def main() -> int:
     try:
         routes, duplicate_routes = unique_routes(routes, definition if args.task_definition else None)
         reject_demonstration_routes(routes, demonstration_entries, definition)
+        reject_excluded_heldout_routes(routes, excluded_routes, definition)
     except (ValueError, DemonstrationManifestError) as error:
         print(f"Cannot use held-out routes: {error}")
         return 2
@@ -415,6 +471,7 @@ def main() -> int:
         "generator": "scripts/find_room_exit.py, isolated held-out route namespace, unique route hashes",
         "note": "Evaluation only. Nothing in the training path may read this file.",
         "task": identity,
+        **({"excluded_heldout": excluded_provenance} if excluded_provenance else {}),
         "sha256": digest, "states": len(entries),
         "routes": sorted({entry["route"] for entry in entries}),
         "frames": {"min": min(entry["frames"] for entry in entries),

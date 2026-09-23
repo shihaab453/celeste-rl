@@ -8,14 +8,19 @@ import unittest
 from pathlib import Path
 
 from celeste_rl.demonstrations import DemonstrationManifestError, route_sha256
-from celeste_rl.tasks import load_task_definition, task_identity
+from celeste_rl.heldout import FORMAT_VERSION, HeldoutManifestError, freeze_entries, manifest_sha256
+from celeste_rl.tasks import base_task_definition, load_task_definition, task_identity
 
-SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+REPO = Path(__file__).resolve().parents[1]
+SCRIPTS = REPO / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from make_heldout_starts import (  # noqa: E402
     candidates,
+    FIRST_SEED,
+    excluded_heldout_routes,
     existing_heldout_routes,
+    reject_excluded_heldout_routes,
     require_minimum_routes,
     reject_demonstration_routes,
     search_command,
@@ -200,6 +205,127 @@ class StateSelectionTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "only 1 unique valid states were produced; 2 requested"):
             select_states([state, dict(state)], 2)
+
+
+class FirstSeedTests(unittest.TestCase):
+    def test_the_default_first_seed_is_unchanged(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_route(root, "old", 101, [action("R")] * 4)
+            routes = existing_heldout_routes(root)
+
+            self.assertEqual(FIRST_SEED, 100)
+            self.assertEqual(unused_search_seeds(routes, 3), [100, 102, 103])
+            self.assertEqual(unused_search_seeds(routes, 3), unused_search_seeds(routes, 3, FIRST_SEED))
+
+    def test_a_fresh_namespace_starts_at_the_given_seed(self):
+        self.assertEqual(unused_search_seeds([], 12, first_seed=112), list(range(112, 124)))
+
+    def test_seeds_already_in_the_namespace_are_still_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_route(root, "a", 112, [action("R")] * 4)
+            write_route(root, "b", 114, [action("L")] * 4)
+            write_route(root, "below-first-seed", 100, [action("U")] * 4)
+            routes = existing_heldout_routes(root)
+
+            self.assertEqual(unused_search_seeds(routes, 3, first_seed=112), [113, 115, 116])
+
+
+class ExcludeHeldoutTests(unittest.TestCase):
+    """G1: a new set may not repeat a complete route of an earlier held-out set. These use the Room 1 base
+    task, which needs no task file."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.definition = base_task_definition()
+        self.identity = task_identity(self.definition)
+
+    def write_manifest(self, name: str, route_lines: dict[str, list[str]], identity: dict | None = None) -> Path:
+        """A valid held-out manifest with one state per route, as the generator would freeze it."""
+        states = [{"route": route, "route_sha256": route_sha256(lines), "search_seed": 100 + index,
+                   "frames": 2, "task_frames": 2, "room": self.definition.task.start_room,
+                   "position": [10 + index, 20], "room_position": [10 + index, 20], "dashes": 1,
+                   "lines": lines[:2]}
+                  for index, (route, lines) in enumerate(sorted(route_lines.items()))]
+        entries = freeze_entries(states)
+        path = self.root / name
+        path.write_text(json.dumps({
+            "format_version": FORMAT_VERSION, "task": identity or self.identity,
+            "sha256": manifest_sha256(entries), "states": len(entries),
+            "routes": sorted(route_lines), "frames": {"min": 2, "max": 2}, "task_frames": {"min": 2, "max": 2},
+            "entries": entries,
+        }), encoding="utf-8")
+        return path
+
+    def test_a_new_route_that_repeats_an_excluded_route_is_refused(self):
+        old = self.write_manifest("old.json", {"old-route": ["1,R", "1,J", "1,R"]})
+        routes_dir = self.root / "routes"
+        routes_dir.mkdir()
+        repeat = write_route(routes_dir, "new-repeat", 112, [action("R"), action("J"), action("R")])
+        fresh = write_route(routes_dir, "new-fresh", 113, [action("L"), action("J"), action("R")])
+
+        excluded, _ = excluded_heldout_routes([old], self.identity)
+
+        with self.assertRaisesRegex(ValueError, "repeat a route of an excluded held-out set: new-repeat$"):
+            reject_excluded_heldout_routes([fresh, repeat], excluded, self.definition)
+
+    def test_routes_absent_from_every_excluded_set_are_accepted(self):
+        first = self.write_manifest("first.json", {"a": ["1,R", "1,J", "1,R"]})
+        second = self.write_manifest("second.json", {"b": ["1,U", "1,J", "1,R"], "c": ["1,D", "1,J", "1,R"]})
+        routes_dir = self.root / "routes"
+        routes_dir.mkdir()
+        fresh = write_route(routes_dir, "new-fresh", 112, [action("L"), action("J"), action("R")])
+
+        excluded, provenance = excluded_heldout_routes([first, second], self.identity)
+
+        reject_excluded_heldout_routes([fresh], excluded, self.definition)
+        self.assertEqual(len(excluded), 3)
+        self.assertEqual([record["routes"] for record in provenance], [1, 2])
+
+    def test_no_excluded_manifest_changes_nothing(self):
+        routes_dir = self.root / "routes"
+        routes_dir.mkdir()
+        route = write_route(routes_dir, "any", 100, [action("R"), action("J")])
+
+        self.assertEqual(excluded_heldout_routes([], self.identity), ([], []))
+        reject_excluded_heldout_routes([route], [], self.definition)
+
+    def test_a_tampered_manifest_is_refused(self):
+        path = self.write_manifest("old.json", {"old-route": ["1,R", "1,J", "1,R"]})
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["entries"][0]["route_sha256"] = "0" * 64
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(HeldoutManifestError, "state_id|sha256"):
+            excluded_heldout_routes([path], self.identity)
+
+    def test_a_manifest_for_another_task_is_refused(self):
+        other = {**self.identity, "name": "another-task"}
+        path = self.write_manifest("other.json", {"old-route": ["1,R", "1,J", "1,R"]}, identity=other)
+
+        with self.assertRaises(HeldoutManifestError):
+            excluded_heldout_routes([path], self.identity)
+
+    def test_a_file_that_is_not_a_manifest_is_refused(self):
+        path = self.root / "list.json"
+        path.write_text("[]", encoding="utf-8")
+
+        with self.assertRaisesRegex(HeldoutManifestError, "not a held-out manifest"):
+            excluded_heldout_routes([path], self.identity)
+
+    def test_the_frozen_room2_set_yields_its_twelve_route_hashes(self):
+        """The file the v2 procedure excludes validates against the procedure's pinned task identity."""
+        procedure = json.loads((REPO / "config" / "heldout-room2-v2-procedure.json").read_text(encoding="utf-8"))
+
+        excluded, provenance = excluded_heldout_routes([REPO / "config" / "heldout_starts-room2.json"],
+                                                       procedure["task"])
+
+        self.assertEqual(len({entry["route_sha256"] for entry in excluded}), 12)
+        self.assertEqual(provenance[0]["sha256"],
+                         "ce57def1b3daed78a5aa3e454ab20cc12858a50b764bd0d94f80a1b2d734f8b0")
 
 
 if __name__ == "__main__":
