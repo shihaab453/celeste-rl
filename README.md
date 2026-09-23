@@ -14,16 +14,24 @@ was **+22.6 percentage points**, with a crossed seed-route 95% bootstrap interva
 an exact two-sided paired sign-flip p-value of 0.03125. Varied starts won in all six matched seeds and on all
 eleven route-level descriptive comparisons.
 
-The fixed canonical start remains a poor measure of generalisation: two policies that scored 98.0% and 98.5%
-there scored 59.7% and 84.6% on the earlier diagnostic state set. The project now proceeds to Room 2. Chapter 1
-has 20 rooms; Room 1 is the first.
+**That benefit did not replicate in Room 2.** The same matched design in
+[Room 2](docs/room2-matched-finetuning.md) found no evidence of a varied-start benefit: canonical-start
+training scored 86.8% route-macro success and varied-start training 80.9%, a paired difference of -5.8 points
+with a 95% crossed seed-route interval from -18.7 to +3.4 points and exact p = 0.50. Across seeds 20 to 24 the
+mean difference was 0.0 points; the varied-start run for seed 25 collapsed during training. Both arms remain below the
+roadmap's 99% held-out bar.
 
-Two experiment reports, and the negative one came first and matters as much:
+The fixed canonical start remains a poor measure of generalisation: two policies that scored 98.0% and 98.5%
+there scored 59.7% and 84.6% on the earlier diagnostic state set. Chapter 1 has 20 rooms; Rooms 1 and 2 have
+been attempted so far.
+
+Three experiment reports, and the negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
 | [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points** under the predeclared matched, route-cluster-aware analysis |
+| [Room 2: matched fine-tuning](docs/room2-matched-finetuning.md) | **No evidence of a varied-start benefit**: B minus A -5.8 points, 95% crossed seed-route interval -18.7 to +3.4, exact paired p = 0.50; one of six varied-start runs collapsed during training |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
@@ -124,15 +132,17 @@ Do not use `uv sync` or `uv run` in this repository: uv's project mode manages a
 ## Next
 
 Phases 0 to 3B are done: the interface, a PPO implementation studied on CartPole, the environment, the
-no-demonstration attempt and the demonstration-assisted comparison.
+no-demonstration attempt and the demonstration-assisted comparison. The Room 2 matched comparison is also done.
 
-1. **Room 2.** Generalise task starts beyond the room 1 savestate, find independent Room 2 routes, then repeat
-   cloning, varied-start fine-tuning and frozen held-out evaluation without tuning against the test set.
+1. **Room 2's shared failure section.** Both arms fail almost entirely in the same stretch of Room 2, so the
+   next change should follow from what that section demands of the player rather than from how starts are
+   sampled. The diagnosis uses training records and demonstrations, not the held-out states, and any
+   follow-up experiment will disclose that it was designed after seeing where held-out failures clustered.
 2. **Two-room retention.** Mix Rooms 1 and 2 during training and measure both separately, so learning Room 2
    cannot silently destroy Room 1 competence.
 3. **How much of the demonstration set is needed.** The cloned Room 1 policy scores below a
-   repeat-your-last-action baseline on held-out routes. Reducing the route count is useful only after Room 2
-   establishes that the full method transfers.
+   repeat-your-last-action baseline on held-out routes. Reducing the route count is useful only once the full
+   method reaches the reliability bar in more than one room.
 4. **Natural two-room play.** Evaluate one frozen checkpoint across the Room 1 to Room 2 transition without an
    artificial reset, as Phase 4 requires.
 
