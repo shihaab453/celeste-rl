@@ -233,6 +233,39 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(stages, ["rollout", "recovery reset", "recovery reset"])
         self.assertEqual(model.updates, [])
 
+    def test_a_failed_relaunch_counts_toward_the_limit_and_aborts(self):
+        """Review J7: a relaunch that raises must end in the recorded abort, not escape recovery."""
+        calls = []
+
+        def relaunch_fails(fault):
+            calls.append(fault)
+            raise RuntimeError("Celeste exited during startup with code 1")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "aborted.zip"
+            model = make(EpochBridge(fault_steps={40}), on_fault=relaunch_fails, abort_checkpoint_path=path)
+            with self.assertRaisesRegex(TrainingAborted, "3 consecutive faults.*exited during startup"):
+                model.learn(96)
+            self.assertTrue(path.exists())
+        self.assertEqual([f["stage"] for f in model.fault_stats["faults"]],
+                         ["rollout", "recovery hook", "recovery hook"])
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(model.updates), 1)
+
+    def test_a_relaunch_that_fails_once_is_retried(self):
+        calls = []
+
+        def fails_once(fault):
+            calls.append(fault)
+            if len(calls) == 1:
+                raise RuntimeError("DebugRC did not answer on port 32279 within 120 s")
+
+        model = make(EpochBridge(fault_steps={40}), on_fault=fails_once)
+        model.learn(96)
+        self.assertEqual([f["stage"] for f in model.fault_stats["faults"]], ["rollout", "recovery hook"])
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(model.num_timesteps, 96)
+
     def test_only_dummy_vec_env_is_supported(self):
         env = VecMonitor(DummyVecEnv([lambda: CelesteRoomEnv(EpochBridge())]))
         with self.assertRaisesRegex(TypeError, "DummyVecEnv"):

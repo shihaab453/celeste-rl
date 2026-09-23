@@ -22,6 +22,7 @@ from celeste_rl.training.run import (
     TrainConfig,
     build_environment,
     new_progress,
+    roll_back_to_checkpoint,
     train,
     update_progress,
 )
@@ -349,6 +350,110 @@ class RunTests(unittest.TestCase):
         self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96, 128, 160])
         self.assertGreaterEqual(bridge.total_resets, 1, "the resumed run starts from a fresh reset, not the saved observation")
 
+    def test_resume_between_checkpoints_rolls_the_records_back_to_the_checkpoint(self):
+        """Review J1: latest.zip is from step 64, but the records reached 96 before the run aborted. The resume
+        must replay 65 to 96 once, not record it twice, and keep what it rolls back."""
+        run_config = config(eval_every=0, checkpoint_every=64)
+        with self.assertRaises(TrainingAborted):
+            train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge(fault_steps=set(range(100, 10000)))),
+                  PROVENANCE)
+        manifest, progress, episodes, _ = read(self.run_dir)
+        self.assertEqual((manifest["accepted_steps"], manifest["checkpoint_state"]["accepted_steps"]), (96, 64))
+        self.assertEqual(len(episodes), 1, "the first death, at step 74, is after the checkpoint")
+
+        model = train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+
+        manifest, progress, episodes, _ = read(self.run_dir)
+        self.assertEqual(model.num_timesteps, 160)
+        self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96, 128, 160])
+        self.assertEqual([episode["index"] for episode in episodes], list(range(1, len(episodes) + 1)))
+        self.assertEqual(manifest["fault_stats"]["accepted_transitions"], 160)
+        rolled_back = manifest["sessions"][1]["rolled_back"]
+        self.assertEqual((rolled_back["from_steps"], rolled_back["to_steps"]), (96, 64))
+        self.assertEqual(rolled_back["lines_moved"], {"episodes.jsonl": 1, "progress.csv": 1})
+        self.assertEqual(rolled_back["fault_stats_before"]["discarded_rollouts"], 3)
+        moved = self.run_dir / rolled_back["moved_to"]
+        self.assertEqual(moved, self.run_dir / "rolled_back" / "session-2")
+        self.assertIn("96,", (moved / "progress.csv").read_text(encoding="utf-8"))
+        self.assertTrue((moved / "aborted.zip").exists())
+        self.assertFalse((self.run_dir / "checkpoints" / "aborted.zip").exists())
+
+    def test_resume_rolls_back_an_evaluation_and_best_checkpoint_made_after_latest(self):
+        # Checkpoint at 64, evaluation and best.zip at 96 (its episodes use bridge steps 97 to 318), then every
+        # step from 330 faults and the run aborts at 96.
+        run_config = config(checkpoint_every=64, eval_every=96)
+        with self.assertRaises(TrainingAborted):
+            train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge(fault_steps=set(range(330, 10000)))),
+                  PROVENANCE)
+        manifest, _, _, evaluations = read(self.run_dir)
+        self.assertEqual([record["accepted_steps"] for record in evaluations], [96])
+        self.assertEqual(manifest["checkpoint_state"]["accepted_steps"], 64)
+
+        train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+
+        manifest, _, _, evaluations = read(self.run_dir)
+        self.assertEqual([record["accepted_steps"] for record in evaluations], [96, 160])
+        for record in evaluations:
+            path = self.run_dir / "checkpoints" / record["checkpoint"]
+            self.assertEqual(record["checkpoint_sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+        # best.zip holds the same weights as the step checkpoint it names (the zip bytes differ by timestamps).
+        best = SupervisedPPO.load(self.run_dir / "checkpoints" / "best.zip", device="cpu").policy.state_dict()
+        named = SupervisedPPO.load(self.run_dir / "checkpoints" / manifest["recorder"]["best_checkpoint"],
+                                   device="cpu").policy.state_dict()
+        self.assertTrue(all(th.equal(best[key], named[key]) for key in best))
+        moved = self.run_dir / manifest["sessions"][1]["rolled_back"]["moved_to"]
+        self.assertEqual(manifest["sessions"][1]["rolled_back"]["checkpoints_moved"], ["step_000000096.zip"])
+        self.assertTrue((moved / "step_000000096.zip").exists())
+        self.assertTrue((moved / "best.zip").exists())
+        self.assertEqual(len((moved / "evaluations.jsonl").read_text(encoding="utf-8").splitlines()), 1)
+
+    def test_resume_refuses_records_ahead_of_latest_without_saved_state(self):
+        """A run from before the saved checkpoint state cannot be rolled back safely, so it is not resumed."""
+        run_config = config(eval_every=0, checkpoint_every=64)
+        with self.assertRaises(TrainingAborted):
+            train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge(fault_steps=set(range(100, 10000)))),
+                  PROVENANCE)
+        manifest_path = self.run_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        del manifest["checkpoint_state"]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "cannot be rolled back"):
+            train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+        _, progress, _, _ = read(self.run_dir)
+        self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96])
+        self.assertFalse((self.run_dir / "rolled_back").exists())
+
+    def test_a_fault_on_the_reset_after_an_evaluation_does_not_repeat_it(self):
+        """Review J2: reset 4 is the one after the evaluation at step 32 (1 initial, 2 and 3 for its episodes).
+        Its record is already written, so the retried rollout must not evaluate again."""
+        train(config(total_timesteps=96, eval_every=32, eval_episodes=1), self.run_dir,
+              CelesteRoomEnv(EpochBridge(fault_resets={4})), PROVENANCE)
+        manifest, _, _, evaluations = read(self.run_dir)
+        self.assertEqual(manifest["fault_stats"]["discarded_rollouts"], 1)
+        self.assertEqual([record["accepted_steps"] for record in evaluations], [32, 64, 96])
+
+    def test_a_fault_during_an_evaluation_reruns_it_once(self):
+        # Step 40 falls inside the first evaluation episode at step 32: nothing is recorded, and the retry
+        # evaluates the same weights once.
+        train(config(total_timesteps=96, eval_every=32, eval_episodes=1), self.run_dir,
+              CelesteRoomEnv(EpochBridge(fault_steps={40})), PROVENANCE)
+        manifest, _, _, evaluations = read(self.run_dir)
+        self.assertEqual(manifest["fault_stats"]["discarded_rollouts"], 1)
+        self.assertEqual([record["accepted_steps"] for record in evaluations], [32, 64, 96])
+
+    def test_a_failed_relaunch_is_recorded_as_an_abort(self):
+        """Review J7 at run level: the run ends aborted with its checkpoint, not crashed without one."""
+        def relaunch_fails(fault):
+            raise RuntimeError("Celeste exited during startup with code 1")
+
+        with self.assertRaises(TrainingAborted):
+            train(config(eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge(fault_steps={40})), PROVENANCE,
+                  on_fault=relaunch_fails)
+        manifest, _, _, _ = read(self.run_dir)
+        self.assertEqual(manifest["status"], "aborted")
+        self.assertTrue((self.run_dir / "checkpoints" / "aborted.zip").exists())
+
     def test_refuses_to_overwrite_a_run(self):
         train(config(total_timesteps=32, eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
         with self.assertRaises(FileExistsError):
@@ -362,6 +467,87 @@ class RunTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "aborted")
         self.assertEqual([int(row["accepted_steps"]) for row in progress], [32])
         self.assertTrue((self.run_dir / "checkpoints" / "aborted.zip").exists())
+
+
+class RollBackTests(unittest.TestCase):
+    """roll_back_to_checkpoint on synthetic files: the parts a fake-bridge run cannot steer."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.run_dir = Path(self.temp.name)
+        checkpoints = self.run_dir / "checkpoints"
+        checkpoints.mkdir()
+        for name in ("step_000000064.zip", "step_000000096.zip", "step_000000096.tmp.zip", "latest.zip"):
+            (checkpoints / name).write_bytes(name.encode())
+        (checkpoints / "best.zip").write_bytes(b"best from step 96")
+        (self.run_dir / "episodes.jsonl").write_bytes(b'{"index": 1}\n{"index": 2}\n')
+        (self.run_dir / "evaluations.jsonl").write_bytes(b'{"accepted_steps": 64}\n{"accepted_steps": 96}\n')
+        (self.run_dir / "progress.csv").write_bytes(b"accepted_steps\n32\n64\n96\n")
+        snapshot_recorder = {"next_checkpoint": 128, "next_eval": 96, "best": [0.0, 10.0, -1e9],
+                             "best_checkpoint": "step_000000064.zip", "accepted_episodes": 1, "last_eval_steps": 64}
+        self.previous = {
+            "accepted_steps": 96,
+            "fault_stats": {"accepted_transitions": 96, "discarded_transitions": 5, "discarded_rollouts": 3,
+                            "faults": ["a", "b", "c"]},
+            "recorder": {**snapshot_recorder, "best": [0.0, 20.0, -1e9], "best_checkpoint": "step_000000096.zip",
+                         "accepted_episodes": 2, "next_eval": 192},
+            "checkpoint_state": {
+                "accepted_steps": 64,
+                "fault_stats": {"accepted_transitions": 64, "discarded_transitions": 0, "discarded_rollouts": 0,
+                                "faults": []},
+                "recorder": snapshot_recorder,
+                "records": {"episodes.jsonl": len(b'{"index": 1}\n'),
+                            "progress.csv": len(b"accepted_steps\n32\n64\n"),
+                            "evaluations.jsonl": len(b'{"accepted_steps": 64}\n')},
+            },
+        }
+
+    def test_a_newer_best_is_replaced_by_the_one_at_the_checkpoint_and_a_repeat_is_harmless(self):
+        for attempt in range(2):
+            fault_stats, recorder, rolled_back = roll_back_to_checkpoint(self.run_dir, self.previous, 64, "session-2")
+            checkpoints = self.run_dir / "checkpoints"
+            moved = self.run_dir / "rolled_back" / "session-2"
+            self.assertEqual((checkpoints / "best.zip").read_bytes(), b"step_000000064.zip")
+            self.assertEqual((moved / "best.zip").read_bytes(), b"best from step 96")
+            self.assertEqual((moved / "step_000000096.zip").read_bytes(), b"step_000000096.zip")
+            self.assertTrue((checkpoints / "step_000000096.tmp.zip").exists(), "only step checkpoints move")
+            self.assertEqual((self.run_dir / "progress.csv").read_bytes(), b"accepted_steps\n32\n64\n")
+            self.assertEqual((moved / "progress.csv").read_bytes(), b"96\n")
+            self.assertEqual((moved / "evaluations.jsonl").read_bytes(), b'{"accepted_steps": 96}\n')
+            self.assertEqual(fault_stats["accepted_transitions"], 64)
+            self.assertEqual((recorder["accepted_episodes"], recorder["next_eval"]), (1, 96))
+            self.assertEqual(rolled_back["lines_moved"], {} if attempt else
+                             {"episodes.jsonl": 1, "progress.csv": 1, "evaluations.jsonl": 1})
+
+    def test_an_evaluation_after_the_checkpoint_rolls_best_back_even_if_the_manifest_missed_it(self):
+        # A hard kill after an evaluation and before the next manifest write: the manifest still shows the
+        # checkpoint's best, but the evaluation line after latest.zip shows best.zip may have changed.
+        previous = {**self.previous, "recorder": self.previous["checkpoint_state"]["recorder"]}
+
+        roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+
+        moved = self.run_dir / "rolled_back" / "session-2"
+        self.assertEqual((self.run_dir / "checkpoints" / "best.zip").read_bytes(), b"step_000000064.zip")
+        self.assertEqual((moved / "best.zip").read_bytes(), b"best from step 96")
+
+    def test_records_shorter_than_at_the_checkpoint_are_refused_before_anything_moves(self):
+        (self.run_dir / "episodes.jsonl").write_bytes(b"")
+
+        with self.assertRaisesRegex(ValueError, "episodes.jsonl is shorter"):
+            roll_back_to_checkpoint(self.run_dir, self.previous, 64, "session-2")
+        self.assertFalse((self.run_dir / "rolled_back").exists())
+        self.assertEqual((self.run_dir / "checkpoints" / "best.zip").read_bytes(), b"best from step 96")
+
+    def test_a_run_that_stopped_at_its_checkpoint_needs_no_rollback(self):
+        previous = {**self.previous, "accepted_steps": 64}
+
+        fault_stats, recorder, rolled_back = roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+
+        self.assertIsNone(rolled_back)
+        self.assertEqual(fault_stats, previous["fault_stats"])
+        self.assertEqual(recorder, previous["recorder"])
+        self.assertFalse((self.run_dir / "rolled_back").exists())
 
 
 if __name__ == "__main__":

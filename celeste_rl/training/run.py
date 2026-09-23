@@ -15,6 +15,12 @@ A run directory holds everything needed to audit or resume the run:
   checkpoints/       latest.zip, previous.zip, best.zip, step_<accepted>.zip, aborted.zip; each written to a
                      temporary file and renamed, so a crash never leaves a half-written checkpoint
   archive.json       with varied starts, the entry states the agent reached, rewritten at every checkpoint
+  rolled_back/       after a resume from a checkpoint older than the records, everything written after that
+                     checkpoint, moved here rather than deleted
+
+A resume continues from checkpoints/latest.zip. latest.zip is written every checkpoint_every accepted steps, but the
+records grow after every rollout, so a run that stopped between checkpoints first has its records, counters,
+schedule, best checkpoint and later step checkpoints rolled back to the state saved with latest.zip (review J1).
 
 Everything counts accepted transitions only (SupervisedPPO rolls the step counter back on a discarded rollout):
 episodes that finish inside a discarded rollout are never written, and checkpoints and evaluations are scheduled on
@@ -38,6 +44,8 @@ import csv
 import hashlib
 import json
 import os
+import re
+import shutil
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -159,6 +167,84 @@ def _atomic_json(path: Path, data: dict) -> None:
     os.replace(temporary, path)
 
 
+# The files that grow after every rollout or evaluation, and so can run ahead of latest.zip.
+RECORD_FILES = ("episodes.jsonl", "progress.csv", "evaluations.jsonl")
+STEP_CHECKPOINT = re.compile(r"step_(\d+)\.zip")
+
+
+def _record_sizes(run_dir: Path) -> dict:
+    return {name: (run_dir / name).stat().st_size if (run_dir / name).exists() else 0 for name in RECORD_FILES}
+
+
+def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
+                            label: str) -> tuple[dict, dict | None, dict | None]:
+    """Make a resumed run's records agree with the checkpoint it resumes from (review J1).
+
+    When the run stopped between checkpoints, the rollouts after latest.zip are replayed, so everything written
+    after it belongs to a timeline that no longer exists: record lines, later step checkpoints, an evaluation's
+    best.zip and aborted.zip. They are moved under rolled_back/<label>/ (never deleted), the record files are cut
+    back to their size when latest.zip was saved, and the counters and schedule are restored from the state saved
+    with it. Everything is checked before anything moves, and repeating the rollback after an interruption is
+    harmless. Returns (fault_stats, recorder state, a record of what was rolled back or None).
+    """
+    if previous["accepted_steps"] == steps:
+        return previous["fault_stats"], previous.get("recorder"), None
+    snapshot = previous.get("checkpoint_state")
+    if not snapshot or snapshot.get("accepted_steps") != steps:
+        raise ValueError(f"the run stopped at {previous['accepted_steps']} accepted steps but latest.zip holds "
+                         f"{steps}, and no state saved with latest.zip matches it, so its records cannot be rolled "
+                         "back; start a new run instead")
+    sizes = _record_sizes(run_dir)
+    for name, size in snapshot["records"].items():
+        if sizes[name] < size:
+            raise ValueError(f"{name} is shorter than when latest.zip was saved; the records were changed")
+    checkpoints = run_dir / "checkpoints"
+    later = sorted(path for path in checkpoints.glob("step_*.zip")
+                   if (match := STEP_CHECKPOINT.fullmatch(path.name)) and int(match.group(1)) > steps)
+    moved_to = run_dir / "rolled_back" / label
+    # best.zip only changes after an evaluation record is written, so an evaluation line after latest.zip catches a
+    # change the manifest missed (a hard kill before its next write); a best.zip already moved means an earlier
+    # attempt was interrupted.
+    best_changed = (snapshot["recorder"]["best"] != (previous.get("recorder") or {}).get("best")
+                    or sizes["evaluations.jsonl"] > snapshot["records"]["evaluations.jsonl"]
+                    or (moved_to / "best.zip").exists())
+    restore_best = snapshot["recorder"].get("best_checkpoint")
+    if best_changed and snapshot["recorder"]["best"] is not None \
+            and (not restore_best or not (checkpoints / restore_best).exists()):
+        raise ValueError("the best checkpoint as it was when latest.zip was saved cannot be restored")
+
+    moved_to.mkdir(parents=True, exist_ok=True)
+    lines_moved = {}
+    for name, size in snapshot["records"].items():
+        path = run_dir / name
+        if not path.exists() or path.stat().st_size == size:
+            continue
+        with path.open("rb") as handle:
+            handle.seek(size)
+            tail = handle.read()
+        (moved_to / name).write_bytes(tail)
+        if size == 0:
+            path.unlink()  # a file that did not exist yet goes whole, so progress.csv gets its header again
+        else:
+            with path.open("r+b") as handle:
+                handle.truncate(size)
+        lines_moved[name] = tail.count(b"\n")
+    # Never overwrite what an interrupted earlier attempt already moved: a best.zip found then is the restored copy.
+    for path in [*later, *(checkpoints / name for name in ("aborted.zip", *(("best.zip",) if best_changed else ())))]:
+        if path.exists() and not (moved_to / path.name).exists():
+            os.replace(path, moved_to / path.name)
+    if best_changed and snapshot["recorder"]["best"] is not None:
+        temporary = checkpoints / "best.tmp.zip"
+        shutil.copyfile(checkpoints / restore_best, temporary)
+        os.replace(temporary, checkpoints / "best.zip")
+    return snapshot["fault_stats"], snapshot["recorder"], {
+        "from_steps": previous["accepted_steps"], "to_steps": steps,
+        "moved_to": moved_to.relative_to(run_dir).as_posix(), "lines_moved": lines_moved,
+        "checkpoints_moved": [path.name for path in later],
+        "fault_stats_before": previous["fault_stats"],
+    }
+
+
 # How far an episode got, for the diagnostics the unshaped campaign lacked (Codex J9, K8). A field is None when
 # no step of the episode reported one, which keeps the records honest instead of inventing a zero.
 PROGRESS_FIELDS = ("max_potential", "max_x", "min_y", "end_x", "end_y")
@@ -241,17 +327,22 @@ class RunRecorder(BaseCallback):
         self.next_checkpoint = config.checkpoint_every
         self.next_eval = config.eval_every if config.eval_every > 0 else None
         self.best: tuple | None = None
+        self.best_checkpoint: str | None = None  # the step checkpoint best.zip was copied from
         self.accepted_episodes = 0
         self.last_eval_steps: int | None = None
+        # Everything a resume from latest.zip must roll back to, saved when latest.zip is written.
+        self.checkpoint_state: dict | None = None
 
     # Scheduling state that must survive a resume.
     def state(self) -> dict:
         return {"next_checkpoint": self.next_checkpoint, "next_eval": self.next_eval, "best": self.best,
+                "best_checkpoint": self.best_checkpoint,
                 "accepted_episodes": self.accepted_episodes, "last_eval_steps": self.last_eval_steps}
 
     def load_state(self, state: dict) -> None:
         self.next_checkpoint, self.next_eval = state["next_checkpoint"], state["next_eval"]
         self.best = tuple(state["best"]) if state["best"] is not None else None
+        self.best_checkpoint = state.get("best_checkpoint")
         self.accepted_episodes = state["accepted_episodes"]
         self.last_eval_steps = state.get("last_eval_steps")
 
@@ -263,12 +354,9 @@ class RunRecorder(BaseCallback):
         steps = self.model.num_timesteps  # accepted and already used by an update
         if steps >= self.next_checkpoint:
             self._checkpoint(steps)
-            while self.next_checkpoint <= steps:
-                self.next_checkpoint += self.config.checkpoint_every
         if self.next_eval is not None and steps >= self.next_eval:
-            self._evaluate(steps)  # a fault here is a rollout fault; the evaluation reruns on the retry
-            while self.next_eval <= steps:
-                self.next_eval += self.config.eval_every
+            # A fault before the record is written is a rollout fault, and the evaluation reruns on the retry.
+            self._evaluate(steps)
         self._rollout = _RolloutStats()  # started after any checkpoint or evaluation, so steps per second is collection only
 
     def _on_step(self) -> bool:
@@ -350,6 +438,9 @@ class RunRecorder(BaseCallback):
         self.write_manifest("running")
 
     def _checkpoint(self, steps: int) -> None:
+        # Advanced first, so the state saved with latest.zip already schedules the next checkpoint.
+        while self.next_checkpoint <= steps:
+            self.next_checkpoint += self.config.checkpoint_every
         latest, previous = self.checkpoints / "latest.zip", self.checkpoints / "previous.zip"
         if latest.exists():
             os.replace(latest, previous)
@@ -358,6 +449,10 @@ class RunRecorder(BaseCallback):
         # The archive is the run's other learned artefact: losing it would throw away every deep excursion.
         if self.env.archive is not None:
             self.env.archive.save(self.run_dir / "archive.json")
+        self.checkpoint_state = {"accepted_steps": steps,
+                                 "fault_stats": json.loads(json.dumps(self.model.fault_stats)),
+                                 "recorder": json.loads(json.dumps(self.state())),
+                                 "records": _record_sizes(self.run_dir)}
         self.write_manifest("running")
 
     def _evaluate(self, steps: int) -> None:
@@ -396,7 +491,13 @@ class RunRecorder(BaseCallback):
                  -float(np.mean(successes)) if successes else -1e9)
         if self.best is None or score > tuple(self.best):
             self.best = score
+            self.best_checkpoint = checkpoint.name
             _atomic_save(self.model, self.checkpoints / "best.zip")
+        # The record is written, so the schedule moves on before the reset below, which can fault. Otherwise the
+        # retried rollout would evaluate the same weights again and write a second record (review J2).
+        if self.next_eval is not None:
+            while self.next_eval <= steps:
+                self.next_eval += self.config.eval_every
         # Evaluation used the training environment: start a fresh training episode.
         self.model._last_obs = self.model.env.reset()
         self.model._last_episode_starts = np.ones((self.model.env.num_envs,), dtype=bool)
@@ -419,7 +520,8 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
             raise ValueError("The resume config differs from the run's config")
         model = SupervisedPPO.load(checkpoints / "latest.zip", env=env, device=config.device,
                                    max_consecutive_discards=config.max_consecutive_discards)
-        model.fault_stats = previous["fault_stats"]
+        model.fault_stats, recorder_state, rolled_back = roll_back_to_checkpoint(
+            run_dir, previous, model.num_timesteps, f"session-{len(previous.get('sessions', [])) + 1}")
         # The first resumed transition must start from a fresh reset, not an observation from when the checkpoint was
         # saved. SB3's load already clears it (force_reset); kept explicit so a library change cannot undo it.
         model._last_obs = None
@@ -445,7 +547,7 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
             # the donor's stream whatever --seed says, and two different seeds produce byte-identical runs.
             model.set_random_seed(config.seed)
         history = []
-        previous = None
+        previous = recorder_state = rolled_back = None
     model.on_fault = on_fault
     model.abort_checkpoint_path = checkpoints / "aborted.zip"
 
@@ -458,14 +560,18 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
             "accepted_steps": model.num_timesteps,
             "fault_stats": model.fault_stats,
             "recorder": recorder.state() if recorder is not None else None,
-            "sessions": history + [{"started": started, "provenance": provenance, "resumed_at": resume_steps}],
+            "checkpoint_state": recorder.checkpoint_state if recorder is not None else None,
+            "sessions": history + [{"started": started, "provenance": provenance, "resumed_at": resume_steps,
+                                    **({"rolled_back": rolled_back} if rolled_back else {})}],
         })
 
     resume_steps = model.num_timesteps
     recorder = RunRecorder(run_dir, config, env, write_manifest, health)
     recorder.init_callback(model)  # also needed when a resumed run has nothing left to learn
-    if previous is not None and previous.get("recorder"):
-        recorder.load_state(previous["recorder"])
+    if recorder_state:
+        recorder.load_state(recorder_state)
+    if previous is not None:
+        recorder.checkpoint_state = previous.get("checkpoint_state")
     write_manifest("running")
     try:
         # SB3 adds the steps already taken to total_timesteps when not resetting the counter, so pass the remainder.
