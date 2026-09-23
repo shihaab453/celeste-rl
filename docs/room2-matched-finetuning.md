@@ -20,6 +20,8 @@ Within each matched seed, success was averaged equally across the twelve complet
 
 **The predeclared rule was not met.** The observed mean favoured A, but the interval includes zero and the paired test does not establish a difference. Varied starts improved three matched seeds and reduced success in three. Seed 25 had the largest negative B minus A difference and remains in the analysis.
 
+With six seeds the exact test has only 64 sign assignments, so it can reach p <= 0.05 only when all six seed differences have the same sign (p = 2/64 = 0.031); a single seed with the opposite sign gives at least 4/64 = 0.0625. The Room 1 comparison had the same property.
+
 ## Matched-seed detail
 
 | Seed | A route-macro | B route-macro | B minus A, points | A successes | B successes |
@@ -35,8 +37,27 @@ The state-weighted totals are descriptive: A cleared 1040/1200 (86.7%); B cleare
 
 In seed 25, B scored 47.3% route-macro success against A's 82.2%, and B timed out on 57 of 200 starts. This is a descriptive observation, not a reason to remove the seed or select a different checkpoint.
 
+## Seed 25 B in its training records
+
+Everything in this section is descriptive. It does not replace the predeclared analysis, which includes seed 25.
+
+Training records, which never touch the held-out states, show that B seed 25 stopped clearing from the canonical start early in training. It cleared 2 of its first 36 canonical-start episodes (the first 50,000 accepted transitions) and 0 of the remaining 150. Of those 150, 65 timed out, 45 of them ending at world x 320 to 329, and 85 died further right, at world x 372 to 443. In the final fifth of training the other five B runs cleared 72% to 89% of their canonical-start episodes and the six A runs cleared 83% to 96%; B seed 25 cleared none of its 45.
+
+On the held-out set, 37 of B seed 25's 57 timeouts never got past world x 320 to 329, the same place its training timeouts stalled. Its failures are concentrated in starts early in the room:
+
+| Start depth, frames into Room 2 | States | A seed 25 | B seed 25 | A seeds 20-24 | B seeds 20-24 |
+|---|---:|---:|---:|---:|---:|
+| 0 to 99 | 39 | 31/39 | 0/39 | 172/195 | 170/195 |
+| 100 to 199 | 43 | 27/43 | 3/43 | 153/215 | 155/215 |
+| 200 to 299 | 49 | 40/49 | 27/49 | 209/245 | 216/245 |
+| 300 and later | 69 | 68/69 | 64/69 | 340/345 | 333/345 |
+
+B seed 25 cleared 3 of the 82 starts in the first 200 frames, against A seed 25's 58 of 82. Across seeds 20 to 24 the mean B minus A route-macro difference was 0.0 points, and pooled over those five seeds the two arms were within 3 points of each other at every start depth. Six seeds cannot estimate how often a varied-start run fails in this way.
+
+Starts 300 or more frames into the room were near ceiling for both arms: 67 to 69 of 69 in each A run and 64 to 69 of 69 in each B run. A's overall Room 2 success of 86.8% also left much less room to improve than Room 1, where A scored 52.2%.
+
 ## Scope and audit
 
 The fixed Room 2 task replays a pinned Room 1 exit fixture to the first controllable Room 2 frame. These results measure Room 2 competence from that setup and its held-out Room 2 states. Natural Room 1-to-Room 2 retention has not been tested.
 
-The analyzer verified all twelve checkpoint hashes, the clean evaluation commit and pinned runtime, all result and episode-file hashes, and exactly one valid row for every frozen state in each run. A separate task audit confirmed the Room 2 task identity, zero stale starts, and 2,400 complete rows. The machine-readable analysis, including per-route results and artifact hashes, is in `docs/results/room2-heldout-ab-200.json`. Live run records remain local in `runs/campaign/20260923-033530-room2-heldout-ab-200-v1/`.
+The analyzer verified all twelve checkpoint hashes, the clean evaluation commit and pinned runtime, all result and episode-file hashes, and exactly one valid row for every frozen state in each run. A separate task audit confirmed the Room 2 task identity, zero stale starts, and 2,400 complete rows. In every run, `latest.zip` and `step_000501760.zip` differ in bytes: the only differing archive member is `data`, and within it only the serialized `observation_space` entry, which decodes to an equal space. Policy weights and optimizer state are byte-identical, and `latest.zip` is the file whose hash the evaluation plan pinned. The machine-readable analysis, including per-route results and artifact hashes, is in `docs/results/room2-heldout-ab-200.json`. Live run records remain local in `runs/campaign/20260923-033530-room2-heldout-ab-200-v1/`.
