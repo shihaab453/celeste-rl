@@ -1,0 +1,458 @@
+{
+  "plan": "config\\campaign-room2-heldout-ab-200.json",
+  "plan_sha256": "85eb19be1b2a29a77815be3b02f80b2c705fc5ff9435ee976a35277d181d5fb6",
+  "campaign": "runs\\campaign\\20260923-033530-room2-heldout-ab-200-v1\\summary.json",
+  "campaign_commit": "1913b4d9a13adbf03b3d322490226654fb2a1050",
+  "heldout_set": "config/heldout_starts-room2.json",
+  "heldout_sha256": "ce57def1b3daed78a5aa3e454ab20cc12858a50b764bd0d94f80a1b2d734f8b0",
+  "validated_runs": 12,
+  "validated_episodes": 2400,
+  "heldout_states_per_run": 200,
+  "independent_routes": 12,
+  "run_artifacts": {
+    "heldout-room2-A-seed20": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed20\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "ca28dd5249988461e5e3f51d6e327685f5806dbfa9c4c8138d83b1f82b33e661",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-033536/results.json",
+      "results_sha256": "0d3b524fdeff7dfc7643b649c8cc995278883bf218ec039499fafd8f668e5758",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-033536/episodes.jsonl",
+      "episodes_sha256": "53aa3a50267f366e35ef02576cdc42c4ddfaa51856bfd2636c7c832f2de2d42e"
+    },
+    "heldout-room2-B-seed20": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed20\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "b342b626a5da778c5605717a1a470688c2005926e0dfd8ed4b91c0801650649d",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-033827/results.json",
+      "results_sha256": "f26809e8fc8dfcaeae95a57e80b1936319582a07c462d0c4e6ff422fd3cd5330",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-033827/episodes.jsonl",
+      "episodes_sha256": "9e03c770e141136123e21fc28e4d33b62a89957ea5c3c3eb56caaf3d5176c4d1"
+    },
+    "heldout-room2-A-seed21": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed21\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "b37fed30ef3914df67989ec76a257b9177304bd838ad8dacdc661a04d09e6e33",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-034119/results.json",
+      "results_sha256": "21c948a91714e1801efe8f6534aba06d4d6b5d754173044c7c240eb5c0954269",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-034119/episodes.jsonl",
+      "episodes_sha256": "5a4ebb7f3ce6faff26282e28b5e0a4f2dbb93384b8f63efce03d92fc51a8b284"
+    },
+    "heldout-room2-B-seed21": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed21\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "25997a0ad6b12ef3beb84cf25a8160662b53d141982f603999b36fd4f6beb4d7",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-034410/results.json",
+      "results_sha256": "9d762e186d9b2188ea0bae7c7e0d8c74dd702dc67bdc534e2495da6e5680d232",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-034410/episodes.jsonl",
+      "episodes_sha256": "d794602ced73447704603b1629b1d8b0f2be9e65c08128f7060f18be6e9e318a"
+    },
+    "heldout-room2-A-seed22": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed22\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "d1074a806dabe4c42ba6a710ec0e1a7673169869d74fbc9f5678de37c2275cc9",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-034727/results.json",
+      "results_sha256": "aa8949a56c969dc1242d3d0a253455aaf64d6e85325bd605999136daeb71fcdb",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-034727/episodes.jsonl",
+      "episodes_sha256": "8260b05b1dcf153fb7b24469d735ad134cd320247d02e4377c8cf6557176470d"
+    },
+    "heldout-room2-B-seed22": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed22\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "fcf1c6ed5d4690291a5ac8d7576d7821e6d4fdde83cac6ac17eac94968b324cb",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-035044/results.json",
+      "results_sha256": "66774a3b9f4772072aba72ebafe9341c06399c654b5dcb0e33a283dbcd41db4d",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-035044/episodes.jsonl",
+      "episodes_sha256": "87bcd85fc6f3742393bbb9933e574569296fa3799126fa6f171b81ca65980e22"
+    },
+    "heldout-room2-A-seed23": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed23\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "5a1e0e29c1cc3aff70d54cf5c0562fb745067cf376f45a85fd5f9548c77f8f49",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-035355/results.json",
+      "results_sha256": "ed55ec5336ecc2a27aa693470caf9005e785d529bd2be5e02b98e77c7e8d09c0",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-035355/episodes.jsonl",
+      "episodes_sha256": "32ece39f15d78df0617d80e4a948b1ffee74e8083165984f949bf47797b02bd6"
+    },
+    "heldout-room2-B-seed23": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed23\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "3bd415284be600225acbf69197a14ad43f5ddd5365f47ab2bf60ec09ef6b7335",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-035716/results.json",
+      "results_sha256": "a9d2d4beca1a5557f3c764c61dd754d711d51ed590760b790ce01e2867f36d5d",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-035716/episodes.jsonl",
+      "episodes_sha256": "8a4ac8abddd38092b1d76ee35f4bb2fd443ae1114c77c44c2a9d41a1e3260ede"
+    },
+    "heldout-room2-A-seed24": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed24\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "1528a073de18c688f181b636a2845023fed3c8805aacd6c0aa40c0efc9e58c29",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-040031/results.json",
+      "results_sha256": "6e3f5d7289995a83550d35fa17e5660895de8c62d26143ebb73fda8c8120caa5",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-040031/episodes.jsonl",
+      "episodes_sha256": "c3a9146125542fbad0015ac30171ad08929ba175fea7c3be481212d7ad48a7c6"
+    },
+    "heldout-room2-B-seed24": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed24\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "55d8c9df538930b0af22d1a2522359a5054209838b7b042431348009dcf2264b",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-040417/results.json",
+      "results_sha256": "c282f08ac9546f013be63066bd5af95a5b69ed5761063ba9d01c4adee45988d9",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-040417/episodes.jsonl",
+      "episodes_sha256": "c8b052419d9a09e6c5b93034aa031065208ca897564aae91d775d037a7379073"
+    },
+    "heldout-room2-A-seed25": {
+      "checkpoint": "runs\\train\\room2-ab-A-seed25\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "77542e6d8fe926923c81e5c6b24768336900fff1fd05aa4790b978d1c2bc1192",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-040739/results.json",
+      "results_sha256": "c37a1cddc35738a600edc5774e7a6309a8d1d811f009ad88010a3853eccd12cc",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-040739/episodes.jsonl",
+      "episodes_sha256": "9444b6acdd635a669ea491972355cac187d7bb0e95e28c0d015e31120721c8a5"
+    },
+    "heldout-room2-B-seed25": {
+      "checkpoint": "runs\\train\\room2-ab-B-seed25\\checkpoints\\latest.zip",
+      "checkpoint_sha256": "7c471076ecf2048f8f2a8d6ea82341acde139609791408edf3f406facdebb27f",
+      "results": "runs/heldout-evaluation/chapter-1-room-2/20260923-041028/results.json",
+      "results_sha256": "4a630978fa0060dd76a99faabd8bc702a71028ae8cc0b0c3a2588644224355ea",
+      "episodes": "runs/heldout-evaluation/chapter-1-room-2/20260923-041028/episodes.jsonl",
+      "episodes_sha256": "01b05c3c9e307fe3989ad64669e5b06b419fab815aee98727b8bcbd8a19a791c"
+    }
+  },
+  "primary": {
+    "estimand": "mean paired B-minus-A route-macro success-rate difference",
+    "A_route_macro_success_rate": 0.8675403598065211,
+    "B_route_macro_success_rate": 0.8092705911820615,
+    "B_minus_A": -0.05826976862445971,
+    "pair_differences": {
+      "20": -0.09173794994733209,
+      "21": -0.01613325281803535,
+      "22": 0.04745237943893543,
+      "23": 0.03995923534682111,
+      "24": 0.020380396946472423,
+      "25": -0.3495394207136198
+    },
+    "exact_two_sided_paired_sign_flip_p": 0.5,
+    "crossed_seed_route_bootstrap_95_interval": [
+      -0.18694354772801566,
+      0.03414710459598067
+    ],
+    "bootstrap_samples": 100000,
+    "bootstrap_seed": 20260922
+  },
+  "secondary": {
+    "arms": {
+      "A": {
+        "successes": 1040,
+        "episodes": 1200,
+        "state_weighted_success_rate": 0.8666666666666667,
+        "route_macro_success_rate": 0.8675403598065211
+      },
+      "B": {
+        "successes": 968,
+        "episodes": 1200,
+        "state_weighted_success_rate": 0.8066666666666666,
+        "route_macro_success_rate": 0.8092705911820615
+      }
+    },
+    "B_minus_A_state_weighted": -0.06000000000000005,
+    "per_seed": {
+      "20": {
+        "A": {
+          "successes": 173,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.865,
+          "route_macro_success_rate": 0.8687283198939378,
+          "endings": {
+            "death": 27,
+            "success": 173
+          }
+        },
+        "B": {
+          "successes": 154,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.77,
+          "route_macro_success_rate": 0.7769903699466058,
+          "endings": {
+            "death": 46,
+            "success": 154
+          }
+        },
+        "B_minus_A_route_macro": -0.09173794994733209,
+        "B_minus_A_state_weighted": -0.09499999999999997
+      },
+      "21": {
+        "A": {
+          "successes": 185,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.925,
+          "route_macro_success_rate": 0.9300630425701936,
+          "endings": {
+            "death": 15,
+            "success": 185
+          }
+        },
+        "B": {
+          "successes": 183,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.915,
+          "route_macro_success_rate": 0.9139297897521582,
+          "endings": {
+            "death": 16,
+            "success": 183,
+            "timeout": 1
+          }
+        },
+        "B_minus_A_route_macro": -0.01613325281803535,
+        "B_minus_A_state_weighted": -0.010000000000000009
+      },
+      "22": {
+        "A": {
+          "successes": 173,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.865,
+          "route_macro_success_rate": 0.8694349475742497,
+          "endings": {
+            "death": 24,
+            "success": 173,
+            "timeout": 3
+          }
+        },
+        "B": {
+          "successes": 183,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.915,
+          "route_macro_success_rate": 0.9168873270131851,
+          "endings": {
+            "death": 17,
+            "success": 183
+          }
+        },
+        "B_minus_A_route_macro": 0.04745237943893543,
+        "B_minus_A_state_weighted": 0.050000000000000044
+      },
+      "23": {
+        "A": {
+          "successes": 174,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.87,
+          "route_macro_success_rate": 0.8711984520479944,
+          "endings": {
+            "death": 26,
+            "success": 174
+          }
+        },
+        "B": {
+          "successes": 182,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.91,
+          "route_macro_success_rate": 0.9111576873948155,
+          "endings": {
+            "death": 18,
+            "success": 182
+          }
+        },
+        "B_minus_A_route_macro": 0.03995923534682111,
+        "B_minus_A_state_weighted": 0.040000000000000036
+      },
+      "24": {
+        "A": {
+          "successes": 169,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.845,
+          "route_macro_success_rate": 0.8434471974017169,
+          "endings": {
+            "death": 26,
+            "success": 169,
+            "timeout": 5
+          }
+        },
+        "B": {
+          "successes": 172,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.86,
+          "route_macro_success_rate": 0.8638275943481893,
+          "endings": {
+            "death": 24,
+            "success": 172,
+            "timeout": 4
+          }
+        },
+        "B_minus_A_route_macro": 0.020380396946472423,
+        "B_minus_A_state_weighted": 0.015000000000000013
+      },
+      "25": {
+        "A": {
+          "successes": 166,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.83,
+          "route_macro_success_rate": 0.8223701993510346,
+          "endings": {
+            "death": 33,
+            "success": 166,
+            "timeout": 1
+          }
+        },
+        "B": {
+          "successes": 94,
+          "episodes": 200,
+          "state_weighted_success_rate": 0.47,
+          "route_macro_success_rate": 0.4728307786374148,
+          "endings": {
+            "death": 49,
+            "success": 94,
+            "timeout": 57
+          }
+        },
+        "B_minus_A_route_macro": -0.3495394207136198,
+        "B_minus_A_state_weighted": -0.36
+      }
+    },
+    "per_route": {
+      "20260922-204255": {
+        "A": {
+          "successes": 74,
+          "episodes": 96,
+          "success_rate": 0.7708333333333334
+        },
+        "B": {
+          "successes": 70,
+          "episodes": 96,
+          "success_rate": 0.7291666666666666
+        },
+        "B_minus_A": -0.04166666666666674
+      },
+      "20260922-204520": {
+        "A": {
+          "successes": 103,
+          "episodes": 120,
+          "success_rate": 0.8583333333333333
+        },
+        "B": {
+          "successes": 96,
+          "episodes": 120,
+          "success_rate": 0.8
+        },
+        "B_minus_A": -0.05833333333333324
+      },
+      "20260922-204615": {
+        "A": {
+          "successes": 90,
+          "episodes": 96,
+          "success_rate": 0.9375
+        },
+        "B": {
+          "successes": 84,
+          "episodes": 96,
+          "success_rate": 0.875
+        },
+        "B_minus_A": -0.0625
+      },
+      "20260922-204654": {
+        "A": {
+          "successes": 75,
+          "episodes": 84,
+          "success_rate": 0.8928571428571429
+        },
+        "B": {
+          "successes": 75,
+          "episodes": 84,
+          "success_rate": 0.8928571428571429
+        },
+        "B_minus_A": 0.0
+      },
+      "20260922-204749": {
+        "A": {
+          "successes": 76,
+          "episodes": 90,
+          "success_rate": 0.8444444444444444
+        },
+        "B": {
+          "successes": 72,
+          "episodes": 90,
+          "success_rate": 0.8
+        },
+        "B_minus_A": -0.0444444444444444
+      },
+      "20260922-204830": {
+        "A": {
+          "successes": 121,
+          "episodes": 138,
+          "success_rate": 0.8768115942028986
+        },
+        "B": {
+          "successes": 109,
+          "episodes": 138,
+          "success_rate": 0.7898550724637681
+        },
+        "B_minus_A": -0.08695652173913049
+      },
+      "20260922-204926": {
+        "A": {
+          "successes": 96,
+          "episodes": 114,
+          "success_rate": 0.8421052631578947
+        },
+        "B": {
+          "successes": 87,
+          "episodes": 114,
+          "success_rate": 0.7631578947368421
+        },
+        "B_minus_A": -0.07894736842105254
+      },
+      "20260922-205005": {
+        "A": {
+          "successes": 83,
+          "episodes": 96,
+          "success_rate": 0.8645833333333334
+        },
+        "B": {
+          "successes": 81,
+          "episodes": 96,
+          "success_rate": 0.84375
+        },
+        "B_minus_A": -0.02083333333333337
+      },
+      "20260922-205236": {
+        "A": {
+          "successes": 81,
+          "episodes": 90,
+          "success_rate": 0.9
+        },
+        "B": {
+          "successes": 76,
+          "episodes": 90,
+          "success_rate": 0.8444444444444444
+        },
+        "B_minus_A": -0.05555555555555558
+      },
+      "20260922-205322": {
+        "A": {
+          "successes": 93,
+          "episodes": 108,
+          "success_rate": 0.8611111111111112
+        },
+        "B": {
+          "successes": 84,
+          "episodes": 108,
+          "success_rate": 0.7777777777777778
+        },
+        "B_minus_A": -0.08333333333333337
+      },
+      "20260922-205410": {
+        "A": {
+          "successes": 74,
+          "episodes": 84,
+          "success_rate": 0.8809523809523809
+        },
+        "B": {
+          "successes": 66,
+          "episodes": 84,
+          "success_rate": 0.7857142857142857
+        },
+        "B_minus_A": -0.09523809523809523
+      },
+      "20260922-205441": {
+        "A": {
+          "successes": 74,
+          "episodes": 84,
+          "success_rate": 0.8809523809523809
+        },
+        "B": {
+          "successes": 68,
+          "episodes": 84,
+          "success_rate": 0.8095238095238095
+        },
+        "B_minus_A": -0.0714285714285714
+      }
+    }
+  }
+}
