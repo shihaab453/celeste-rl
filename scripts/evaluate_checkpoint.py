@@ -34,6 +34,11 @@ options this is the original behaviour: `--episodes` stochastic canonical episod
 
 Results go to runs/evaluation/<timestamp>/ (named tasks: runs/evaluation/<task>/<timestamp>/): results.json,
 episodes.jsonl with one row per episode, and starts.json when demonstration starts are used.
+
+Field meanings in episodes.jsonl: `max_x` is the true running maximum of world x over the episode and `end_x`,
+`end_y` are the position on the last frame that had a player (both from the training progress helper). This
+differs from `scripts/evaluate_heldout.py`, whose `max_x` and `end_x` are the final frame's x. The two agree
+whenever the final frame has a player, which was true of every Room 2 held-out row.
 """
 from __future__ import annotations
 

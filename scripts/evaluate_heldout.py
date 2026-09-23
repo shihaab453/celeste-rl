@@ -20,6 +20,11 @@ confidence interval. Cluster-aware uncertainty belongs in the analysis across ro
 
 Room 1 results go to `runs/heldout-evaluation/<timestamp>/results.json`; named tasks add a task directory.
 Every attempted episode is written to `episodes.jsonl`.
+
+Field meanings in episodes.jsonl: `max_x`, despite its name, and `end_x` are both the player's world x on the
+episode's final frame; `max_x_episode` is the true running maximum. In `scripts/evaluate_checkpoint.py` rows,
+`max_x` is the running maximum and `end_x` is the last frame that had a player. The two `end_x` values agree
+whenever the final frame has a player, which was true of every Room 2 held-out row.
 """
 from __future__ import annotations
 
