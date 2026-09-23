@@ -1,7 +1,7 @@
 {
   "name": "heldout-room2-v2-procedure",
   "written": "2026-09-23",
-  "status": "Procedure only. Nothing generated. The guards G1 and G2 below are implemented and tested (commit f1a0135, amendment 1). The generation itself still needs an orchestrator review and the owner's approval.",
+  "status": "Procedure only. Nothing generated. The guards G1 and G2 below are implemented and tested (commit f1a0135, amendment 1). The owner approved generation on 2026-09-23; attempt 1 produced no route and was stopped (amendment 2).",
   "why": "The current Room 2 held-out set (config/heldout_starts-room2.json) has had its aggregate failure band seen, so any follow-up comparison (O1, O2, or an entropy or checkpoint-schedule experiment) needs a fresh set. The procedure is fixed now, before the noise-check results exist, so nothing learned from them can shape the new test set.",
   "task": {
     "name": "chapter-1-room-2",
@@ -42,10 +42,10 @@
   "procedure": {
     "route_namespace": "runs/room2-heldout-v2-routes (new, empty; never the old runs/room2-heldout-routes)",
     "output": "config/heldout_starts-room2-v2.json (must not exist beforehand; never config/heldout_starts-room2.json)",
-    "command": "scripts/make_heldout_starts.py --task-definition config/room2.json --demonstrations config/demonstrations-room2.json --exclude-heldout config/heldout_starts-room2.json --routes-dir runs/room2-heldout-v2-routes --output config/heldout_starts-room2-v2.json --first-seed 112 --searches 12 --min-routes 12 --states 200 --earliest 20 --spacing 12 --search-minutes 10",
-    "seeds": "112 to 123 first. Checked 2026-09-23 against every route.json under runs/: no namespace has used any of them (used: Room 2 held-out 100 to 111, Room 1 held-out 100 to 110, demonstrations 0 to 6, Room 1 routes 0 to 6 and 100 to 104).",
+    "command": "scripts/make_heldout_starts.py --task-definition config/room2.json --demonstrations config/demonstrations-room2.json --exclude-heldout config/heldout_starts-room2.json --routes-dir runs/room2-heldout-v2-routes --output config/heldout_starts-room2-v2.json --first-seed 116 --searches 12 --min-routes 12 --states 200 --earliest 20 --spacing 12 --search-minutes 10",
+    "seeds": "116 to 127 first (amendment 2; 112 to 115 were tried in attempt 1 and are never used again). Checked 2026-09-23 against every route.json under runs/: no namespace has used any seed from 112 on (used: Room 2 held-out 100 to 111, Room 1 held-out 100 to 110, demonstrations 0 to 6, Room 1 routes 0 to 6 and 100 to 104).",
     "routes_and_states": "12 routes and 200 states, matching the original. --min-routes is 12 rather than the default 10 so the new set has the same number of route clusters as the one it replaces.",
-    "seed_that_finds_no_route": "The build writes nothing and exits if fewer than 12 unique routes exist. Rerun with --first-seed set to the lowest seed never tried (124, then 125, and so on) and --searches equal to the routes still missing. A seed is tried once and never retried. Every attempted seed and its outcome is recorded in the handoff and in the commit message that freezes the set.",
+    "seed_that_finds_no_route": "The build writes nothing and exits if fewer than 12 unique routes exist. Rerun with --first-seed set to the lowest seed never tried (128, then 129, and so on) and --searches equal to the routes still missing. A seed is tried once and never retried. Every attempted seed and its outcome is recorded in the handoff and in the commit message that freezes the set.",
     "stuck_route_rule": "If any guard (demonstration overlap or G1) rejects a route, the build refuses and writes nothing, and the rejected route stays in the namespace, so every later run over the namespace would refuse too. Then: (1) search the missing routes with new, never-tried seeds, using the command above with --first-seed set to the lowest seed never tried and --searches equal to the routes still missing; the script searches before it checks, so the new routes land in the namespace even though that run refuses again; (2) build with the command above plus --routes <explicit list of the accepted route directories> --searches 0, so the rejected route is never read; (3) record the excluded route folder, its seed, the guard that rejected it and the reason, in the handoff and in the commit message that freezes the set. Never delete or move a route folder. If a new route is rejected too, repeat from (1).",
     "search_budget": "10 minutes per seed (--search-minutes 10), the original default.",
     "candidates_and_selection": "Identical to the original: earliest task frame 20, spacing 12, prefixes shorter than the transition step minus 12, replay-validate every candidate, even selection of 200 by stride."
@@ -74,6 +74,13 @@
       "number": 1,
       "change": "G1 and G2 implemented in scripts/make_heldout_starts.py (commit f1a0135) and their status updated; status text updated; checked that the command's --exclude-heldout and --first-seed match the real option names (the command itself is unchanged); added the stuck-route rule and the optional descriptive overlap count.",
       "reason": "The procedure required both guards before generation, and a rejected route would otherwise block every later build over the namespace with no declared way forward. Nothing has been generated."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 2,
+      "change": "Seeds 112 to 115 are recorded as tried and will not be used again; the build restarts with --first-seed 116 --searches 12 (seeds 116 to 127, checked unused in every namespace), otherwise the same command. Rule for every seed from now on: a seed counts as tried as soon as its search process has been started, whatever happens next (launch failure, crash, interruption or no route). It is never reused, and a rerun always starts at the lowest seed never tried. Before any build, a launch-only readiness check must show the game copy answering on DebugRC, with no search run. The command, the seeds field, the example in seed_that_finds_no_route and the status text are updated to match.",
+      "reason": "Attempt 1 (2026-09-23 18:19) started before Steam was ready. Seeds 112 to 114 failed inside the game launch ('Steam not found!' in the game's errorLog.txt; no search step ran), and seed 115 launched and was stopped by the worker, possibly mid-search. No route was produced and no set was generated. Counting all four as tried keeps the rule simple and removes any choice about which seeds to reuse. The four empty route folders stay in runs/room2-heldout-v2-routes; the build ignores folders without route.json."
     }
   ]
 }
