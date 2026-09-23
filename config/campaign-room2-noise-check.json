@@ -88,9 +88,9 @@
     ],
     "analysis_code": {
       "script": "scripts/analyze_noise_check.py",
-      "sha256": "b6a5074bc9d777a2844c5a10e067c09bc0268d1606d3d077d81d3e1c93056f66",
-      "git_blob": "a17a5bd63adcdbe47af218b0e200bed8403ec8d8",
-      "commit": "85bb8ed2da93f84acce2c0036daf0b0c7cab1c20",
+      "sha256": "3dfdfd67e8ef51ac16b6a296a11dce3020504544e0c92303bda257dd80c7aebb",
+      "git_blob": "c45fa11922b8e0c9e8d0c740c5f8c45808f4b993",
+      "commit": "44f036960bb89e29ffe8da22788a10d6f9263faf",
       "note": "Committed before any run. The sha256 is of the file as committed; with line-ending conversion the git blob id is the stable identity. Run with --output to a new path."
     },
     "primary_start_x_below": 460,
@@ -771,6 +771,13 @@
       "number": 5,
       "change": "Tool re-pinned from 84e2777 to 85bb8ed; documented the two end_x meanings.",
       "reason": "A docstring was added to evaluate_checkpoint.py; its behaviour is unchanged."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 6,
+      "change": "Analysis script re-pinned from 85bb8ed (blob a17a5bd) to 44f0369 (blob c45fa11). The script now checks the primary start count per route against starts.demonstration.primary_route_counts, refuses unless its own git blob equals analysis_code.git_blob and records that blob in its output; its fail-closed campaign checks gained tests. The declared analysis, decision rule and tool pin are unchanged.",
+      "reason": "A review found that only the total of 42 primary starts was checked, that the script did not confirm it was the pinned analysis, and that the fail-closed checks in load_campaign had no tests. No noise-check data exists yet."
     }
   ]
 }
