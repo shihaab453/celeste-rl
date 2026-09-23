@@ -17,8 +17,9 @@ eleven route-level descriptive comparisons.
 **That benefit did not replicate in Room 2.** The same matched design in
 [Room 2](docs/room2-matched-finetuning.md) found no evidence of a varied-start benefit: canonical-start
 training scored 86.8% route-macro success and varied-start training 80.9%, a paired difference of -5.8 points
-with a 95% crossed seed-route interval from -18.7 to +3.4 points and exact p = 0.50. Across seeds 20 to 24 the
-mean difference was 0.0 points; the varied-start run for seed 25 collapsed during training. Both arms remain below the
+with a 95% crossed seed-route interval from -18.7 to +3.4 points and exact p = 0.50. The varied-start run for
+seed 25 collapsed during training. As a descriptive observation, not a sensitivity analysis, seeds 20 to 24
+averaged a 0.0 point difference; the six-seed result above is the one that counts. Both arms remain below the
 roadmap's 99% held-out bar.
 
 The fixed canonical start remains a poor measure of generalisation: two policies that scored 98.0% and 98.5%
@@ -30,7 +31,7 @@ Three experiment reports, and the negative one came first and matters as much:
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
-| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points** under the predeclared matched, route-cluster-aware analysis |
+| [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points in Room 1** under the predeclared matched, route-cluster-aware analysis |
 | [Room 2: matched fine-tuning](docs/room2-matched-finetuning.md) | **No evidence of a varied-start benefit**: B minus A -5.8 points, 95% crossed seed-route interval -18.7 to +3.4, exact paired p = 0.50; one of six varied-start runs collapsed during training |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
@@ -134,8 +135,8 @@ Do not use `uv sync` or `uv run` in this repository: uv's project mode manages a
 Phases 0 to 3B are done: the interface, a PPO implementation studied on CartPole, the environment, the
 no-demonstration attempt and the demonstration-assisted comparison. The Room 2 matched comparison is also done.
 
-1. **Room 2's shared failure section.** Both arms fail almost entirely in the same stretch of Room 2, so the
-   next change should follow from what that section demands of the player rather than from how starts are
+1. **Room 2's shared failure section.** Both arms fail almost entirely in
+   [the same stretch of Room 2](docs/room2-matched-finetuning.md#where-training-episodes-fail), so the next change should follow from what that section demands of the player rather than from how starts are
    sampled. The diagnosis uses training records and demonstrations, not the held-out states, and any
    follow-up experiment will disclose that it was designed after seeing where held-out failures clustered.
 2. **Two-room retention.** Mix Rooms 1 and 2 during training and measure both separately, so learning Room 2

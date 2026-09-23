@@ -56,6 +56,16 @@ B seed 25 cleared 3 of the 82 starts in the first 200 frames, against A seed 25'
 
 Starts 300 or more frames into the room were near ceiling for both arms: 67 to 69 of 69 in each A run and 64 to 69 of 69 in each B run. A's overall Room 2 success of 86.8% also left much less room to improve than Room 1, where A scored 52.2%.
 
+## Where training episodes fail
+
+Everything in this section is descriptive. It uses training records, the room's map data and the seven demonstrations, not the held-out states.
+
+Both arms fail in the same short stretch of the room. In every one of the 12 training runs, 93.5% to 99.6% of training deaths ended between world x 360 and 459, and no training death ended left of x 372. The game's map data for this room (`1-ForsakenCity.bin`, room `lvl_2`) shows what that stretch contains: a bottomless pit from x 368 to 407, a block from x 400 to 439 whose top (y -72) is covered in upward spikes, and a gap from x 432 to 463 with upward spikes along its floor.
+
+Just before the pit, on a raised step at x 352 to 367, the map places a spring, an object that bounces the player upward. All seven demonstrations touch it, 11 times in total. On every touch the player's speed becomes exactly (0, -185) pixels per second in that frame, which is what the game's spring bounce sets, and 10 of the 11 touches also gave back a used dash (in the other the dash was still available). After its last bounce, every demonstration starts a dash between x 364 and 400 and passes above the spiked block.
+
+The policy's observation has no channel for springs. Its local grid shows the step as a plain solid block with empty cells above it. The policy does receive its own position, speed and dash count, so in this single fixed room it could still learn where the spring is. Whether the missing spring contributes to the failures in this stretch is a hypothesis that these runs do not test.
+
 ## Scope and audit
 
 The fixed Room 2 task replays a pinned Room 1 exit fixture to the first controllable Room 2 frame. These results measure Room 2 competence from that setup and its held-out Room 2 states. Natural Room 1-to-Room 2 retention has not been tested.
