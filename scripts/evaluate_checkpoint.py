@@ -421,6 +421,8 @@ def main() -> int:
     (output_dir / "results.json").write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
     if aborted:
         print(f"\nSTOPPED: {aborted}. Rows so far are in {output_dir / 'episodes.jsonl'}.")
+        # Announced even on a stop, so a campaign summary links the partial record and its hashes.
+        print(f"Results: {output_dir / 'results.json'}")
         return 3
     rate = f"{results['success_rate']:.1%}" if results["success_rate"] is not None else "n/a"
     print(f"\nsuccess {len(successes)}/{len(episodes)} = {rate}, 95% interval {low:.1%} to {high:.1%}")
