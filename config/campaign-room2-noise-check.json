@@ -14,8 +14,9 @@
   },
   "tool": {
     "script": "scripts/evaluate_checkpoint.py",
-    "commit": "84e27779490bbfa0c583dd059cd9b57c5b52d780",
-    "note": "The plan must be run at a commit whose scripts/evaluate_checkpoint.py matches this commit."
+    "commit": "85bb8ed2da93f84acce2c0036daf0b0c7cab1c20",
+    "git_blob": "b2acc16780795cc814fb2b3fda179233d5dd6623",
+    "note": "The campaign must run at a commit whose scripts/evaluate_checkpoint.py is this same blob; the analysis script checks it. Re-pinned from 84e2777 on 2026-09-23 because a docstring was added (amendment 5); no behaviour changed."
   },
   "held_out_use": "None. config/heldout_starts-room2.json and every held-out route are never read. The tool refuses any input path naming a held-out file. These starts overlap the demonstrations by design and must never be used as held-out data.",
   "starts": {
@@ -46,7 +47,18 @@
         "360 to 459": 17,
         "after 459": 30
       },
-      "validation": "The environment's arrival check validates every replay. Any fallback to the task start or any start problem stops that checkpoint's run (exit 3); it is a failed run, never a result."
+      "validation": "The environment's arrival check validates every replay. Any fallback to the task start or any start problem stops that checkpoint's run (exit 3); it is a failed run, never a result.",
+      "start_replay_failure": "Start validity does not depend on the policy. If any start fails to replay, stop the campaign, amend the plan to drop that start with the reason, re-commit, and restart every checkpoint from scratch. No partial rows from a stopped campaign are analysed.",
+      "primary_route_counts": {
+        "20260920-021356": 6,
+        "20260922-163841": 9,
+        "20260922-164006": 6,
+        "20260922-164111": 4,
+        "20260922-164552": 6,
+        "20260922-164712": 5,
+        "20260922-164815": 6,
+        "total": 42
+      }
     }
   },
   "checkpoints": "The 12 final latest.zip files pinned by the hashes in config/campaign-room2-heldout-ab-200.json, re-verified 2026-09-23. The clone is a descriptive reference, labelled biased on these starts because it was fitted on 5 of the 7 routes (check routes 20260922-164006 and 20260922-164552).",
@@ -64,29 +76,50 @@
   "analysis": {
     "label": "diagnostic only; not a confirmatory A/B claim; does not change the published Room 2 result",
     "determinism_rule": "If a start's two deterministic repeats disagree, report it as a validity problem, use the mean of the two repeats for that start, and state how many starts were affected. Never silently use only the first repeat.",
-    "primary": "Per checkpoint: for each of the 7 route clusters, the mean over its starts of (deterministic success, averaged over the 2 repeats) minus (stochastic success rate out of 5); then the equal-weight mean of the 7 route values. Starts from one route are adjacent prefixes and are never treated as independent; the route is the cluster.",
+    "primary": "Per checkpoint, over the 42 demonstration starts whose start x is below 460: for each of the 7 route clusters, the mean over its primary starts of (deterministic success, averaged over the 2 repeats) minus (stochastic success rate out of 5); then the equal-weight mean of the 7 route values. Route 20260922-164111 has only 4 primary starts (counts 6, 9, 6, 4, 6, 5, 6). Starts from one route are adjacent prefixes and never independent; the route is the cluster.",
     "canonical_start": "Reported separately per checkpoint: deterministic success (mean of 2 repeats) minus stochastic success out of 50.",
     "summary_over_checkpoints": "The checkpoint is the unit: all 12 values, their median and range, and the count of checkpoints at least +10 points and below +3 points. Arms A and B are also summarised separately, descriptively.",
     "secondary_descriptive": [
-      "primary difference restricted to starts whose start x is before 460 (30 of 72 starts begin after the failure band)",
-      "failures by end_x band (final-frame position): before 360, 360 to 459, after 459, per checkpoint and mode",
+      "the same difference over all 72 demonstration starts, route clusters weighted equally",
+      "failures by end_x band (last frame with a player): before 360, 360 to 459, after 459, per checkpoint and mode",
       "failures by true max_x band (running maximum over the episode), the same bands, labelled separately",
       "ending counts per mode",
       "clone reference row, labelled biased on these starts"
     ],
-    "analysis_code": "The computation above is written and committed as an offline script before any result file of this campaign is opened."
+    "analysis_code": {
+      "script": "scripts/analyze_noise_check.py",
+      "sha256": "b6a5074bc9d777a2844c5a10e067c09bc0268d1606d3d077d81d3e1c93056f66",
+      "git_blob": "a17a5bd63adcdbe47af218b0e200bed8403ec8d8",
+      "commit": "85bb8ed2da93f84acce2c0036daf0b0c7cab1c20",
+      "note": "Committed before any run. The sha256 is of the file as committed; with line-ending conversion the git blob id is the stable identity. Run with --output to a new path."
+    },
+    "primary_start_x_below": 460,
+    "primary_starts": 42,
+    "start_x_definition": "A start's x is its recorded world position x in the start list (starts.json), the expected arrival position checked by the environment."
   },
   "decision_rule": {
     "written_before_data": true,
-    "rule": "If the primary deterministic-minus-stochastic difference is at least +10 points in at least 9 of the 12 checkpoints, recommend that the next experiment predeclares its evaluation mode and treats the fine-tuning entropy setting as a training-design question, ahead of O1. If it is below +3 points in at least 9 of the 12, noise is not the main cost: recommend O1 or O2. Otherwise the check is inconclusive and makes no recommendation. Deterministic play can also be worse, which is why the rule is two-sided. The owner makes the final call.",
+    "rule": "Applied to the primary (the 42 starts before x 460). If the primary deterministic-minus-stochastic difference is at least +10 points in at least 9 of the 12 checkpoints, recommend that the next experiment predeclares its evaluation mode and treats the fine-tuning entropy setting as a training-design question, ahead of O1. If it is below +3 points in at least 9 of the 12, noise is not the main cost: recommend O1 or O2. Otherwise the check is inconclusive and makes no recommendation. Deterministic play can also be worse, which is why the rule is two-sided. The clone never counts. The owner makes the final call.",
     "scope": "This check can support a recommendation about the evaluation mode. It cannot show that a lower entropy bonus during training would produce a better policy. That needs a new training experiment.",
-    "no_retroactive_change": "Switching the published Room 2 metric to deterministic play after the fact is ruled out; any adoption goes into a new predeclared experiment."
+    "no_retroactive_change": "Switching the published Room 2 metric to deterministic play after the fact is ruled out; any adoption goes into a new predeclared experiment.",
+    "thresholds": {
+      "favour_points": 10,
+      "favour_min_checkpoints": 9,
+      "null_points": 3,
+      "null_min_checkpoints": 9
+    },
+    "outcomes": {
+      "favour": "recommend predeclaring the evaluation mode in the next experiment, ahead of O1; the training entropy setting stays a separate training-design question",
+      "null": "noise is not the main cost: recommend O1 or O2",
+      "inconclusive": "this check makes no recommendation"
+    }
   },
   "public_claims": "None without a separate owner decision.",
   "budget": {
     "episodes": 7228,
     "estimate": "About 1 to 1.5 s per episode: the Room 2 held-out campaign took 166 to 297 s per 200 episodes including launch. Every episode here also replays a 326 to 886 frame start recipe, and canonical-start episodes play the whole room, up to 1,800 frames on a timeout. About 10 to 15 minutes per checkpoint, about 2 to 3 hours for all 13.",
-    "limit_minutes_per_run": 45
+    "limit_minutes_per_run": 90,
+    "limit_reason": "A policy that often times out costs roughly 5 to 7 s per 1,800-frame episode plus its start replay, the clone especially, and a run that hits its limit is a failed run."
   },
   "machinery": "scripts/run_overnight.py with this committed plan: clean tree, pinned runtime, dry run first, one live game script at a time, Steam running, laptop on the charger.",
   "runs": [
@@ -101,7 +134,7 @@
       "checkpoint_sha256": "ca28dd5249988461e5e3f51d6e327685f5806dbfa9c4c8138d83b1f82b33e661",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed20",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -148,7 +181,7 @@
       "checkpoint_sha256": "b342b626a5da778c5605717a1a470688c2005926e0dfd8ed4b91c0801650649d",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed20",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -195,7 +228,7 @@
       "checkpoint_sha256": "b37fed30ef3914df67989ec76a257b9177304bd838ad8dacdc661a04d09e6e33",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed21",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -242,7 +275,7 @@
       "checkpoint_sha256": "25997a0ad6b12ef3beb84cf25a8160662b53d141982f603999b36fd4f6beb4d7",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed21",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -289,7 +322,7 @@
       "checkpoint_sha256": "d1074a806dabe4c42ba6a710ec0e1a7673169869d74fbc9f5678de37c2275cc9",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed22",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -336,7 +369,7 @@
       "checkpoint_sha256": "fcf1c6ed5d4690291a5ac8d7576d7821e6d4fdde83cac6ac17eac94968b324cb",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed22",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -383,7 +416,7 @@
       "checkpoint_sha256": "5a1e0e29c1cc3aff70d54cf5c0562fb745067cf376f45a85fd5f9548c77f8f49",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed23",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -430,7 +463,7 @@
       "checkpoint_sha256": "3bd415284be600225acbf69197a14ad43f5ddd5365f47ab2bf60ec09ef6b7335",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed23",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -477,7 +510,7 @@
       "checkpoint_sha256": "1528a073de18c688f181b636a2845023fed3c8805aacd6c0aa40c0efc9e58c29",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed24",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -524,7 +557,7 @@
       "checkpoint_sha256": "55d8c9df538930b0af22d1a2522359a5054209838b7b042431348009dcf2264b",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed24",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -571,7 +604,7 @@
       "checkpoint_sha256": "77542e6d8fe926923c81e5c6b24768336900fff1fd05aa4790b978d1c2bc1192",
       "run_dir": "runs/evaluation/_planned-noise-room2-A-seed25",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -618,7 +651,7 @@
       "checkpoint_sha256": "7c471076ecf2048f8f2a8d6ea82341acde139609791408edf3f406facdebb27f",
       "run_dir": "runs/evaluation/_planned-noise-room2-B-seed25",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -665,7 +698,7 @@
       "checkpoint_sha256": "5b00c8c285af7802c4b5760d97875aa81631feb0f3778136cf115fa9f4dbdb1b",
       "run_dir": "runs/evaluation/_planned-noise-room2-clone",
       "resumable": false,
-      "limit_minutes": 45,
+      "limit_minutes": 90,
       "command": [
         "scripts/evaluate_checkpoint.py",
         "--task-definition",
@@ -700,6 +733,44 @@
         "--shaping-scale",
         "2.0"
       ]
+    }
+  ],
+  "field_meanings": "In these rows max_x is the true running maximum of world x and end_x the position on the last frame that had a player. In evaluate_heldout.py rows, max_x and end_x are the final frame's x. The two end_x values agree whenever the final frame has a player.",
+  "amendments": [
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 1,
+      "change": "Primary restricted to the 42 demonstration starts with start x below 460; all 72 kept as secondary.",
+      "reason": "The 30 starts after x 459 are likely at ceiling in both modes: held-out states 300 or more frames into the room scored 93% to 100% per run in both arms. They would pull every checkpoint's difference towards 0."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 2,
+      "change": "Added the start_replay_failure rule: stop, amend, re-commit, restart every checkpoint.",
+      "reason": "Start validity does not depend on the policy, so a partial campaign is never analysed."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 3,
+      "change": "limit_minutes raised from 45 to 90 for every run.",
+      "reason": "A mostly timing-out policy (the clone especially) could exceed 45 minutes, and a timed-out run fails."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 4,
+      "change": "Pinned the committed analysis script (path, sha256, git blob, commit); added decision thresholds.",
+      "reason": "The evaluator prints canonical success into the campaign log during the run, so the analysis must be fixed first."
+    },
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 5,
+      "change": "Tool re-pinned from 84e2777 to 85bb8ed; documented the two end_x meanings.",
+      "reason": "A docstring was added to evaluate_checkpoint.py; its behaviour is unchanged."
     }
   ]
 }
