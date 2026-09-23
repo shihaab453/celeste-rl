@@ -1,0 +1,68 @@
+{
+  "name": "heldout-room2-v2-procedure",
+  "written": "2026-09-23",
+  "status": "Procedure only. Nothing generated. It cannot run until the owner approves and the worker commits the two guard changes G1 and G2 below, and the owner then approves the generation itself after an orchestrator review.",
+  "why": "The current Room 2 held-out set (config/heldout_starts-room2.json) has had its aggregate failure band seen, so any follow-up comparison (O1, O2, or an entropy or checkpoint-schedule experiment) needs a fresh set. The procedure is fixed now, before the noise-check results exist, so nothing learned from them can shape the new test set.",
+  "task": {
+    "name": "chapter-1-room-2",
+    "task_definition": "config/room2.json",
+    "task_definition_sha256": "979b68d1c068c88e0952a50a5b9f37b1cea0dc25e65aa517a9949c6d6d6d46bd",
+    "source_route_sha256": "3ac088282e6bce43054b80b9a52105ab30b0f7a007731c0bec7daa23941dcf30",
+    "start_room": "2",
+    "target_room": "3"
+  },
+  "original_procedure_as_found": {
+    "output": "config/heldout_starts-room2.json, local commit 7a3c1f5; manifest metadata: generated 2026-09-22T20:59:37 at commit 784b1f3, sha256 ce57def1b3daed78a5aa3e454ab20cc12858a50b764bd0d94f80a1b2d734f8b0, 200 states, 12 routes, task frames 20 to 620",
+    "command": "scripts/make_heldout_starts.py --task-definition config/room2.json --demonstrations config/demonstrations-room2.json --routes-dir runs/room2-heldout-routes --output config/heldout_starts-room2.json, with --searches of at least 12 and every other option at its default (inferred, see evidence)",
+    "defaults_then": {"states": 200, "min_routes": 10, "earliest": 20, "spacing": 12, "search_minutes": 10, "first_seed": 100},
+    "route_namespace": "runs/room2-heldout-routes (12 routes, recorded seeds 100 to 111)",
+    "search": "scripts/find_room_exit.py --seed <seed> --task-definition config/room2.json --max-minutes 10 --output-root runs/room2-heldout-routes, one child process per seed, launched by make_heldout_starts.search()",
+    "selection": "candidates(): every task-relative prefix at task frames 20, 32, 44, ... that is shorter than the route's transition step minus 12, deduplicated by full recipe; every candidate replayed and kept only if it arrives alive at its recorded position and dashes; select_states(): deduplicate by state_id, sort by (task frames, route), and take 200 evenly by stride",
+    "evidence": "No generator run record was kept (runs/heldout-starts/chapter-1-room-2/20260922-204254 holds only episode.tas). The single generator output folder was created at 20:42:54, the 12 route folders at 20:42:55 to 20:54:41, and the manifest at 20:59:37, so one invocation ran all 12 searches. The handoff (2026-09-22) records 12 routes, seeds 100 to 111, and 440 candidates all replaying. Task frames 20 to 620 match earliest 20 and spacing 12. Whether --searches was exactly 12 cannot be proven from the records; it was at least 12 and every recorded seed succeeded."
+  },
+  "guards": {
+    "existing": [
+      "Demonstration overlap: make_heldout_starts.reject_demonstration_routes() rejects any new route whose full task-relative route hash appears in the explicit --demonstrations manifest (celeste_rl/demonstrations.reject_heldout_overlap).",
+      "Within-set duplicates: unique_routes() keeps one route per distinct action trace; select_states() deduplicates by state_id.",
+      "Overwrite: the script refuses if its --output file already exists."
+    ],
+    "missing_and_required": {
+      "G1": {
+        "problem": "Nothing rejects a new route that repeats a route of the current held-out set. With the old namespace, existing_heldout_routes() would feed the 12 old routes straight back in; with a new namespace, see G2.",
+        "proposed_change": "Add a repeatable --exclude-heldout <manifest> option to scripts/make_heldout_starts.py. For each given manifest: validate it with celeste_rl.heldout.validate_manifest against the task identity, collect only its entries' route_sha256 values, and refuse the build if any new complete-route hash is in that set, using the existing reject_heldout_overlap comparison. Hash comparison only; no state is read beyond the validation the existing guards already perform. Offline tests: overlap refused, no overlap accepted, a tampered manifest refused.",
+        "status": "proposed; needs owner approval before it is written"
+      },
+      "G2": {
+        "problem": "unused_search_seeds() starts at FIRST_SEED = 100 and skips only seeds recorded in the given namespace. In a fresh namespace it would search seeds 100 to 111 again (checked offline), and the seeded search would likely regenerate the old routes.",
+        "proposed_change": "Add a --first-seed option to scripts/make_heldout_starts.py (default 100, the current behaviour), passed to unused_search_seeds().",
+        "status": "proposed; needs owner approval before it is written"
+      }
+    }
+  },
+  "procedure": {
+    "route_namespace": "runs/room2-heldout-v2-routes (new, empty; never the old runs/room2-heldout-routes)",
+    "output": "config/heldout_starts-room2-v2.json (must not exist beforehand; never config/heldout_starts-room2.json)",
+    "command": "scripts/make_heldout_starts.py --task-definition config/room2.json --demonstrations config/demonstrations-room2.json --exclude-heldout config/heldout_starts-room2.json --routes-dir runs/room2-heldout-v2-routes --output config/heldout_starts-room2-v2.json --first-seed 112 --searches 12 --min-routes 12 --states 200 --earliest 20 --spacing 12 --search-minutes 10",
+    "seeds": "112 to 123 first. Checked 2026-09-23 against every route.json under runs/: no namespace has used any of them (used: Room 2 held-out 100 to 111, Room 1 held-out 100 to 110, demonstrations 0 to 6, Room 1 routes 0 to 6 and 100 to 104).",
+    "routes_and_states": "12 routes and 200 states, matching the original. --min-routes is 12 rather than the default 10 so the new set has the same number of route clusters as the one it replaces.",
+    "seed_that_finds_no_route": "The build writes nothing and exits if fewer than 12 unique routes exist. Rerun with --first-seed set to the lowest seed never tried (124, then 125, and so on) and --searches equal to the routes still missing. A seed is tried once and never retried. Every attempted seed and its outcome is recorded in the handoff and in the commit message that freezes the set.",
+    "search_budget": "10 minutes per seed (--search-minutes 10), the original default.",
+    "candidates_and_selection": "Identical to the original: earliest task frame 20, spacing 12, prefixes shorter than the transition step minus 12, replay-validate every candidate, even selection of 200 by stride."
+  },
+  "validation": [
+    "every selected state replays exactly (make_heldout_starts.validate)",
+    "12 unique full-route hashes",
+    "zero overlap with the 7 demonstration routes (existing guard)",
+    "zero overlap with the 12 routes of config/heldout_starts-room2.json (G1)",
+    "the manifest validates with celeste_rl.heldout.validate_manifest and carries the Room 2 task identity"
+  ],
+  "protections": [
+    "scripts/evaluate_checkpoint.py refuses any demonstration-start input whose path contains 'heldout'; the new file and its route namespace both do.",
+    "Nothing in celeste_rl/ may read the new file, as for the original (checked 2026-09-23: no module references a heldout_starts file).",
+    "No policy is evaluated on the new set until a new experiment's plan pins its path and sha256.",
+    "The new file is committed immediately after generation, before any other use, in its own commit."
+  ],
+  "estimated_run_time": "About 20 to 40 minutes if every seed finds a route quickly: the original took about 12 minutes for 12 searches and about 5 minutes to validate 440 candidates. Up to about 2 hours 15 minutes if every search runs its full 10-minute budget.",
+  "machinery": "Clean tracked tree, pinned runtime, Steam running, one live game script at a time, never alongside the noise-check campaign. The script's own clean-tree and runtime checks apply.",
+  "order": "After G1 and G2 are committed and reviewed, and after owner approval. Planned before the noise-check run, so the set is frozen before any noise-check result exists."
+}
