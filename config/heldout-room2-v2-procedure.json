@@ -1,7 +1,7 @@
 {
   "name": "heldout-room2-v2-procedure",
   "written": "2026-09-23",
-  "status": "Procedure only. Nothing generated. It cannot run until the owner approves and the worker commits the two guard changes G1 and G2 below, and the owner then approves the generation itself after an orchestrator review.",
+  "status": "Procedure only. Nothing generated. The guards G1 and G2 below are implemented and tested (commit f1a0135, amendment 1). The generation itself still needs an orchestrator review and the owner's approval.",
   "why": "The current Room 2 held-out set (config/heldout_starts-room2.json) has had its aggregate failure band seen, so any follow-up comparison (O1, O2, or an entropy or checkpoint-schedule experiment) needs a fresh set. The procedure is fixed now, before the noise-check results exist, so nothing learned from them can shape the new test set.",
   "task": {
     "name": "chapter-1-room-2",
@@ -30,12 +30,12 @@
       "G1": {
         "problem": "Nothing rejects a new route that repeats a route of the current held-out set. With the old namespace, existing_heldout_routes() would feed the 12 old routes straight back in; with a new namespace, see G2.",
         "proposed_change": "Add a repeatable --exclude-heldout <manifest> option to scripts/make_heldout_starts.py. For each given manifest: validate it with celeste_rl.heldout.validate_manifest against the task identity, collect only its entries' route_sha256 values, and refuse the build if any new complete-route hash is in that set, using the existing reject_heldout_overlap comparison. Hash comparison only; no state is read beyond the validation the existing guards already perform. Offline tests: overlap refused, no overlap accepted, a tampered manifest refused.",
-        "status": "proposed; needs owner approval before it is written"
+        "status": "implemented in commit f1a0135 (owner-approved 2026-09-23): --exclude-heldout, repeatable; the output manifest records each excluded manifest's path, sha256 and route count"
       },
       "G2": {
         "problem": "unused_search_seeds() starts at FIRST_SEED = 100 and skips only seeds recorded in the given namespace. In a fresh namespace it would search seeds 100 to 111 again (checked offline), and the seeded search would likely regenerate the old routes.",
         "proposed_change": "Add a --first-seed option to scripts/make_heldout_starts.py (default 100, the current behaviour), passed to unused_search_seeds().",
-        "status": "proposed; needs owner approval before it is written"
+        "status": "implemented in commit f1a0135 (owner-approved 2026-09-23): --first-seed, default 100; seeds already recorded in the namespace are still skipped"
       }
     }
   },
@@ -46,6 +46,7 @@
     "seeds": "112 to 123 first. Checked 2026-09-23 against every route.json under runs/: no namespace has used any of them (used: Room 2 held-out 100 to 111, Room 1 held-out 100 to 110, demonstrations 0 to 6, Room 1 routes 0 to 6 and 100 to 104).",
     "routes_and_states": "12 routes and 200 states, matching the original. --min-routes is 12 rather than the default 10 so the new set has the same number of route clusters as the one it replaces.",
     "seed_that_finds_no_route": "The build writes nothing and exits if fewer than 12 unique routes exist. Rerun with --first-seed set to the lowest seed never tried (124, then 125, and so on) and --searches equal to the routes still missing. A seed is tried once and never retried. Every attempted seed and its outcome is recorded in the handoff and in the commit message that freezes the set.",
+    "stuck_route_rule": "If any guard (demonstration overlap or G1) rejects a route, the build refuses and writes nothing, and the rejected route stays in the namespace, so every later run over the namespace would refuse too. Then: (1) search the missing routes with new, never-tried seeds, using the command above with --first-seed set to the lowest seed never tried and --searches equal to the routes still missing; the script searches before it checks, so the new routes land in the namespace even though that run refuses again; (2) build with the command above plus --routes <explicit list of the accepted route directories> --searches 0, so the rejected route is never read; (3) record the excluded route folder, its seed, the guard that rejected it and the reason, in the handoff and in the commit message that freezes the set. Never delete or move a route folder. If a new route is rejected too, repeat from (1).",
     "search_budget": "10 minutes per seed (--search-minutes 10), the original default.",
     "candidates_and_selection": "Identical to the original: earliest task frame 20, spacing 12, prefixes shorter than the transition step minus 12, replay-validate every candidate, even selection of 200 by stride."
   },
@@ -56,6 +57,7 @@
     "zero overlap with the 12 routes of config/heldout_starts-room2.json (G1)",
     "the manifest validates with celeste_rl.heldout.validate_manifest and carries the Room 2 task identity"
   ],
+  "descriptive_after_generation": "Optional, descriptive only, never a refusal: one aggregate count of new states that share (task frame, position, dashes) with any state of config/heldout_starts-room2.json or any demonstration state, reported with the set. Early states near the room entrance are expected to coincide because every route starts from the same task start.",
   "protections": [
     "scripts/evaluate_checkpoint.py refuses any demonstration-start input whose path contains 'heldout'; the new file and its route namespace both do.",
     "Nothing in celeste_rl/ may read the new file, as for the original (checked 2026-09-23: no module references a heldout_starts file).",
@@ -64,5 +66,14 @@
   ],
   "estimated_run_time": "About 20 to 40 minutes if every seed finds a route quickly: the original took about 12 minutes for 12 searches and about 5 minutes to validate 440 candidates. Up to about 2 hours 15 minutes if every search runs its full 10-minute budget.",
   "machinery": "Clean tracked tree, pinned runtime, Steam running, one live game script at a time, never alongside the noise-check campaign. The script's own clean-tree and runtime checks apply.",
-  "order": "After G1 and G2 are committed and reviewed, and after owner approval. Planned before the noise-check run, so the set is frozen before any noise-check result exists."
+  "order": "After G1 and G2 are committed and reviewed, and after owner approval. Planned before the noise-check run, so the set is frozen before any noise-check result exists.",
+  "amendments": [
+    {
+      "date": "2026-09-23",
+      "before_any_data": true,
+      "number": 1,
+      "change": "G1 and G2 implemented in scripts/make_heldout_starts.py (commit f1a0135) and their status updated; status text updated; checked that the command's --exclude-heldout and --first-seed match the real option names (the command itself is unchanged); added the stuck-route rule and the optional descriptive overlap count.",
+      "reason": "The procedure required both guards before generation, and a rejected route would otherwise block every later build over the namespace with no declared way forward. Nothing has been generated."
+    }
+  ]
 }
