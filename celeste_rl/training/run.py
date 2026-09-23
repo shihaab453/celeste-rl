@@ -187,14 +187,18 @@ def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
     with it. Everything is checked before anything moves, and repeating the rollback after an interruption is
     harmless. Returns (fault_stats, recorder state, a record of what was rolled back or None).
     """
-    if previous["accepted_steps"] == steps:
-        return previous["fault_stats"], previous.get("recorder"), None
     snapshot = previous.get("checkpoint_state")
-    if not snapshot or snapshot.get("accepted_steps") != steps:
+    matches = bool(snapshot) and snapshot.get("accepted_steps") == steps
+    sizes = _record_sizes(run_dir)
+    if previous["accepted_steps"] == steps:
+        # The manifest agrees with latest.zip, but a hard kill between a record write and the manifest write after
+        # it leaves the records ahead of both. The state saved with latest.zip then decides.
+        if not matches or all(sizes[name] <= size for name, size in snapshot["records"].items()):
+            return previous["fault_stats"], previous.get("recorder"), None
+    elif not matches:
         raise ValueError(f"the run stopped at {previous['accepted_steps']} accepted steps but latest.zip holds "
                          f"{steps}, and no state saved with latest.zip matches it, so its records cannot be rolled "
                          "back; start a new run instead")
-    sizes = _record_sizes(run_dir)
     for name, size in snapshot["records"].items():
         if sizes[name] < size:
             raise ValueError(f"{name} is shorter than when latest.zip was saved; the records were changed")
@@ -214,6 +218,17 @@ def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
         raise ValueError("the best checkpoint as it was when latest.zip was saved cannot be restored")
 
     moved_to.mkdir(parents=True, exist_ok=True)
+    # Checkpoint files first and records last: a retry after an interruption (for example a file locked on
+    # Windows) finds out whether best.zip changed from the evaluation records, so they must keep showing it until
+    # everything else has moved. Never overwrite what an interrupted earlier attempt already moved: a best.zip
+    # found then is the restored copy.
+    for path in [*later, *(checkpoints / name for name in ("aborted.zip", *(("best.zip",) if best_changed else ())))]:
+        if path.exists() and not (moved_to / path.name).exists():
+            os.replace(path, moved_to / path.name)
+    if best_changed and snapshot["recorder"]["best"] is not None:
+        temporary = checkpoints / "best.tmp.zip"
+        shutil.copyfile(checkpoints / restore_best, temporary)
+        os.replace(temporary, checkpoints / "best.zip")
     lines_moved = {}
     for name, size in snapshot["records"].items():
         path = run_dir / name
@@ -229,14 +244,6 @@ def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
             with path.open("r+b") as handle:
                 handle.truncate(size)
         lines_moved[name] = tail.count(b"\n")
-    # Never overwrite what an interrupted earlier attempt already moved: a best.zip found then is the restored copy.
-    for path in [*later, *(checkpoints / name for name in ("aborted.zip", *(("best.zip",) if best_changed else ())))]:
-        if path.exists() and not (moved_to / path.name).exists():
-            os.replace(path, moved_to / path.name)
-    if best_changed and snapshot["recorder"]["best"] is not None:
-        temporary = checkpoints / "best.tmp.zip"
-        shutil.copyfile(checkpoints / restore_best, temporary)
-        os.replace(temporary, checkpoints / "best.zip")
     return snapshot["fault_stats"], snapshot["recorder"], {
         "from_steps": previous["accepted_steps"], "to_steps": steps,
         "moved_to": moved_to.relative_to(run_dir).as_posix(), "lines_moved": lines_moved,
@@ -442,18 +449,27 @@ class RunRecorder(BaseCallback):
         while self.next_checkpoint <= steps:
             self.next_checkpoint += self.config.checkpoint_every
         latest, previous = self.checkpoints / "latest.zip", self.checkpoints / "previous.zip"
+        # The new weights are saved before the old ones are rotated, and the old ones are copied rather than
+        # moved, so a kill at any moment leaves a latest.zip to resume from.
+        temporary = latest.with_name("latest.tmp.zip")
+        self.model.save(temporary)
         if latest.exists():
-            os.replace(latest, previous)
-        _atomic_save(self.model, latest)
+            shutil.copyfile(latest, previous.with_name("previous.tmp.zip"))
+            os.replace(previous.with_name("previous.tmp.zip"), previous)
+        os.replace(temporary, latest)
         _atomic_save(self.model, self.checkpoints / f"step_{steps:09d}.zip")
         # The archive is the run's other learned artefact: losing it would throw away every deep excursion.
         if self.env.archive is not None:
             self.env.archive.save(self.run_dir / "archive.json")
-        self.checkpoint_state = {"accepted_steps": steps,
-                                 "fault_stats": json.loads(json.dumps(self.model.fault_stats)),
-                                 "recorder": json.loads(json.dumps(self.state())),
-                                 "records": _record_sizes(self.run_dir)}
+        self.checkpoint_state = self.snapshot(steps)
         self.write_manifest("running")
+
+    def snapshot(self, steps: int) -> dict:
+        """Everything a resume from latest.zip at `steps` must roll back to."""
+        return {"accepted_steps": steps,
+                "fault_stats": json.loads(json.dumps(self.model.fault_stats)),
+                "recorder": json.loads(json.dumps(self.state())),
+                "records": _record_sizes(self.run_dir)}
 
     def _evaluate(self, steps: int) -> None:
         # The evaluated weights go on disk before the episodes run, and the record names their file and its
@@ -498,6 +514,11 @@ class RunRecorder(BaseCallback):
         if self.next_eval is not None:
             while self.next_eval <= steps:
                 self.next_eval += self.config.eval_every
+        # An evaluation at the checkpoint's step belongs to the state saved with latest.zip, and the manifest records
+        # it at once, so a hard kill in the next rollout neither loses it nor makes the resume evaluate again.
+        if self.checkpoint_state is not None and self.checkpoint_state["accepted_steps"] == steps:
+            self.checkpoint_state = self.snapshot(steps)
+        self.write_manifest("running")
         # Evaluation used the training environment: start a fresh training episode.
         self.model._last_obs = self.model.env.reset()
         self.model._last_episode_starts = np.ones((self.model.env.num_envs,), dtype=bool)

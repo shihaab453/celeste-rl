@@ -8,12 +8,15 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import torch as th
 
+import celeste_rl.training.run as run_module
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.starts import Start, StartArchive
@@ -48,6 +51,42 @@ def read(run_dir: Path):
     evaluations = [json.loads(line) for line in (run_dir / "evaluations.jsonl").open(encoding="utf-8")] \
         if (run_dir / "evaluations.jsonl").exists() else []
     return manifest, progress, episodes, evaluations
+
+
+class HardKill(BaseException):
+    """The process is killed: nothing after this moment reaches the disk. SupervisedPPO only catches bridge faults,
+    so this passes straight through training, as a kill would."""
+
+
+class KillableBridge(EpochBridge):
+    """Killed `after` steps once `armed()` first holds."""
+
+    def __init__(self, armed, after=5, **kwargs):
+        super().__init__(**kwargs)
+        self.armed, self.remaining = armed, None
+        self.after = after
+
+    def step(self, *args, **kwargs):
+        if self.remaining is None and self.armed():
+            self.remaining = self.after
+        if self.remaining is not None:
+            if self.remaining == 0:
+                raise HardKill()
+            self.remaining -= 1
+        return super().step(*args, **kwargs)
+
+
+def train_until_killed(run_config: TrainConfig, run_dir: Path, env: CelesteRoomEnv) -> None:
+    """Train until a HardKill. A killed process never writes the "crashed" manifest, so that write is dropped."""
+    real = run_module._atomic_json
+
+    def atomic_json(path, data):
+        if data.get("status") != "crashed":
+            real(path, data)
+
+    with mock.patch.object(run_module, "_atomic_json", atomic_json):
+        with unittest.TestCase().assertRaises(HardKill):
+            train(run_config, run_dir, env, PROVENANCE)
 
 
 class ProgressRecordTests(unittest.TestCase):
@@ -454,6 +493,46 @@ class RunTests(unittest.TestCase):
         self.assertEqual(manifest["status"], "aborted")
         self.assertTrue((self.run_dir / "checkpoints" / "aborted.zip").exists())
 
+    def test_a_hard_kill_after_an_evaluation_at_a_checkpoint_does_not_repeat_it(self):
+        """The checkpoint and the evaluation share step 64, and the run is killed a few steps into the next
+        rollout. The resume starts from latest.zip at 64 and must not evaluate those weights again."""
+        run_config = config(checkpoint_every=64, eval_every=64, eval_episodes=1)
+        evaluations = self.run_dir / "evaluations.jsonl"
+        train_until_killed(run_config, self.run_dir, CelesteRoomEnv(KillableBridge(armed=evaluations.exists)))
+        manifest, _, _, recorded = read(self.run_dir)
+        self.assertEqual([record["accepted_steps"] for record in recorded], [64])
+        self.assertEqual(manifest["status"], "running", "a killed run writes nothing more")
+
+        train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+
+        manifest, progress, episodes, recorded = read(self.run_dir)
+        self.assertEqual([record["accepted_steps"] for record in recorded], [64, 128, 160])
+        self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96, 128, 160])
+        self.assertEqual([episode["index"] for episode in episodes], list(range(1, len(episodes) + 1)))
+        self.assertEqual(manifest["status"], "finished")
+
+    def test_a_hard_kill_while_saving_a_checkpoint_leaves_latest_zip_to_resume_from(self):
+        """Killed while the weights at 128 are being written: the checkpoint at 64 must still be there."""
+        run_config = config(total_timesteps=192, checkpoint_every=64, eval_every=0)
+        real_save = SupervisedPPO.save
+
+        def save(model, path, *args, **kwargs):
+            if Path(path).name == "latest.tmp.zip" and model.num_timesteps == 128:
+                raise HardKill()
+            return real_save(model, path, *args, **kwargs)
+
+        with mock.patch.object(SupervisedPPO, "save", save):
+            train_until_killed(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()))
+        self.assertTrue((self.run_dir / "checkpoints" / "latest.zip").exists())
+
+        train(run_config, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+
+        manifest, progress, episodes, _ = read(self.run_dir)
+        self.assertEqual(manifest["status"], "finished")
+        self.assertEqual(manifest["sessions"][1]["rolled_back"]["to_steps"], 64)
+        self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96, 128, 160, 192])
+        self.assertEqual([episode["index"] for episode in episodes], list(range(1, len(episodes) + 1)))
+
     def test_refuses_to_overwrite_a_run(self):
         train(config(total_timesteps=32, eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
         with self.assertRaises(FileExistsError):
@@ -539,7 +618,13 @@ class RollBackTests(unittest.TestCase):
         self.assertFalse((self.run_dir / "rolled_back").exists())
         self.assertEqual((self.run_dir / "checkpoints" / "best.zip").read_bytes(), b"best from step 96")
 
+    def _cut_records_to_the_checkpoint(self):
+        for name, size in self.previous["checkpoint_state"]["records"].items():
+            with (self.run_dir / name).open("r+b") as handle:
+                handle.truncate(size)
+
     def test_a_run_that_stopped_at_its_checkpoint_needs_no_rollback(self):
+        self._cut_records_to_the_checkpoint()
         previous = {**self.previous, "accepted_steps": 64}
 
         fault_stats, recorder, rolled_back = roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
@@ -548,6 +633,61 @@ class RollBackTests(unittest.TestCase):
         self.assertEqual(fault_stats, previous["fault_stats"])
         self.assertEqual(recorder, previous["recorder"])
         self.assertFalse((self.run_dir / "rolled_back").exists())
+
+    def test_records_ahead_of_a_manifest_that_agrees_with_latest_are_rolled_back(self):
+        # A hard kill between a progress row and the manifest write after it, in the first rollout after the
+        # checkpoint: the manifest still says 64, like latest.zip, but the records reached 96.
+        checkpoints = self.run_dir / "checkpoints"
+        (checkpoints / "step_000000096.zip").unlink()
+        (checkpoints / "best.zip").write_bytes(b"step_000000064.zip")
+        (self.run_dir / "evaluations.jsonl").write_bytes(b'{"accepted_steps": 64}\n')
+        snapshot = self.previous["checkpoint_state"]
+        previous = {**self.previous, "accepted_steps": 64, "fault_stats": snapshot["fault_stats"],
+                    "recorder": snapshot["recorder"]}
+
+        fault_stats, recorder, rolled_back = roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+
+        self.assertEqual((rolled_back["from_steps"], rolled_back["to_steps"]), (64, 64))
+        self.assertEqual(rolled_back["lines_moved"], {"episodes.jsonl": 1, "progress.csv": 1})
+        self.assertEqual((self.run_dir / "progress.csv").read_bytes(), b"accepted_steps\n32\n64\n")
+        self.assertEqual((self.run_dir / "episodes.jsonl").read_bytes(), b'{"index": 1}\n')
+        self.assertEqual((checkpoints / "best.zip").read_bytes(), b"step_000000064.zip")
+        self.assertEqual(recorder["accepted_episodes"], 1)
+
+    def test_a_rollback_interrupted_by_a_locked_file_is_finished_by_a_retry(self):
+        # best.zip is held open (an antivirus scan, a reader) the first time, as on Windows, and the manifest
+        # missed the evaluation that changed it: only the evaluation records show that best.zip must go back.
+        previous = {**self.previous, "recorder": self.previous["checkpoint_state"]["recorder"]}
+        real_replace = os.replace
+
+        def best_zip_locked(source, target):
+            if Path(source).name == "best.zip" and Path(source).parent.name == "checkpoints":
+                raise PermissionError(32, "The process cannot access the file because it is being used by "
+                                          "another process")
+            real_replace(source, target)
+
+        with mock.patch.object(os, "replace", best_zip_locked):
+            with self.assertRaises(PermissionError):
+                roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+        roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+
+        moved = self.run_dir / "rolled_back" / "session-2"
+        self.assertEqual((self.run_dir / "checkpoints" / "best.zip").read_bytes(), b"step_000000064.zip")
+        self.assertEqual((moved / "best.zip").read_bytes(), b"best from step 96")
+        self.assertEqual((moved / "step_000000096.zip").read_bytes(), b"step_000000096.zip")
+        self.assertEqual((self.run_dir / "evaluations.jsonl").read_bytes(), b'{"accepted_steps": 64}\n')
+        self.assertEqual((moved / "evaluations.jsonl").read_bytes(), b'{"accepted_steps": 96}\n')
+
+    def test_a_checkpoint_without_a_best_leaves_no_best_zip(self):
+        snapshot = self.previous["checkpoint_state"]
+        previous = {**self.previous, "checkpoint_state": {
+            **snapshot, "recorder": {**snapshot["recorder"], "best": None, "best_checkpoint": None}}}
+
+        roll_back_to_checkpoint(self.run_dir, previous, 64, "session-2")
+
+        self.assertFalse((self.run_dir / "checkpoints" / "best.zip").exists())
+        self.assertEqual((self.run_dir / "rolled_back" / "session-2" / "best.zip").read_bytes(),
+                         b"best from step 96")
 
 
 if __name__ == "__main__":
