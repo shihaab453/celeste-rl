@@ -6,7 +6,8 @@ Run from the repo root with the RL interpreter, after the campaign has finished:
 
 It implements only the analysis declared in the plan and fails closed before computing anything if a declared
 run, file, hash, start or row is missing, duplicated, stopped or inconsistent. `--output` is required, so reading
-a campaign never overwrites an earlier analysis by accident.
+a campaign never overwrites an earlier analysis by accident. The script also refuses unless its own git blob id
+equals the plan's pinned analysis_code.git_blob, and records that blob in its output.
 
 Everything here is diagnostic. It is not a confirmatory A/B analysis and does not change the published Room 2
 result.
@@ -19,6 +20,7 @@ Definitions, all fixed by the plan:
   route's primary starts of (deterministic minus stochastic). Primary starts are demonstration starts whose
   recorded start position x is below the plan's threshold. The all-starts secondary uses every demonstration
   start the same way. The canonical start is reported separately.
+- The primary start count per route must equal the plan's primary_route_counts, not only the total.
 - Failures are episodes whose ending is not success. They are banded by `end_x` (in these rows the last frame
   with a player, from the training progress helper) and separately by the true running maximum `max_x`.
 """
@@ -31,6 +33,7 @@ import statistics
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Callable
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -189,14 +192,33 @@ def _git_blob(commit: str, path: str) -> str:
     return result.stdout.strip()
 
 
-def load_campaign(plan_path: Path, summary_path: Path) -> tuple[dict, dict]:
-    """Validate the campaign against the plan and return (plan, per-run data)."""
+def script_git_blob() -> str:
+    """This file's git blob id. git hash-object applies the repo's line-ending rules, so a CRLF checkout on
+    Windows and an LF checkout elsewhere give the same id; a raw sha256 of the file would not."""
+    relative = Path(__file__).resolve().relative_to(REPO).as_posix()
+    result = subprocess.run(["git", "hash-object", "--", relative], cwd=REPO, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise AnalysisError(f"cannot compute the git blob of {relative}: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+def load_campaign(plan_path: Path, summary_path: Path, *, script_blob: str | None = None,
+                  git_blob: Callable[[str, str], str] = _git_blob) -> tuple[dict, dict]:
+    """Validate the campaign against the plan and return (plan, per-run data).
+
+    `script_blob` is this script's git blob id (computed when not given); `git_blob(commit, path)` looks up a
+    file's blob at a commit. Both are parameters only so tests can supply them.
+    """
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    pinned_blob = plan["analysis"]["analysis_code"]["git_blob"]
+    own_blob = script_git_blob() if script_blob is None else script_blob
+    if own_blob != pinned_blob:
+        raise AnalysisError(f"this analysis script is blob {own_blob}, but the plan pins {pinned_blob}")
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     if summary.get("plan") != plan["name"] or summary.get("plan_sha256") != file_sha256(plan_path):
         raise AnalysisError("the campaign summary was not produced from this plan file")
     tool = plan["tool"]
-    if _git_blob(summary["commit"], tool["script"]) != _git_blob(tool["commit"], tool["script"]):
+    if git_blob(summary["commit"], tool["script"]) != git_blob(tool["commit"], tool["script"]):
         raise AnalysisError("the campaign ran a different evaluate_checkpoint.py from the pinned tool commit")
     protocol = plan["evaluation_protocol"]
     expected_starts_sha = plan["starts"]["demonstration"]["expected_start_list_sha256"]
@@ -250,9 +272,14 @@ def analyse(plan: dict, data: dict) -> dict:
     threshold = plan["analysis"]["primary_start_x_below"]
     measures = {run_id: checkpoint_measures(item["starts"], item["rows"], threshold) for run_id, item in data.items()}
     expected_primary = plan["analysis"]["primary_starts"]
+    expected_routes = {route: count for route, count in
+                       plan["starts"]["demonstration"]["primary_route_counts"].items() if route != "total"}
     for run_id, value in measures.items():
         if value["primary"]["starts"] != expected_primary:
             raise AnalysisError(f"{run_id} has {value['primary']['starts']} primary starts, expected {expected_primary}")
+        if value["primary"]["starts_per_route"] != expected_routes:
+            raise AnalysisError(f"{run_id} has primary starts per route {value['primary']['starts_per_route']}, "
+                                f"expected {expected_routes}")
     reference = [entry["id"] for entry in plan["runs"] if entry.get("arm") is None]
     return {
         "label": plan["analysis"]["label"],
@@ -277,13 +304,14 @@ def main() -> int:
         print(f"{args.output} already exists; choose a new path rather than overwrite an analysis")
         return 2
     try:
-        plan, data = load_campaign(args.plan, args.campaign)
+        own_blob = script_git_blob()
+        plan, data = load_campaign(args.plan, args.campaign, script_blob=own_blob)
         report = analyse(plan, data)
     except (OSError, KeyError, json.JSONDecodeError, AnalysisError) as error:
         print(f"Analysis refused: {error}")
         return 2
     report = {"plan": plan["name"], "plan_sha256": file_sha256(args.plan), "campaign": str(args.campaign),
-              **report}
+              "analysis_code_git_blob": own_blob, **report}
     args.output.write_text(json.dumps(report, indent=2, default=str), encoding="utf-8")
     summary = report["summary"]
     print("Diagnostic only; not a confirmatory claim.")

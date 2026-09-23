@@ -1,13 +1,22 @@
 """The noise-check analysis on synthetic rows: validation fails closed, and the declared quantities are exact."""
 from __future__ import annotations
 
+import hashlib
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 from scripts.analyze_noise_check import (
     CANONICAL_ID,
+    REPO,
     AnalysisError,
+    analyse,
     band_of,
     checkpoint_measures,
+    file_sha256,
+    load_campaign,
+    script_git_blob,
     start_list_sha256,
     summarise,
     validate_rows,
@@ -158,6 +167,151 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(result["decision"], "inconclusive")
         self.assertNotIn("clone", result["primary_points_by_checkpoint"])
         self.assertEqual(set(result["by_arm_descriptive"]), {"A", "B"})
+
+
+PINNED_ANALYSIS_BLOB = "e" * 40
+TOOL_BLOB = "f" * 40
+
+
+def fake_git_blob(blobs: dict[str, str]):
+    """A stand-in for the git lookup: the tool's blob at each commit."""
+    return lambda commit, path: blobs[commit]
+
+
+class CampaignFixture:
+    """A complete synthetic campaign on disk for one declared checkpoint: plan, summary, result, rows, starts."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        run_dir = root / "run"
+        run_dir.mkdir()
+        self.starts_path = run_dir / "starts.json"
+        self.result_path = run_dir / "result.json"
+        self.episodes_path = run_dir / "episodes.jsonl"
+        self.plan_path = root / "plan.json"
+        self.summary_path = root / "summary.json"
+        starts_sha = start_list_sha256(STARTS)
+        self.starts = {"starts": [{**start, "lines": ["1,R"]} for start in STARTS], "sha256": starts_sha}
+        self.result = {
+            "checkpoint_sha256": ENTRY["checkpoint_sha256"], "evaluation_seed": 7,
+            "deterministic_repeats": PROTOCOL["deterministic_repeats_per_start"], "aborted": None, "task": TASK,
+            "attributable": True,
+            "demonstration_starts": {"starts_file": "starts.json", "starts_sha256": starts_sha,
+                                     "stochastic_per_start": PROTOCOL["stochastic_episodes_per_demonstration_start"]},
+        }
+        self.rows = complete_rows()
+        self.plan = {
+            "name": "noise-test",
+            "task": TASK,
+            "tool": {"script": "scripts/evaluate_checkpoint.py", "commit": "pinned-commit", "git_blob": TOOL_BLOB},
+            "starts": {"demonstration": {"expected_start_list_sha256": starts_sha,
+                                         "primary_route_counts": {"r1": 2, "r2": 1, "total": 3}}},
+            "evaluation_protocol": {**PROTOCOL, "evaluation_seed": 7},
+            "analysis": {"label": "diagnostic", "primary_start_x_below": 460, "primary_starts": 3,
+                         "analysis_code": {"script": "scripts/analyze_noise_check.py",
+                                           "git_blob": PINNED_ANALYSIS_BLOB}},
+            "decision_rule": {**DecisionTests.PLAN["decision_rule"], "scope": "diagnostic"},
+            "runs": [{**ENTRY, "role": "declared checkpoint"}],
+        }
+        self.status = "ok"
+        self.git_blobs = {"pinned-commit": TOOL_BLOB, "campaign-commit": TOOL_BLOB}
+
+    def write(self) -> None:
+        """Write every file, then a summary that records their hashes as the campaign runner would."""
+        self.starts_path.write_text(json.dumps(self.starts), encoding="utf-8")
+        self.result_path.write_text(json.dumps(self.result), encoding="utf-8")
+        self.episodes_path.write_text("".join(json.dumps(r) + "\n" for r in self.rows), encoding="utf-8")
+        self.plan_path.write_text(json.dumps(self.plan), encoding="utf-8")
+        artifact = {"result_file": str(self.result_path), "episodes_file": str(self.episodes_path),
+                    "result_sha256": file_sha256(self.result_path),
+                    "episodes_sha256": file_sha256(self.episodes_path)}
+        summary = {"plan": self.plan["name"], "plan_sha256": file_sha256(self.plan_path), "commit": "campaign-commit",
+                   "results": [{"id": ENTRY["id"], "status": self.status, "artifact": artifact}]}
+        self.summary_path.write_text(json.dumps(summary), encoding="utf-8")
+
+    def load(self, script_blob: str = PINNED_ANALYSIS_BLOB):
+        return load_campaign(self.plan_path, self.summary_path, script_blob=script_blob,
+                             git_blob=fake_git_blob(self.git_blobs))
+
+
+class LoadCampaignTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.campaign = CampaignFixture(Path(self.temp.name))
+
+    def test_a_complete_campaign_loads_and_analyses(self):
+        self.campaign.write()
+        plan, data = self.campaign.load()
+        report = analyse(plan, data)
+        self.assertEqual(report["checkpoints"][ENTRY["id"]]["primary"]["starts_per_route"], {"r1": 2, "r2": 1})
+
+    def test_a_changed_plan_file_is_refused(self):
+        self.campaign.write()
+        self.campaign.plan_path.write_text(json.dumps({**self.campaign.plan, "note": "edited"}), encoding="utf-8")
+        with self.assertRaisesRegex(AnalysisError, "not produced from this plan file"):
+            self.campaign.load()
+
+    def test_a_different_evaluate_checkpoint_blob_is_refused(self):
+        self.campaign.git_blobs["campaign-commit"] = "0" * 40
+        self.campaign.write()
+        with self.assertRaisesRegex(AnalysisError, "different evaluate_checkpoint.py"):
+            self.campaign.load()
+
+    def test_a_run_that_did_not_finish_ok_is_refused(self):
+        self.campaign.status = "failed"
+        self.campaign.write()
+        with self.assertRaisesRegex(AnalysisError, "did not finish ok: failed"):
+            self.campaign.load()
+
+    def test_a_result_or_episodes_file_changed_after_the_campaign_is_refused(self):
+        for path_name in ("result_path", "episodes_path"):
+            with self.subTest(path_name):
+                self.campaign.write()
+                path = getattr(self.campaign, path_name)
+                path.write_text(path.read_text(encoding="utf-8") + " ", encoding="utf-8")
+                with self.assertRaisesRegex(AnalysisError, "changed after the campaign"):
+                    self.campaign.load()
+
+    def test_a_wrong_start_list_is_refused(self):
+        self.campaign.plan["starts"]["demonstration"]["expected_start_list_sha256"] = "9" * 64
+        self.campaign.write()
+        with self.assertRaisesRegex(AnalysisError, "did not use the declared start list"):
+            self.campaign.load()
+
+    def test_a_start_list_edited_on_disk_is_refused(self):
+        self.campaign.starts["starts"][0]["position"] = [301, -40]
+        self.campaign.write()
+        with self.assertRaisesRegex(AnalysisError, "did not use the declared start list"):
+            self.campaign.load()
+
+    def test_an_aborted_or_non_attributable_result_is_refused(self):
+        complete = self.campaign.result
+        for field, value in (("aborted", "the game closed"), ("attributable", False)):
+            with self.subTest(field):
+                self.campaign.result = {**complete, field: value}
+                self.campaign.write()
+                with self.assertRaisesRegex(AnalysisError, f"result {field} is"):
+                    self.campaign.load()
+
+    def test_primary_counts_per_route_must_match_the_plan(self):
+        for counts in ({"r1": 1, "r2": 2, "total": 3}, {"r1": 3, "total": 3}, {"r1": 2, "r2": 1, "r3": 0, "total": 3}):
+            with self.subTest(counts):
+                self.campaign.plan["starts"]["demonstration"]["primary_route_counts"] = counts
+                self.campaign.write()
+                plan, data = self.campaign.load()
+                with self.assertRaisesRegex(AnalysisError, "primary starts per route"):
+                    analyse(plan, data)
+
+    def test_an_analysis_script_other_than_the_pinned_blob_is_refused(self):
+        self.campaign.write()
+        with self.assertRaisesRegex(AnalysisError, "the plan pins " + PINNED_ANALYSIS_BLOB):
+            self.campaign.load(script_blob="1" * 40)
+
+    def test_the_script_blob_is_the_line_ending_normalised_git_blob(self):
+        content = (REPO / "scripts" / "analyze_noise_check.py").read_bytes().replace(b"\r\n", b"\n")
+        expected = hashlib.sha1(b"blob %d\0" % len(content) + content).hexdigest()
+        self.assertEqual(script_git_blob(), expected)
 
 
 if __name__ == "__main__":
