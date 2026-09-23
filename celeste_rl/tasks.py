@@ -59,6 +59,14 @@ def resolve_task_definition(path: str | Path | None) -> TaskDefinition:
     return load_task_definition(path) if path else base_task_definition()
 
 
+def start_recipe(definition: TaskDefinition, relative_lines) -> tuple[str, ...]:
+    """The complete replay recipe from the base savestate for a task-relative prefix: the task's pinned setup
+    lines, then the prefix. The held-out generator and demonstration-start evaluation both build starts here,
+    so a start means the same thing wherever it is made."""
+    setup = definition.start.lines if definition.start is not None else ()
+    return tuple(setup) + tuple(relative_lines)
+
+
 def task_identity(definition: TaskDefinition) -> dict:
     """Stable task provenance carried by every later-room dataset and result."""
     return {

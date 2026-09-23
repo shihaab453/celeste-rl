@@ -13,10 +13,10 @@ from celeste_rl.heldout import (
     state_id,
     validate_manifest,
 )
-from scripts.evaluate_heldout import entry_start, route_summaries
+from scripts.evaluate_heldout import entry_start, play, route_summaries
 from celeste_rl.endings import RoomTask
 from celeste_rl.starts import Start
-from celeste_rl.tasks import TaskDefinition, base_task_definition, task_identity
+from celeste_rl.tasks import TaskDefinition, base_task_definition, start_recipe, task_identity
 
 
 def entry(route: str = "route-a", seed: int = 100, line: str = "1,R") -> dict:
@@ -170,6 +170,65 @@ class ManifestTests(unittest.TestCase):
 
         with self.assertRaisesRegex(HeldoutManifestError, "task-start recipe"):
             entry_start(source, definition)
+
+
+class StartRecipeTests(unittest.TestCase):
+    def test_recipe_is_the_pinned_setup_then_the_task_relative_prefix(self):
+        definition = TaskDefinition(
+            "room-2", RoomTask("2", "3"), Start(("1,R", "1,R"), (261, 1), "2", 0))
+
+        self.assertEqual(start_recipe(definition, ["1,L", "1,J"]), ("1,R", "1,R", "1,L", "1,J"))
+        self.assertEqual(start_recipe(base_task_definition(), ["1,L"]), ("1,L",))
+
+    def test_a_recipe_is_accepted_by_the_held_out_entry_check(self):
+        definition = TaskDefinition(
+            "room-2", RoomTask("2", "3"), Start(("1,R", "1,R"), (261, 1), "2", 0))
+        lines = list(start_recipe(definition, ["1,L"]))
+        source = {**entry(line="1,R"), "frames": 3, "task_frames": 1, "room": "2", "position": [340.0, 152.0],
+                  "room_position": [20.0, 152.0], "lines": lines}
+
+        start, task_frames, _ = entry_start(source, definition)
+
+        self.assertEqual(start.lines, tuple(lines))
+        self.assertEqual(task_frames, 1)
+
+
+class _Model:
+    def predict(self, obs, deterministic=False):
+        return None, None
+
+
+class _Env:
+    """Player world x per frame: the reset frame, then each step; the last step ends the episode."""
+
+    def __init__(self, xs, ending="timeout"):
+        self.xs, self.ending, self.index = xs, ending, 0
+
+    def reset(self, options=None):
+        self.index = 0
+        return {}, {"start": "archive", "start_problem": None, "player": {"x": self.xs[0], "y": 0}}
+
+    def step(self, action):
+        self.index += 1
+        done = self.index == len(self.xs) - 1
+        return {}, 0.0, done, False, {"ending": self.ending if done else None,
+                                      "player": {"x": self.xs[self.index], "y": 0}}
+
+
+class PlayRowTests(unittest.TestCase):
+    def test_max_x_keeps_its_final_frame_meaning_and_new_fields_are_added(self):
+        result = play(_Model(), _Env([300, 350, 410, 325]), Start(("1,R",), (300, 0), "2", 0), False)
+
+        self.assertEqual(result["max_x"], 325)       # unchanged: the final-frame x, as in the frozen results
+        self.assertEqual(result["end_x"], 325)
+        self.assertEqual(result["max_x_episode"], 410)
+        self.assertEqual((result["ending"], result["length"], result["problem"]), ("timeout", 3, None))
+
+    def test_the_first_frame_after_the_start_replay_counts_towards_the_maximum(self):
+        result = play(_Model(), _Env([500, 350, 325]), Start(("1,R",), (500, 0), "2", 0), False)
+
+        self.assertEqual(result["max_x_episode"], 500)
+        self.assertEqual(result["max_x"], 325)
 
 
 class RouteSummaryTests(unittest.TestCase):

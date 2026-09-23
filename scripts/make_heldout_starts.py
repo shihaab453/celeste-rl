@@ -60,6 +60,7 @@ from celeste_rl.tasks import (  # noqa: E402
     TaskDefinitionError,
     canonical_task_identity,
     resolve_task_definition,
+    start_recipe,
     task_identity,
 )
 from celeste_rl.training.game import GameSession  # noqa: E402
@@ -198,7 +199,6 @@ def candidates(routes: list[Path], earliest: int, spacing: int,
                definition: TaskDefinition | None = None) -> list[dict]:
     """Every distinct sampled prefix, ordered across depths for later even selection."""
     definition = definition or resolve_task_definition(None)
-    setup = definition.start.lines if definition.start is not None else ()
     picked, seen = [], set()
     for path in routes:
         route = load_route(path)
@@ -210,7 +210,7 @@ def candidates(routes: list[Path], earliest: int, spacing: int,
         # Stop short of the transition: a start one frame from the exit tests nothing.
         for frame in range(earliest, max(earliest, step - spacing), spacing):
             relative_prefix = tuple(relative_lines[:frame])
-            prefix = tuple(setup) + relative_prefix
+            prefix = start_recipe(definition, relative_prefix)
             if prefix in seen:
                 continue
             seen.add(prefix)

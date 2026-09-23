@@ -49,6 +49,7 @@ from celeste_rl.tasks import (  # noqa: E402
     task_identity,
 )
 from celeste_rl.training.game import GameSession  # noqa: E402
+from celeste_rl.training.run import new_progress, update_progress  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
 
 DEFAULT_SET = REPO / "config" / "heldout_starts.json"
@@ -75,13 +76,22 @@ def play(model, env: CelesteRoomEnv, start: Start, deterministic: bool) -> dict:
     obs, info = env.reset(options={"start": start})
     if info["start"] != "archive":
         return {"ending": None, "problem": info["start_problem"]}
+    # The running maximum uses the training records' definition, starting from the first frame after the
+    # start replay.
+    progress = update_progress(new_progress(), info)
     length = 0
     while True:
         action, _ = model.predict(obs, deterministic=deterministic)
         obs, _, terminated, truncated, info = env.step(action)
         length += 1
+        update_progress(progress, info)
         if terminated or truncated:
-            return {"ending": info["ending"], "length": length, "max_x": info["player"] and info["player"]["x"],
+            final_x = info["player"] and info["player"]["x"]
+            return {"ending": info["ending"], "length": length,
+                    # Despite its name, max_x is the player's world x on the final frame, not a maximum. It is
+                    # kept unchanged for compatibility with the frozen result files; end_x is the same value
+                    # under an honest name, and max_x_episode is the true running maximum.
+                    "max_x": final_x, "end_x": final_x, "max_x_episode": progress["max_x"],
                     "problem": None}
 
 
