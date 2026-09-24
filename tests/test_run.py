@@ -112,6 +112,14 @@ class ProgressRecordTests(unittest.TestCase):
         self.assertEqual((progress["end_x"], progress["end_y"], progress["max_x"]), (80, 120, 80))
         self.assertEqual(progress["max_potential"], 0.3)
 
+    def test_frames_without_a_new_best_potential_are_counted(self):
+        progress = update_progress(new_progress(), {"potential": 0.1})
+        for potential in (0.1, 0.1, 0.2, 0.2, 0.2, 0.2):
+            update_progress(progress, {"potential": potential, "ending": None})
+        self.assertEqual((progress["frames_since_best"], progress["longest_without_new_best"]), (3, 3))
+        update_progress(progress, {"potential": 0.0, "ending": "death"})  # the ending step is not counted
+        self.assertEqual((progress["frames_since_best"], progress["longest_without_new_best"]), (3, 3))
+
     def test_fields_never_reported_stay_none(self):
         self.assertEqual(update_progress(new_progress(), self.info()), dict.fromkeys(PROGRESS_FIELDS))
 

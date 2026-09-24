@@ -259,7 +259,10 @@ def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
 
 # How far an episode got, for the diagnostics the unshaped campaign lacked (Codex J9, K8). A field is None when
 # no step of the episode reported one, which keeps the records honest instead of inventing a zero.
-PROGRESS_FIELDS = ("max_potential", "max_x", "min_y", "end_x", "end_y")
+# The last two count frames since the potential last reached a strictly new best, the quantity the stall ending
+# uses: an episode would have ended as stalled with stall_frames N exactly when its longest stretch reached N.
+PROGRESS_FIELDS = ("max_potential", "max_x", "min_y", "end_x", "end_y", "frames_since_best",
+                   "longest_without_new_best")
 
 
 def new_progress() -> dict:
@@ -273,7 +276,14 @@ def update_progress(progress: dict, info: dict) -> dict:
         if value is not None and (progress[field] is None or better(value, progress[field])):
             progress[field] = value
 
-    keep("max_potential", info.get("potential"), lambda new, old: new > old)
+    potential = info.get("potential")
+    # The ending step reports potential 0 by definition, so it is not a frame without progress.
+    if potential is not None and info.get("ending") is None:
+        new_best = progress["max_potential"] is None or potential > progress["max_potential"]
+        progress["frames_since_best"] = 0 if new_best else (progress["frames_since_best"] or 0) + 1
+        progress["longest_without_new_best"] = max(progress["longest_without_new_best"] or 0,
+                                                   progress["frames_since_best"])
+    keep("max_potential", potential, lambda new, old: new > old)
     player = info.get("player")
     if player is not None:
         keep("max_x", player["x"], lambda new, old: new > old)

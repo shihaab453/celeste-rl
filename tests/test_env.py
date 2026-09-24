@@ -368,6 +368,20 @@ class StallTests(unittest.TestCase):
                                                  stall_frames=DEADLINE_FRAMES))
         self.assertEqual((step, info["ending"]), (DEADLINE_FRAMES, TIMEOUT))
 
+    def test_the_progress_record_counts_exactly_what_the_rule_uses(self):
+        """A success is cut by stall_frames N exactly when its record's longest stretch reaches N."""
+        from celeste_rl.training.run import new_progress, update_progress
+        path = self.STILL * 10 + [self.FORWARD]
+        stalled_at, _, _ = self.play(CelesteRoomEnv(MovingBridge(path), reward_config=V2, stall_frames=30))
+        env = CelesteRoomEnv(MovingBridge(path), reward_config=V2)
+        _, info = env.reset()
+        progress = update_progress(new_progress(), info)
+        for step in range(1, stalled_at + 1):
+            _, _, _, _, info = env.step(noop())
+            update_progress(progress, info)
+            self.assertEqual(progress["frames_since_best"] >= 30, step == stalled_at, step)
+        self.assertEqual(progress["longest_without_new_best"], 30)
+
     def test_a_negative_setting_is_refused(self):
         with self.assertRaises(ValueError):
             CelesteRoomEnv(ReplayBridge(), stall_frames=-1)
