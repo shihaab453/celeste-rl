@@ -34,6 +34,19 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(archive.starts[cell_of((80, 120))].frames, 40)
         self.assertEqual((archive.offered, archive.replaced), (3, 1))
 
+    def test_a_replacing_route_does_not_inherit_the_old_route_s_outcomes(self):
+        archive = StartArchive(seed=0, sampling="success")
+        old = start(100, 80, 120)
+        archive.offer(old)
+        for _ in range(5):
+            archive.record_outcome(old, False)
+        cell = cell_of((80, 120))
+        self.assertLess(archive.success_rate(cell), 0.5)
+        self.assertFalse(archive.offer(start(120, 81, 121)), "a longer route is refused")
+        self.assertLess(archive.success_rate(cell), 0.5, "a refused route changes nothing")
+        self.assertTrue(archive.offer(start(40, 82, 122)))
+        self.assertEqual(archive.success_rate(cell), 0.5, "the new route starts unmeasured")
+
     def test_would_keep_agrees_with_offer(self):
         """The environment asks would_keep every step, so it must never disagree with what offer does."""
         archive = StartArchive(max_frames=600, seed=0)

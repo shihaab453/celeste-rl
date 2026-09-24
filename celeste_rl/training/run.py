@@ -293,6 +293,10 @@ def update_progress(progress: dict, info: dict) -> dict:
     return progress
 
 
+def _blank_if_none(value):
+    return "" if value is None else value
+
+
 def _median(episodes, field: str):
     values = [e[field] for e in episodes if e.get(field) is not None]
     return float(np.median(values)) if values else ""
@@ -441,7 +445,8 @@ class RunRecorder(BaseCallback):
                 for name in ("cells_learning", "cells_mastered", "nearest_x_mastered")}
                if self.env.archive is not None else
                {f"archive_{name}": "" for name in ("cells_learning", "cells_mastered", "nearest_x_mastered")}),
-            "archive_furthest_x": (self.env.archive.coverage()["furthest_x"] or "")
+            # `is None`, not `or`: a furthest position of exactly x 0 is a value, not a blank.
+            "archive_furthest_x": _blank_if_none(self.env.archive.coverage()["furthest_x"])
             if self.env.archive is not None else "",
             # SB3's statistics for the most recent completed update. on_rollout_end runs before this rollout's
             # update, so a row carries the update that followed the previous rollout: one row of lag out of

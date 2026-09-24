@@ -132,7 +132,11 @@ class StartArchive:
         if held is not None and held.frames <= start.frames:
             return False
         self.starts[cell] = start
-        self.replaced += held is not None
+        if held is not None:
+            # A different route into the cell is a different start: the old one's successes and failures say
+            # nothing about it, so it begins unmeasured rather than inheriting them.
+            self.outcomes.pop(cell, None)
+            self.replaced += 1
         return True
 
     def success_rate(self, cell) -> float:

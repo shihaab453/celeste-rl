@@ -112,6 +112,10 @@ class ProgressRecordTests(unittest.TestCase):
         self.assertEqual((progress["end_x"], progress["end_y"], progress["max_x"]), (80, 120, 80))
         self.assertEqual(progress["max_potential"], 0.3)
 
+    def test_a_furthest_position_of_zero_is_recorded_not_blanked(self):
+        from celeste_rl.training.run import _blank_if_none
+        self.assertEqual((_blank_if_none(0), _blank_if_none(None), _blank_if_none(12.5)), (0, "", 12.5))
+
     def test_frames_without_a_new_best_potential_are_counted(self):
         progress = update_progress(new_progress(), {"potential": 0.1})
         for potential in (0.1, 0.1, 0.2, 0.2, 0.2, 0.2):
