@@ -190,6 +190,16 @@ class PlayTests(unittest.TestCase):
         self.assertEqual(rows[-1]["episode"], {"ending": "success", "length": 5, "return": 1.0, "max_x": 300,
                                                "end_x": 290, "end_y": -20})
 
+    def test_rows_carry_the_longest_stretch_without_a_new_best(self):
+        def canonical(model, env, deterministic):
+            return {"ending": "success", "length": 400, "max_x": 540, "end_x": 535, "end_y": -179,
+                    "longest_without_new_best": 131}
+
+        rows, _ = play_all(FakeModel(), None, episode_plan(1, 1, [], 5), lambda row: None,
+                           canonical_episode=canonical)
+
+        self.assertEqual([row["longest_without_new_best"] for row in rows], [131, 131])
+
     def test_starts_get_all_stochastic_then_all_deterministic_repeats(self):
         plan = episode_plan(0, 2, [self.START], 3)
 

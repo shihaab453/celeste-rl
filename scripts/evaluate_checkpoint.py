@@ -239,7 +239,10 @@ def play_all(model, env, plan: list[dict], write_row, canonical_episode=run_epis
         problem = episode.get("problem")
         row = {"order": len(rows), "start_id": item["start_id"], "mode": item["mode"], "repeat": item["repeat"],
                "ending": episode["ending"], "length": episode["length"], "max_x": episode.get("max_x"),
-               "end_x": episode.get("end_x"), "end_y": episode.get("end_y"), "problem": problem,
+               "end_x": episode.get("end_x"), "end_y": episode.get("end_y"),
+               # What the training-only stall ending would have seen: it ends an episode at N frames exactly when
+               # this reaches N. Evaluation itself never stops early.
+               "longest_without_new_best": episode.get("longest_without_new_best"), "problem": problem,
                "episode": episode}
         if item["start_id"] != CANONICAL_ID:
             start = item["start"]
