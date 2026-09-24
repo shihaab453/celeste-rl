@@ -258,11 +258,22 @@ class SearchAttemptTests(unittest.TestCase):
 
         def run(command, **kwargs):
             self.assertTrue(record.exists(), "the attempt is recorded before the search starts")
+            self.assertIs(kwargs.get("stderr"), subprocess.STDOUT)
+            kwargs["stdout"].write("searching\n" + ("Steam not found\n" if returncode else ""))
             if creates_route:
                 write_route(root, "20260924-120000", seed, [action("R")] * 4)
-            return subprocess.CompletedProcess(command, returncode, stdout="searching\n",
-                                               stderr="Steam not found\n" if returncode else "")
+            return subprocess.CompletedProcess(command, returncode)
         return run
+
+    def test_a_record_cut_short_by_a_kill_still_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ATTEMPTS).mkdir()
+            (root / ATTEMPTS / "seed-112.json").write_text("", encoding="utf-8")
+            (root / ATTEMPTS / "seed-113.json").write_text('{"seed": 11', encoding="utf-8")
+            (root / ATTEMPTS / "seed-114.json.tmp").write_text("{}", encoding="utf-8")
+
+            self.assertEqual(attempted_seeds(root), {112, 113})
 
     def test_a_failed_search_is_recorded_with_its_output(self):
         with tempfile.TemporaryDirectory() as directory:

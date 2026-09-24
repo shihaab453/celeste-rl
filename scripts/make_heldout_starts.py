@@ -37,6 +37,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -137,13 +139,21 @@ def existing_heldout_routes(routes_dir: Path) -> list[Path]:
 
 
 def attempted_seeds(routes_dir: Path) -> set[int]:
-    """Seeds whose search process was started in this namespace, whether or not it produced a route."""
+    """Seeds whose search process was started in this namespace, whether or not it produced a route.
+
+    Read from the file names, not their contents, so a record cut short by a kill still counts."""
     seeds = set()
     for path in (routes_dir / ATTEMPTS).glob("seed-*.json"):
-        seed = json.loads(path.read_text(encoding="utf-8")).get("seed")
-        if isinstance(seed, int) and not isinstance(seed, bool):
-            seeds.add(seed)
+        match = re.fullmatch(r"seed-(\d+)\.json", path.name)
+        if match:
+            seeds.add(int(match.group(1)))
     return seeds
+
+
+def _write_attempt(record: Path, data: dict) -> None:
+    temporary = record.with_name(record.name + ".tmp")
+    temporary.write_text(json.dumps(data), encoding="utf-8")
+    os.replace(temporary, record)
 
 
 def unused_search_seeds(routes: list[Path], count: int, first_seed: int = FIRST_SEED,
@@ -250,19 +260,20 @@ def search(seed: int, game_dir: Path, minutes: float, routes_dir: Path = HELDOUT
     attempts.mkdir(exist_ok=True)
     record = attempts / f"seed-{seed}.json"
     started = datetime.now().isoformat(timespec="seconds")
-    record.write_text(json.dumps({"seed": seed, "started": started}), encoding="utf-8")
+    _write_attempt(record, {"seed": seed, "started": started})
     # Listed after the record exists, so a folder this call created for its own bookkeeping is never taken
     # for the child's route folder.
     before = {p.name for p in routes_dir.glob("*")}
-    result = subprocess.run(
-        search_command(seed, game_dir, minutes, routes_dir, task_definition),
-        cwd=REPO, capture_output=True, text=True)
-    (attempts / f"seed-{seed}.out").write_text((result.stdout or "") + (result.stderr or ""), encoding="utf-8")
+    # Streamed straight to the file, so the output survives even if this process is killed mid-search.
+    with (attempts / f"seed-{seed}.out").open("w", encoding="utf-8") as output:
+        result = subprocess.run(
+            search_command(seed, game_dir, minutes, routes_dir, task_definition),
+            cwd=REPO, stdout=output, stderr=subprocess.STDOUT, text=True)
     after = {p.name for p in routes_dir.glob("*") if not p.name.startswith("_")} - before
     folder = routes_dir / sorted(after)[-1] if result.returncode == 0 and after else None
     found = folder if folder is not None and (folder / "route.json").exists() else None
-    record.write_text(json.dumps({"seed": seed, "started": started, "returncode": result.returncode,
-                                  "route": found.name if found else None}), encoding="utf-8")
+    _write_attempt(record, {"seed": seed, "started": started, "returncode": result.returncode,
+                            "route": found.name if found else None})
     if found is None:
         print(f"  seed {seed}: no route ({result.returncode})")
     return found
