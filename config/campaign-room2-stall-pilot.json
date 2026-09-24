@@ -1,0 +1,627 @@
+{
+  "name": "room2-stall-pilot-v1",
+  "written": "2026-09-24T16:25:03+01:00",
+  "label": "training-side stability pilot; a screen, not a confirmatory result; nothing reads a held-out set",
+  "status": "Designed after the orchestrator reviews of 2026-09-24 (handoff, NEXT ACTIONS Objective 6); needs the owner's approval before any run.",
+  "question": "In Room 2 fine-tuning from the 7-route seed-0 clone, does ending a training episode as an ordinary failure once its best progress potential has not risen for N frames reduce the collapse rate?",
+  "why": "Objective 6's training runs collapsed into timeout stalls (A 4/8, B 7/8 plus one barely clearing). Stalls sit on floor no demonstration touches; rew-v2 values a stall exactly like a death; a stall uses the whole 1,800-frame deadline, about 88% of a rollout, so collapsed runs get few attempts. rew-v2 charges every failure its unspent deadline, so an early stalled ending is worth exactly a timeout: the option removes the waste without changing what any ending is worth. It cannot teach recovery from the floor, and may not help a run whose entropy has already drained.",
+  "expected_effect": "Measured on the control episodes (second review): at N 296, frames per episode fall from 1,570 to at most 882 (A31), 1,381 to 822 (A32), 938 to 539 (A33) and 896 to 522 (A37): about 1.7 to 1.8 times more attempts for stuck runs, not several times, because stalls start after the last new best (A31's median no-progress stretch in timeouts is 1,194 frames), not at frame 0. Healthy runs barely change.",
+  "task": {
+    "name": "chapter-1-room-2",
+    "task_definition": "config/room2.json",
+    "task_definition_sha256": "979b68d1c068c88e0952a50a5b9f37b1cea0dc25e65aa517a9949c6d6d6d46bd",
+    "source_route_sha256": "3ac088282e6bce43054b80b9a52105ab30b0f7a007731c0bec7daa23941dcf30",
+    "start_room": "2",
+    "target_room": "3"
+  },
+  "treatment": {
+    "option": "--stall-frames N (TrainConfig.stall_frames; code 738297c; ending 'stalled' in FAILURES)",
+    "stall_frames": 296,
+    "total_timesteps": 500000,
+    "n_derivation": {
+      "value": 296,
+      "rule": "twice the longest stretch without a strictly new best potential in any of the 21 Room 2 demonstrations (148 by the review's count, 147 by the rule's own count; 118 or 119 over the 7-route set, mostly the opening climb; at most 77 or 78 after the first new best)",
+      "change_declared": "The first review set N = max(296, the smallest N cutting at most 1% of the control checkpoints' successes). That gave 815, set by the second-longest stretch in 179 successes, both from the borderline run A37. After seeing that control data and before any treatment data, the second review dropped the 1% rule as the wrong test: at N 296, 160 of 400 control episodes reach 296 frames without progress and only 11 of them go on to clear; the healthy runs lose 3 of 143 clears; after the cut point A37 clears at most 0.38 per 1,000 frames against 0.36 for a fresh episode. The final-checkpoint play without the rule and the harm check are the guard against teaching anything bad.",
+      "success_cut_at_296": "11 of 179 stochastic control successes (A33 1, A34 2, A35 1, A37 7)"
+    },
+    "everything_else": "identical to arm A of config/campaign-room2-demos-ab.json: rew-v2, shaping 2.0, canonical start only, 500,000 transitions, checkpoints every 100,000, no training evaluations",
+    "evaluation_never_uses_it": "evaluate_checkpoint.py and evaluate_heldout.py build their environment without the option (test_the_evaluators_never_enable_it)"
+  },
+  "controls": {
+    "runs": "the existing runs/train/room2-demos-A-seed30..37 (and B-seed30..33 for the exploratory group)",
+    "why_no_rerun": "Training is deterministic: old A seed 20 reproduced exactly at 3cabed1, and the option-off regression at 84272d3 reproduced A31 exactly for 143,360 steps (160 episodes; every training-determined progress column identical; only env_steps_per_second and game memory differ). Code since then touches the evaluator row fields only (3adb530).",
+    "pairing_check": "In every treatment run, every episode before its first stalled ending must equal the control's episode of the same index in accepted_steps, ending, length, return, max_x, end_x, end_y and max_potential. If any pair fails, that control is rerun inside the campaign by a dated amendment before analysis.",
+    "analysis_unit": "two groups of 8 after the first stall ending, not a paired test"
+  },
+  "primary": {
+    "measure": "each final latest.zip played without the rule: 50 stochastic canonical episodes plus 1 deterministic, evaluate_checkpoint.py --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0, run as a second, mechanically completed campaign pinning the treatment checkpoint hashes",
+    "protocol": {
+      "episodes": 50,
+      "seed": 20260924
+    },
+    "collapse_below": 0.5,
+    "borderline": 0.1,
+    "a_controls_already_played": "played at 3adb530 before this plan, pinned by result hash; the same checkpoints played at 84272d3 gave identical endings",
+    "b_controls": "played in the same second campaign as the treatment (not yet measured, so not pinned here)"
+  },
+  "screen": {
+    "label": "a screen only: 8 runs cannot show a small improvement",
+    "max_treatment_collapses": 1,
+    "harm_points": 0.1,
+    "harm_check": "flag harm if the median final-checkpoint clear rate of the treatment's non-collapsed runs is more than 10 points below the control's",
+    "control_collapses_by_this_measure": "5 of 8 (A30 19/50, A31 0/50, A32 0/50, A33 1/50, A34 46/50, A35 47/50, A36 50/50, A37 16/50); 4 of 8 was the training-episode measure. 5/8 is used everywhere.",
+    "power_note": "With no real effect the screen passes about 0.6% of the time if the true collapse rate is 5/8, and about 16% at a pooled 5/14 (if the old A20 to A25 had 0/6 under this measure). One-sided Fisher against 5/8: 1/8 gives p 0.059, 0/8 gives p 0.013 (second review; recomputed in the analyzer's tests). Still a screen.",
+    "if_it_passes": "a held-out experiment may be designed with the option; any later experiment with other clones checks its own collapse rate",
+    "if_it_fails": "do not lower N below 296 (that would cut demonstrated behaviour); move to the next lever, recovery demonstrations from the stall region"
+  },
+  "secondary": {
+    "final_window_steps": 50000,
+    "crossing_x": 344,
+    "headline_waste": "frames per episode and attempts reaching the crossing (max_x >= 344) per 100k window: deaths after long wandering are waste too (72 of the 160 control episodes that reach 296 frames without progress end in death, 77 in timeout, 11 in success)",
+    "clear_time": "median success length per run in the final-checkpoint play without the rule; descriptive, never a gate",
+    "measures": [
+      "training clear rate over episodes ending in the last 50,000 accepted steps",
+      "per 100k window: episodes, clear rate, timeout share, stalled share",
+      "per 100k window: share of frames spent in timeout or stalled episodes",
+      "per 100k window: attempts reaching the crossing (max_x >= 344)",
+      "per 100k window: mean policy entropy",
+      "episodes per run (rises by construction under the treatment; not a health measure)"
+    ]
+  },
+  "groups": {
+    "A": {
+      "counts_toward_screen": true,
+      "clone": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "pairs": [
+        {
+          "treatment": "room2-stall-A-seed30",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed30",
+            "checkpoint": "runs/train/room2-demos-A-seed30/checkpoints/latest.zip",
+            "checkpoint_sha256": "d91514099f3d5ebca0e6ec33f2cc3a385149a158eea4229480c8d088293edcdb",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-150641/results.json",
+            "play_result_sha256": "baa3b043018cb9cead9cbf44e42bcff80673724e7f0c802f70fc964d44304c20"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed31",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed31",
+            "checkpoint": "runs/train/room2-demos-A-seed31/checkpoints/latest.zip",
+            "checkpoint_sha256": "5adc6ea45ab26a06b3f33ad597731cace969d1020bfd9c69fe3d9046ddf53675",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-150740/results.json",
+            "play_result_sha256": "73184a624158a78f70df941891827c1d3793c5db8a47a7e198f02a5189ee77d1"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed32",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed32",
+            "checkpoint": "runs/train/room2-demos-A-seed32/checkpoints/latest.zip",
+            "checkpoint_sha256": "3b4d29b564ce33f473d27e639a21532d649c1681b7dc78875ba6d94716261e47",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151138/results.json",
+            "play_result_sha256": "2b18e3103924d1ff02d77833ac796a53b9ca3e3d67d9bd4105763679fc9f7cea"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed33",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed33",
+            "checkpoint": "runs/train/room2-demos-A-seed33/checkpoints/latest.zip",
+            "checkpoint_sha256": "65ece9685db96a8013637d69b09124faf976b37985f3872eda44fcaf69ce19d3",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151347/results.json",
+            "play_result_sha256": "49b40fd12454c375b81141f4e34ecaee0b4d54d455ba1d65d5d65dea42dd428d"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed34",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed34",
+            "checkpoint": "runs/train/room2-demos-A-seed34/checkpoints/latest.zip",
+            "checkpoint_sha256": "bbaa989e7ebb4bb5ab625da75f9498fea75c14394ac0c7d46cda6488991b847f",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151524/results.json",
+            "play_result_sha256": "d1045574343877b54ec743c8dc859bcb501999982c7dde0fd17a372a3a1b356b"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed35",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed35",
+            "checkpoint": "runs/train/room2-demos-A-seed35/checkpoints/latest.zip",
+            "checkpoint_sha256": "a3ed401e4082e4341f20faa670266e1017e354302385c0343028bb8a16c2b03a",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151622/results.json",
+            "play_result_sha256": "4abca3ac78a04f34c5f658c64854482eac7e816e8ae3852f8e53eeee30588fc1"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed36",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed36",
+            "checkpoint": "runs/train/room2-demos-A-seed36/checkpoints/latest.zip",
+            "checkpoint_sha256": "ffb767d562518530bb138dc7d6f182b392ab546fdac2e8c1eb25d61a3fd2f053",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151719/results.json",
+            "play_result_sha256": "b6303399f995e4e5d5fd623bc4ca07f0dd261e8e531dd0d5bedf52e1277a9e98"
+          }
+        },
+        {
+          "treatment": "room2-stall-A-seed37",
+          "control": {
+            "run_dir": "runs/train/room2-demos-A-seed37",
+            "checkpoint": "runs/train/room2-demos-A-seed37/checkpoints/latest.zip",
+            "checkpoint_sha256": "c243659892263bc764a45cd43a1135e9d88ef30569c9a88ac689722b20a04006",
+            "play_result": "runs/evaluation/chapter-1-room-2/20260924-151814/results.json",
+            "play_result_sha256": "efc574bd88b25336879cb46d097ea7bca56beabe2add72a53f7f5d500d79d504"
+          }
+        }
+      ]
+    },
+    "B-exploratory": {
+      "counts_toward_screen": false,
+      "clone": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "pairs": [
+        {
+          "treatment": "room2-stall-B-seed30",
+          "control": {
+            "run_dir": "runs/train/room2-demos-B-seed30",
+            "checkpoint": "runs/train/room2-demos-B-seed30/checkpoints/latest.zip",
+            "checkpoint_sha256": "17dc042d0048edc4351004d077dd65fa188e53a963b30105918362f42edd25f8",
+            "play_result": null,
+            "play_result_sha256": null,
+            "played_in": "the play campaign, entry play-room2-demos-B-seed30"
+          }
+        },
+        {
+          "treatment": "room2-stall-B-seed31",
+          "control": {
+            "run_dir": "runs/train/room2-demos-B-seed31",
+            "checkpoint": "runs/train/room2-demos-B-seed31/checkpoints/latest.zip",
+            "checkpoint_sha256": "b18517024f2837045db49693b915c2d55631e90c6d0380b51a89963e7dcf60b5",
+            "play_result": null,
+            "play_result_sha256": null,
+            "played_in": "the play campaign, entry play-room2-demos-B-seed31"
+          }
+        },
+        {
+          "treatment": "room2-stall-B-seed32",
+          "control": {
+            "run_dir": "runs/train/room2-demos-B-seed32",
+            "checkpoint": "runs/train/room2-demos-B-seed32/checkpoints/latest.zip",
+            "checkpoint_sha256": "8c9af8fafdeaedfac7f2bbd5e92764ed15a34a571548fe72739b7a338d8d7fc8",
+            "play_result": null,
+            "play_result_sha256": null,
+            "played_in": "the play campaign, entry play-room2-demos-B-seed32"
+          }
+        },
+        {
+          "treatment": "room2-stall-B-seed33",
+          "control": {
+            "run_dir": "runs/train/room2-demos-B-seed33",
+            "checkpoint": "runs/train/room2-demos-B-seed33/checkpoints/latest.zip",
+            "checkpoint_sha256": "447455bb344cacf8a3c3ca8b75f0115c800d0f34289feda7207d107eba6f205e",
+            "play_result": null,
+            "play_result_sha256": null,
+            "played_in": "the play campaign, entry play-room2-demos-B-seed33"
+          }
+        }
+      ],
+      "why": "does the option help once entropy has drained (the B collapse mode)? 4 runs, never part of the screen"
+    }
+  },
+  "disclosure": "The result covers only the 7-route seed-0 clone (and, exploratorily, the 21-route seed-0 clone). Clone-to-clone variation is large (4 to 22 clears of 50 across 10 clones).",
+  "analysis": {
+    "analysis_code": "scripts/analyze_stall_pilot.py",
+    "analysis_code_git_blob": "f2124c87d2b040fae0ce53cbdef51b40f443db97",
+    "run": "after both campaigns: analyze_stall_pilot.py --plan <this> --training <summary> --play <summary> --output <new path>"
+  },
+  "order": "A-stall seeds 30 to 37 first, then B-stall seeds 30 to 33",
+  "runs": [
+    {
+      "id": "room2-stall-A-seed30",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 30,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed30",
+      "checkpoint": "runs/train/room2-stall-A-seed30/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "30",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed30"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed31",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 31,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed31",
+      "checkpoint": "runs/train/room2-stall-A-seed31/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "31",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed31"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed32",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 32,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed32",
+      "checkpoint": "runs/train/room2-stall-A-seed32/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "32",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed32"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed33",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 33,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed33",
+      "checkpoint": "runs/train/room2-stall-A-seed33/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "33",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed33"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed34",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 34,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed34",
+      "checkpoint": "runs/train/room2-stall-A-seed34/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "34",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed34"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed35",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 35,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed35",
+      "checkpoint": "runs/train/room2-stall-A-seed35/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "35",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed35"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed36",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 36,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed36",
+      "checkpoint": "runs/train/room2-stall-A-seed36/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "36",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed36"
+      ]
+    },
+    {
+      "id": "room2-stall-A-seed37",
+      "stage": "room2-stall-pilot",
+      "arm": "A-stall",
+      "seed": 37,
+      "init_from": "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+      "run_dir": "runs/train/room2-stall-A-seed37",
+      "checkpoint": "runs/train/room2-stall-A-seed37/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260922-210737/cloned.zip",
+        "--seed",
+        "37",
+        "--run-dir",
+        "runs/train/room2-stall-A-seed37"
+      ]
+    },
+    {
+      "id": "room2-stall-B-seed30",
+      "stage": "room2-stall-pilot",
+      "arm": "B-stall",
+      "seed": 30,
+      "init_from": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "run_dir": "runs/train/room2-stall-B-seed30",
+      "checkpoint": "runs/train/room2-stall-B-seed30/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+        "--seed",
+        "30",
+        "--run-dir",
+        "runs/train/room2-stall-B-seed30"
+      ]
+    },
+    {
+      "id": "room2-stall-B-seed31",
+      "stage": "room2-stall-pilot",
+      "arm": "B-stall",
+      "seed": 31,
+      "init_from": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "run_dir": "runs/train/room2-stall-B-seed31",
+      "checkpoint": "runs/train/room2-stall-B-seed31/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+        "--seed",
+        "31",
+        "--run-dir",
+        "runs/train/room2-stall-B-seed31"
+      ]
+    },
+    {
+      "id": "room2-stall-B-seed32",
+      "stage": "room2-stall-pilot",
+      "arm": "B-stall",
+      "seed": 32,
+      "init_from": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "run_dir": "runs/train/room2-stall-B-seed32",
+      "checkpoint": "runs/train/room2-stall-B-seed32/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+        "--seed",
+        "32",
+        "--run-dir",
+        "runs/train/room2-stall-B-seed32"
+      ]
+    },
+    {
+      "id": "room2-stall-B-seed33",
+      "stage": "room2-stall-pilot",
+      "arm": "B-stall",
+      "seed": 33,
+      "init_from": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "run_dir": "runs/train/room2-stall-B-seed33",
+      "checkpoint": "runs/train/room2-stall-B-seed33/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 120,
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+        "--seed",
+        "33",
+        "--run-dir",
+        "runs/train/room2-stall-B-seed33"
+      ]
+    }
+  ]
+}
