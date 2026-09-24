@@ -533,6 +533,40 @@ class RunTests(unittest.TestCase):
         self.assertEqual([int(row["accepted_steps"]) for row in progress], [32, 64, 96, 128, 160, 192])
         self.assertEqual([episode["index"] for episode in episodes], list(range(1, len(episodes) + 1)))
 
+    def test_the_stall_option_is_recorded_and_counted(self):
+        run_config = config(total_timesteps=64, eval_every=0, stall_frames=5)
+        train(run_config, self.run_dir, build_environment(EpochBridge(), run_config, self.run_dir), PROVENANCE)
+        manifest, progress, episodes, _ = read(self.run_dir)
+        self.assertEqual(manifest["config"]["stall_frames"], 5)
+        self.assertIn("ending_stalled", progress[0])
+        self.assertGreater(sum(int(row["ending_stalled"]) for row in progress), 0)
+        self.assertEqual(sum(int(row["ending_stalled"]) for row in progress),
+                         sum(episode["ending"] == "stalled" for episode in episodes))
+
+    def test_without_the_option_the_records_keep_their_columns(self):
+        run_config = config(total_timesteps=64, eval_every=0)
+        train(run_config, self.run_dir, build_environment(EpochBridge(), run_config, self.run_dir), PROVENANCE)
+        manifest, progress, episodes, _ = read(self.run_dir)
+        self.assertEqual(manifest["config"]["stall_frames"], 0)
+        self.assertNotIn("ending_stalled", progress[0])
+        self.assertEqual([name for name in progress[0] if name.startswith("ending_")],
+                         [f"ending_{name}" for name in ("success", "death", "restart", "left_level", "wrong_room",
+                                                        "timeout")])
+        self.assertFalse(any(episode["ending"] == "stalled" for episode in episodes))
+
+    def test_a_run_from_before_the_option_still_resumes(self):
+        interrupted = config(total_timesteps=96, eval_every=0, checkpoint_every=32)
+        train(TrainConfig(**{**interrupted.__dict__, "total_timesteps": 64}), self.run_dir,
+              CelesteRoomEnv(EpochBridge()), PROVENANCE)
+        manifest_path = self.run_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["config"]["total_timesteps"] = 96
+        del manifest["config"]["stall_frames"]
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        model = train(interrupted, self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE, resume=True)
+        self.assertEqual(model.num_timesteps, 96)
+
     def test_refuses_to_overwrite_a_run(self):
         train(config(total_timesteps=32, eval_every=0), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
         with self.assertRaises(FileExistsError):

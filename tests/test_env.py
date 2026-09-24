@@ -24,6 +24,7 @@ from celeste_rl.endings import (
     FAILURES,
     LEFT_LEVEL,
     RESTART,
+    STALLED,
     SUCCESS,
     TIMEOUT,
     WRONG_ROOM,
@@ -320,6 +321,65 @@ class MovingBridge(ReplayBridge):
         x, y = self.path[min(self.index, len(self.path)) - 1]
         observation.state["Player"]["Position"] = {"X": x, "Y": y}
         return observation
+
+
+class StallTests(unittest.TestCase):
+    """The training-only stall ending: an ordinary failure once the best potential has not risen for N frames."""
+
+    STILL = [(19, 144)]
+    FORWARD = (84, 128)  # a higher potential than the start (see test_moving_towards_the_exit_pays...)
+
+    def play(self, env: CelesteRoomEnv, limit: int = DEADLINE_FRAMES):
+        env.reset()
+        total = 0.0
+        for step in range(1, limit + 1):
+            _, reward, terminated, _, info = env.step(noop())
+            total += reward
+            if terminated:
+                return step, total, info
+        raise AssertionError("episode did not end")
+
+    def test_off_by_default(self):
+        self.assertEqual(CelesteRoomEnv(ReplayBridge()).stall_frames, 0)
+        step, _, info = self.play(CelesteRoomEnv(MovingBridge(self.STILL), reward_config=V2))
+        self.assertEqual((step, info["ending"]), (DEADLINE_FRAMES, TIMEOUT))
+
+    def test_standing_still_ends_as_stalled_and_is_worth_exactly_a_timeout(self):
+        step, stalled_total, info = self.play(CelesteRoomEnv(MovingBridge(self.STILL), reward_config=V2,
+                                                             stall_frames=30))
+        self.assertEqual((step, info["ending"]), (30, STALLED))
+        self.assertIn(STALLED, FAILURES)
+        _, timeout_total, _ = self.play(CelesteRoomEnv(MovingBridge(self.STILL), reward_config=V2))
+        self.assertAlmostEqual(stalled_total, timeout_total, places=9)
+
+    def test_a_new_best_potential_restarts_the_count(self):
+        path = self.STILL * 10 + [self.FORWARD]
+        step, _, info = self.play(CelesteRoomEnv(MovingBridge(path), reward_config=V2, stall_frames=30))
+        self.assertEqual((step, info["ending"]), (11 + 30, STALLED))
+
+    def test_a_death_in_the_same_frame_wins(self):
+        env = CelesteRoomEnv(WalkingBridge(self.STILL * 30, [{"type": "death", "room": "1"}]), reward_config=V2,
+                             stall_frames=30)
+        step, _, info = self.play(env)
+        self.assertEqual((step, info["ending"]), (30, DEATH))
+
+    def test_the_deadline_wins_over_a_stall_on_the_same_frame(self):
+        step, _, info = self.play(CelesteRoomEnv(MovingBridge(self.STILL), reward_config=V2,
+                                                 stall_frames=DEADLINE_FRAMES))
+        self.assertEqual((step, info["ending"]), (DEADLINE_FRAMES, TIMEOUT))
+
+    def test_a_negative_setting_is_refused(self):
+        with self.assertRaises(ValueError):
+            CelesteRoomEnv(ReplayBridge(), stall_frames=-1)
+
+    def test_the_evaluators_never_enable_it(self):
+        """Held-out and checkpoint evaluation play the full deadline, whatever the run trained with."""
+        scripts = Path(__file__).resolve().parents[1] / "scripts"
+        for name in ("evaluate_heldout.py", "evaluate_checkpoint.py"):
+            source = (scripts / name).read_text(encoding="utf-8")
+            with self.subTest(script=name):
+                self.assertNotIn("stall_frames", source)
+                self.assertNotIn("build_environment", source)
 
 
 class Room2Bridge(ReplayBridge):

@@ -55,7 +55,7 @@ from pathlib import Path
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
-from celeste_rl.endings import SUCCESS
+from celeste_rl.endings import ENDINGS, STALLED, SUCCESS
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.reward import RewardConfig
 from celeste_rl.schema import MENU_INPUTS
@@ -109,6 +109,9 @@ class TrainConfig:
     # 50, not 20 (Codex K7): 20 episodes cannot show a success rate below 5%, and the rates worth catching
     # early are smaller than that.
     eval_episodes: int = 50
+    # Training only, 0 (off) by default: end an episode as `stalled`, an ordinary failure, once its best progress
+    # potential has not risen for this many frames. Evaluation never uses it.
+    stall_frames: int = 0
 
     def __post_init__(self):
         """Refuse a configuration that cannot run (Codex J10). A checkpoint interval of 0 never advances the
@@ -121,6 +124,8 @@ class TrainConfig:
             problems.append(f"eval_every must be 0 (no evaluation) or greater, got {self.eval_every}")
         if not 0.0 <= self.canonical_fraction <= 1.0:
             problems.append(f"canonical_fraction must be between 0 and 1, got {self.canonical_fraction}")
+        if self.stall_frames < 0:
+            problems.append(f"stall_frames must be 0 (off) or greater, got {self.stall_frames}")
         if self.max_start_frames <= 0:
             problems.append(f"max_start_frames must be greater than 0, got {self.max_start_frames}")
         if self.start_sampling not in SAMPLING:
@@ -152,7 +157,7 @@ def build_environment(bridge, config: TrainConfig, run_dir: Path) -> CelesteRoom
     kwargs = {"task": task} if task is not None else {}
     return CelesteRoomEnv(bridge, disabled_inputs=config.disabled_inputs, reward_config=reward,
                           start_sampler=None if archive is None else archive.sample, archive=archive,
-                          task_start=task_start, **kwargs)
+                          task_start=task_start, stall_frames=config.stall_frames, **kwargs)
 
 
 def _atomic_save(model: SupervisedPPO, path: Path) -> None:
@@ -403,7 +408,10 @@ class RunRecorder(BaseCallback):
             "success_rate": len(successes) / len(episodes) if episodes else "",
             "mean_return": float(np.mean([e["return"] for e in episodes])) if episodes else "",
             "mean_success_length": float(np.mean([e["length"] for e in successes])) if successes else "",
-            **{f"ending_{name}": endings.get(name, 0) for name in ("success", "death", "restart", "left_level", "wrong_room", "timeout")},
+            # From endings.py, so a new ending is counted rather than dropped. `stalled` only has a column when the
+            # option is on, so every run without it keeps exactly the columns it always had.
+            **{f"ending_{name}": endings.get(name, 0) for name in ENDINGS
+               if name != STALLED or self.config.stall_frames},
             # From the reward version, so a version that adds a component records it instead of dropping it.
             **{f"component_{name}": sum(e["components"].get(name, 0.0) for e in episodes)
                for name in self.env.reward_config.components},
@@ -537,7 +545,8 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
 
     if resume:
         previous = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if previous["config"] != json.loads(json.dumps(asdict(config))):
+        # A run from before stall_frames existed ran with it off.
+        if {"stall_frames": 0, **previous["config"]} != json.loads(json.dumps(asdict(config))):
             raise ValueError("The resume config differs from the run's config")
         model = SupervisedPPO.load(checkpoints / "latest.zip", env=env, device=config.device,
                                    max_consecutive_discards=config.max_consecutive_discards)

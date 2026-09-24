@@ -8,6 +8,8 @@ loading. The ending is decided from those events first and the state second, in 
   3. success: a transition from the task's start room to its target room.
   4. wrong_room: any other transition.
   5. timeout: the decision-frame counter reached the deadline.
+  6. stalled (training option only, set by the environment, never by `classify`): no new best progress
+     potential for the configured number of frames. It is an ordinary failure and never beats the others.
 
 Anything the rules cannot explain raises EndingFault, which the environment reports as a bridge fault: no
 player without a death, restart or level exit in the same reply; an unknown event type; a malformed event.
@@ -25,7 +27,10 @@ RESTART = "restart"
 LEFT_LEVEL = "left_level"
 WRONG_ROOM = "wrong_room"
 TIMEOUT = "timeout"
-FAILURES = (DEATH, RESTART, LEFT_LEVEL, WRONG_ROOM, TIMEOUT)
+STALLED = "stalled"
+FAILURES = (DEATH, RESTART, LEFT_LEVEL, WRONG_ROOM, TIMEOUT, STALLED)
+# Every ending, in the order records list them.
+ENDINGS = (SUCCESS, *FAILURES)
 
 KNOWN_EVENTS = {"death", "transition", "load_level", "level_exit", "pause", "unpause"}
 

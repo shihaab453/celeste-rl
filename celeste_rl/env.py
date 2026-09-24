@@ -30,7 +30,7 @@ from gymnasium import spaces
 
 from celeste_rl.actions import apply_disabled, disabled_mask, parse_line, to_line, to_parts
 from celeste_rl.bridge import BridgeError
-from celeste_rl.endings import SUCCESS, WRONG_ROOM, EndingFault, RoomTask, classify
+from celeste_rl.endings import STALLED, SUCCESS, WRONG_ROOM, EndingFault, RoomTask, classify
 from celeste_rl.observation import ObservationBuilder, SchemaViolation, observation_space
 from celeste_rl.potential import RoomPotential
 from celeste_rl.reward import RewardConfig, reward_components
@@ -50,7 +50,7 @@ class CelesteRoomEnv(gym.Env):
 
     def __init__(self, bridge, disabled_inputs: Iterable[str] = MENU_INPUTS, task: RoomTask = RoomTask(),
                  reward_config: RewardConfig = RewardConfig(), start_sampler=None,
-                 archive: StartArchive | None = None, task_start: Start | None = None):
+                 archive: StartArchive | None = None, task_start: Start | None = None, stall_frames: int = 0):
         """`bridge` is a LockstepBridge (or anything with the same reset/step/close). `disabled_inputs` defaults to
         pause, quick restart and journal (decision D1); pass () to enable all 24 inputs.
 
@@ -58,7 +58,16 @@ class CelesteRoomEnv(gym.Env):
         arguments at each reset and returns a `Start` to begin from, or None for the task start. `archive`
         collects the states this environment reaches. They are separate so an evaluation can run held-out
         starts without writing to the archive it is measuring.
+
+        `stall_frames` is a training-only option, 0 (off) by default and never set by an evaluator: when it is
+        positive, an episode whose best progress potential has not risen for that many frames ends as `stalled`,
+        an ordinary failure. Under rew-v2 every failure totals the same whenever it happens, so this changes
+        how long a stuck episode lasts, not what it is worth.
         """
+        if stall_frames < 0:
+            raise ValueError(f"stall_frames must be 0 (off) or positive, got {stall_frames}")
+        self.stall_frames = stall_frames
+        self._best_potential, self._best_at = 0.0, 0
         self.bridge = bridge
         self.task = task
         self.reward_config = reward_config
@@ -225,6 +234,7 @@ class CelesteRoomEnv(gym.Env):
         if used_sample is not None and self.archive is not None:
             self.archive.record_use(used_sample)
         self._potential_value = self._start_potential(observation.state)
+        self._best_potential, self._best_at = self._potential_value, self._elapsed
         self._ready = True
         return obs, self._info(frame=observation.tas_frame, reset_events=observation.events,
                                potential=self._potential_value,
@@ -250,6 +260,14 @@ class CelesteRoomEnv(gym.Env):
             raise BridgeFault(f"step at frame {observation.tas_frame} could not be interpreted: {error}") from error
 
         self._elapsed = elapsed
+        # Checked only when the game itself ended nothing, so a death, a success or the deadline in the same
+        # frame always wins. A strictly higher potential counts as progress; equal does not.
+        if ending is None and self.stall_frames and self._potential is not None:
+            current = self._potential.value(observation.state)
+            if current > self._best_potential:
+                self._best_potential, self._best_at = current, elapsed
+            elif elapsed - self._best_at >= self.stall_frames:
+                ending = STALLED
         terminated = ending is not None
         # The terminal potential is 0 by definition, so an episode's shaping sums to -scale * potential(start).
         value = 0.0 if terminated or self._potential is None else self._potential.value(observation.state)
