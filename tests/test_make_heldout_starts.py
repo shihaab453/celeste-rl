@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from celeste_rl.demonstrations import DemonstrationManifestError, route_sha256
 from celeste_rl.heldout import FORMAT_VERSION, HeldoutManifestError, freeze_entries, manifest_sha256
@@ -15,7 +17,10 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPTS = REPO / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
+import make_heldout_starts  # noqa: E402
 from make_heldout_starts import (  # noqa: E402
+    ATTEMPTS,
+    attempted_seeds,
     candidates,
     FIRST_SEED,
     excluded_heldout_routes,
@@ -230,6 +235,57 @@ class FirstSeedTests(unittest.TestCase):
             routes = existing_heldout_routes(root)
 
             self.assertEqual(unused_search_seeds(routes, 3, first_seed=112), [113, 115, 116])
+
+
+class SearchAttemptTests(unittest.TestCase):
+    """A seed counts as tried as soon as its search starts (v2 procedure, amendment 2)."""
+
+    def test_a_seed_whose_search_left_no_route_is_still_skipped(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_route(root, "found", 112, [action("R")] * 4)
+            (root / ATTEMPTS).mkdir()
+            for seed in (112, 113):
+                (root / ATTEMPTS / f"seed-{seed}.json").write_text(json.dumps({"seed": seed}), encoding="utf-8")
+            routes = existing_heldout_routes(root)
+
+            self.assertEqual(routes, [root / "found"], "the attempt records are never read as a route")
+            self.assertEqual(attempted_seeds(root), {112, 113})
+            self.assertEqual(unused_search_seeds(routes, 3, 112, attempted_seeds(root)), [114, 115, 116])
+
+    def _fake_run(self, root: Path, seed: int, creates_route: bool, returncode: int):
+        record = root / ATTEMPTS / f"seed-{seed}.json"
+
+        def run(command, **kwargs):
+            self.assertTrue(record.exists(), "the attempt is recorded before the search starts")
+            if creates_route:
+                write_route(root, "20260924-120000", seed, [action("R")] * 4)
+            return subprocess.CompletedProcess(command, returncode, stdout="searching\n",
+                                               stderr="Steam not found\n" if returncode else "")
+        return run
+
+    def test_a_failed_search_is_recorded_with_its_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(make_heldout_starts.subprocess, "run", self._fake_run(root, 112, False, 1)):
+                found = make_heldout_starts.search(112, Path("C:/game"), 1.0, root)
+
+            self.assertIsNone(found)
+            record = json.loads((root / ATTEMPTS / "seed-112.json").read_text(encoding="utf-8"))
+            self.assertEqual((record["seed"], record["returncode"], record["route"]), (112, 1, None))
+            self.assertIn("Steam not found", (root / ATTEMPTS / "seed-112.out").read_text(encoding="utf-8"))
+            self.assertEqual(attempted_seeds(root), {112})
+
+    def test_the_first_search_in_a_namespace_still_finds_its_route_folder(self):
+        # The attempts folder is created in the same call; it must not be taken for the route folder.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with mock.patch.object(make_heldout_starts.subprocess, "run", self._fake_run(root, 116, True, 0)):
+                found = make_heldout_starts.search(116, Path("C:/game"), 1.0, root)
+
+            self.assertEqual(found, root / "20260924-120000")
+            record = json.loads((root / ATTEMPTS / "seed-116.json").read_text(encoding="utf-8"))
+            self.assertEqual((record["returncode"], record["route"]), (0, "20260924-120000"))
 
 
 class ExcludeHeldoutTests(unittest.TestCase):
