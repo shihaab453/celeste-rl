@@ -20,6 +20,9 @@ class StallPilotAnalysisTests(unittest.TestCase):
         self.assertAlmostEqual(fisher_one_sided(1, 4, 8, 8), 616 / 4368, places=12)   # about 0.14
         self.assertAlmostEqual(fisher_one_sided(0, 4, 8, 8), 70 / 1820, places=12)    # about 0.038
         self.assertAlmostEqual(fisher_one_sided(4, 4, 8, 8), 1 - fisher_one_sided_upper(4, 4), places=12)
+        # Against the primary measure's 5/8 control count (second review): about 0.059 and 0.013.
+        self.assertAlmostEqual(fisher_one_sided(1, 5, 8, 8), 476 / 8008, places=12)
+        self.assertAlmostEqual(fisher_one_sided(0, 5, 8, 8), 56 / 4368, places=12)
 
     def test_collapse_is_strictly_below_the_threshold(self):
         self.assertTrue(collapsed(0.48, 0.5))
@@ -43,6 +46,7 @@ class StallPilotAnalysisTests(unittest.TestCase):
         windows = window_metrics(episodes, progress, crossing_x=344)
         first = windows["0k-100k"]
         self.assertEqual(first["episodes"], 3)
+        self.assertAlmostEqual(first["mean_frames_per_episode"], 2600 / 3)
         self.assertAlmostEqual(first["share_of_frames_in_timeout_or_stalled_episodes"], 2100 / 2600)
         self.assertEqual(first["attempts_reaching_crossing"], 2)
         self.assertAlmostEqual(first["mean_entropy"], 0.5)

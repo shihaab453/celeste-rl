@@ -95,6 +95,9 @@ def window_metrics(episodes: list[dict], progress: list[dict], crossing_x: int) 
         wasted = sum(episode["length"] for episode in group if episode["ending"] in ("timeout", "stalled"))
         out[f"{key * 100}k-{(key + 1) * 100}k"] = {
             "episodes": len(group),
+            # A headline waste measure with attempts reaching the crossing: stuck runs also die after long
+            # wandering, so the timeout share alone understates the waste.
+            "mean_frames_per_episode": frames / len(group),
             "clear_rate": sum(episode["ending"] == "success" for episode in group) / len(group),
             "timeout_share": sum(episode["ending"] == "timeout" for episode in group) / len(group),
             "stalled_share": sum(episode["ending"] == "stalled" for episode in group) / len(group),
@@ -145,6 +148,8 @@ def play_rate(result_path: Path, expected_checkpoint_sha256: str, protocol: dict
     if result.get("attributable") is not True or result.get("runtime_problems"):
         raise AnalysisError(f"{result_path} is not attributable")
     return {"clear_rate": result["success_rate"], "endings": result["endings"],
+            # Descriptive, never a gate: how long successful episodes take without the rule.
+            "success_length": result.get("success_length"),
             "deterministic": result["deterministic"]["ending"], "result": str(result_path)}
 
 
