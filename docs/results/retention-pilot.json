@@ -1,0 +1,572 @@
+{
+ "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "bfbe8608848e3f9b7c179431bc116ae4735a7e9801969e254b5e6b50a6223007",
+ "pilot_plan_sha256": "6f07add90fab22fc6c03487d27c0065fe2a1f05f0fc608c5da3921e253214ae5",
+ "evaluation_plan_sha256": "2533a65850d10e386de2baade2810ce07beb14e9bb349e50f12a5a0bf7a9dc3c",
+ "evaluation_commit": "f26914de29ae95d3304fea926cd6f5d7c6167048",
+ "aggregates_only": "The Room 1 held-out set (config/heldout_starts.json) already carries the published Phase 3B result. This pilot reports only aggregate success per checkpoint; nobody looks at per-route or per-state Room 1 results.",
+ "floor": {
+  "clone": {
+   "per_run": [
+    {
+     "route_macro": 0.1488,
+     "state_weighted": 0.15,
+     "successes": 30,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.1411,
+     "state_weighted": 0.14,
+     "successes": 28,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.1042,
+     "state_weighted": 0.105,
+     "successes": 21,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.1738,
+     "state_weighted": 0.175,
+     "successes": 35,
+     "episodes": 200
+    }
+   ],
+   "route_macro": 0.142,
+   "state_weighted": 0.1425
+  },
+  "final": {
+   "per_run": [
+    {
+     "route_macro": 0.2973,
+     "state_weighted": 0.3,
+     "successes": 60,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.2501,
+     "state_weighted": 0.25,
+     "successes": 50,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.1514,
+     "state_weighted": 0.155,
+     "successes": 31,
+     "episodes": 200
+    },
+    {
+     "route_macro": 0.1197,
+     "state_weighted": 0.12,
+     "successes": 24,
+     "episodes": 200
+    }
+   ],
+   "route_macro": 0.2046,
+   "state_weighted": 0.2062
+  }
+ },
+ "runs": {
+  "R-k0": {
+   "donor_seed": 3,
+   "room1_before": {
+    "route_macro": 0.7643,
+    "state_weighted": 0.76
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.2137,
+     "state_weighted": 0.22,
+     "successes": 44,
+     "episodes": 200,
+     "route_macro_drop": 0.5506,
+     "route_macro_retained_share": 0.1152,
+     "state_weighted_drop": 0.54,
+     "state_weighted_retained_share": 0.1255
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2341,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "episodes": 200,
+     "route_macro_drop": 0.5302,
+     "route_macro_retained_share": 0.0527,
+     "state_weighted_drop": 0.525,
+     "state_weighted_retained_share": 0.052
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.2848,
+     "state_weighted": 0.29,
+     "successes": 58,
+     "episodes": 200,
+     "route_macro_drop": 0.4795,
+     "route_macro_retained_share": 0.1433,
+     "state_weighted_drop": 0.47,
+     "state_weighted_retained_share": 0.1513
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.3227,
+     "state_weighted": 0.32,
+     "successes": 64,
+     "episodes": 200,
+     "route_macro_drop": 0.4416,
+     "route_macro_retained_share": 0.211,
+     "state_weighted_drop": 0.44,
+     "state_weighted_retained_share": 0.2055
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.3139,
+     "state_weighted": 0.31,
+     "successes": 62,
+     "episodes": 200,
+     "route_macro_drop": 0.4504,
+     "route_macro_retained_share": 0.1953,
+     "state_weighted_drop": 0.45,
+     "state_weighted_retained_share": 0.1874
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.294,
+     "state_weighted": 0.295,
+     "successes": 59,
+     "episodes": 200,
+     "route_macro_drop": 0.4703,
+     "route_macro_retained_share": 0.1597,
+     "state_weighted_drop": 0.465,
+     "state_weighted_retained_share": 0.1603
+    }
+   ],
+   "room2": {
+    "clone_clears_of_50": 5,
+    "final_clears_of_50": 50,
+    "training": {
+     "clear_per_100k": [
+      0.099,
+      0.355,
+      0.568,
+      0.866,
+      0.898
+     ],
+     "first_50k_window_at_half": 250000
+    },
+    "h2_B_k_training": {
+     "clear_per_100k": [
+      0.138,
+      0.486,
+      0.951,
+      0.958,
+      0.964
+     ],
+     "first_50k_window_at_half": 200000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "R-k": [
+     -0.767,
+     0.096,
+     0.298,
+     0.29,
+     0.499,
+     0.545,
+     0.441,
+     0.581,
+     0.61,
+     0.778
+    ],
+    "H2_B-k": [
+     -0.416,
+     0.124,
+     0.33,
+     0.457,
+     0.337,
+     0.619,
+     0.547,
+     0.679,
+     0.653,
+     0.59
+    ]
+   }
+  },
+  "R-k1": {
+   "donor_seed": 4,
+   "room1_before": {
+    "route_macro": 0.7691,
+    "state_weighted": 0.765
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1543,
+     "state_weighted": 0.15,
+     "successes": 30,
+     "episodes": 200,
+     "route_macro_drop": 0.6148,
+     "route_macro_retained_share": 0.0196,
+     "state_weighted_drop": 0.615,
+     "state_weighted_retained_share": 0.012
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2071,
+     "state_weighted": 0.2,
+     "successes": 40,
+     "episodes": 200,
+     "route_macro_drop": 0.562,
+     "route_macro_retained_share": 0.0044,
+     "state_weighted_drop": 0.565,
+     "state_weighted_retained_share": -0.0111
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.1924,
+     "state_weighted": 0.185,
+     "successes": 37,
+     "episodes": 200,
+     "route_macro_drop": 0.5767,
+     "route_macro_retained_share": -0.0216,
+     "state_weighted_drop": 0.58,
+     "state_weighted_retained_share": -0.0379
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1357,
+     "state_weighted": 0.14,
+     "successes": 28,
+     "episodes": 200,
+     "route_macro_drop": 0.6334,
+     "route_macro_retained_share": -0.1221,
+     "state_weighted_drop": 0.625,
+     "state_weighted_retained_share": -0.1185
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.115,
+     "state_weighted": 0.11,
+     "successes": 22,
+     "episodes": 200,
+     "route_macro_drop": 0.6541,
+     "route_macro_retained_share": -0.1587,
+     "state_weighted_drop": 0.655,
+     "state_weighted_retained_share": -0.1722
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.0878,
+     "state_weighted": 0.09,
+     "successes": 18,
+     "episodes": 200,
+     "route_macro_drop": 0.6813,
+     "route_macro_retained_share": -0.2069,
+     "state_weighted_drop": 0.675,
+     "state_weighted_retained_share": -0.2079
+    }
+   ],
+   "room2": {
+    "clone_clears_of_50": 21,
+    "final_clears_of_50": 46,
+    "training": {
+     "clear_per_100k": [
+      0.169,
+      0.452,
+      0.848,
+      0.889,
+      0.943
+     ],
+     "first_50k_window_at_half": 200000
+    },
+    "h2_B_k_training": {
+     "clear_per_100k": [
+      0.093,
+      0.207,
+      0.709,
+      0.887,
+      0.858
+     ],
+     "first_50k_window_at_half": 250000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "R-k": [
+     0.858,
+     0.501,
+     0.743,
+     0.698,
+     0.629,
+     0.768,
+     0.796,
+     0.732,
+     0.638,
+     0.819
+    ],
+    "H2_B-k": [
+     -0.183,
+     -0.452,
+     -0.089,
+     0.108,
+     0.33,
+     0.27,
+     0.628,
+     0.313,
+     0.384,
+     0.282
+    ]
+   }
+  },
+  "R-k2": {
+   "donor_seed": 5,
+   "room1_before": {
+    "route_macro": 0.7735,
+    "state_weighted": 0.775
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1674,
+     "state_weighted": 0.175,
+     "successes": 35,
+     "episodes": 200,
+     "route_macro_drop": 0.6061,
+     "route_macro_retained_share": 0.0402,
+     "state_weighted_drop": 0.6,
+     "state_weighted_retained_share": 0.0514
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2353,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "episodes": 200,
+     "route_macro_drop": 0.5382,
+     "route_macro_retained_share": 0.054,
+     "state_weighted_drop": 0.54,
+     "state_weighted_retained_share": 0.0506
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.3162,
+     "state_weighted": 0.32,
+     "successes": 64,
+     "episodes": 200,
+     "route_macro_drop": 0.4573,
+     "route_macro_retained_share": 0.1962,
+     "state_weighted_drop": 0.455,
+     "state_weighted_retained_share": 0.2001
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.2754,
+     "state_weighted": 0.27,
+     "successes": 54,
+     "episodes": 200,
+     "route_macro_drop": 0.4981,
+     "route_macro_retained_share": 0.1245,
+     "state_weighted_drop": 0.505,
+     "state_weighted_retained_share": 0.1122
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.2758,
+     "state_weighted": 0.27,
+     "successes": 54,
+     "episodes": 200,
+     "route_macro_drop": 0.4977,
+     "route_macro_retained_share": 0.1252,
+     "state_weighted_drop": 0.505,
+     "state_weighted_retained_share": 0.1122
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.3012,
+     "state_weighted": 0.305,
+     "successes": 61,
+     "episodes": 200,
+     "route_macro_drop": 0.4723,
+     "route_macro_retained_share": 0.1698,
+     "state_weighted_drop": 0.47,
+     "state_weighted_retained_share": 0.1737
+    }
+   ],
+   "room2": {
+    "clone_clears_of_50": 13,
+    "final_clears_of_50": 50,
+    "training": {
+     "clear_per_100k": [
+      0.188,
+      0.57,
+      0.865,
+      0.92,
+      0.935
+     ],
+     "first_50k_window_at_half": 200000
+    },
+    "h2_B_k_training": {
+     "clear_per_100k": [
+      0.245,
+      0.715,
+      0.875,
+      0.872,
+      0.886
+     ],
+     "first_50k_window_at_half": 150000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "R-k": [
+     0.302,
+     0.507,
+     0.681,
+     0.804,
+     0.49,
+     0.443,
+     0.656,
+     0.508,
+     0.516,
+     0.519
+    ],
+    "H2_B-k": [
+     -0.769,
+     -0.203,
+     -0.008,
+     0.068,
+     0.203,
+     0.418,
+     0.393,
+     0.407,
+     0.525,
+     0.606
+    ]
+   }
+  },
+  "R-k3": {
+   "donor_seed": 6,
+   "room1_before": {
+    "route_macro": 0.6593,
+    "state_weighted": 0.66
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.166,
+     "state_weighted": 0.165,
+     "successes": 33,
+     "episodes": 200,
+     "route_macro_drop": 0.4933,
+     "route_macro_retained_share": 0.0464,
+     "state_weighted_drop": 0.495,
+     "state_weighted_retained_share": 0.0435
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2466,
+     "state_weighted": 0.255,
+     "successes": 51,
+     "episodes": 200,
+     "route_macro_drop": 0.4127,
+     "route_macro_retained_share": 0.0924,
+     "state_weighted_drop": 0.405,
+     "state_weighted_retained_share": 0.1075
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.3071,
+     "state_weighted": 0.305,
+     "successes": 61,
+     "episodes": 200,
+     "route_macro_drop": 0.3522,
+     "route_macro_retained_share": 0.2254,
+     "state_weighted_drop": 0.355,
+     "state_weighted_retained_share": 0.2177
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.2826,
+     "state_weighted": 0.275,
+     "successes": 55,
+     "episodes": 200,
+     "route_macro_drop": 0.3767,
+     "route_macro_retained_share": 0.1715,
+     "state_weighted_drop": 0.385,
+     "state_weighted_retained_share": 0.1516
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.3309,
+     "state_weighted": 0.325,
+     "successes": 65,
+     "episodes": 200,
+     "route_macro_drop": 0.3284,
+     "route_macro_retained_share": 0.2778,
+     "state_weighted_drop": 0.335,
+     "state_weighted_retained_share": 0.2618
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.3105,
+     "state_weighted": 0.315,
+     "successes": 63,
+     "episodes": 200,
+     "route_macro_drop": 0.3488,
+     "route_macro_retained_share": 0.2329,
+     "state_weighted_drop": 0.345,
+     "state_weighted_retained_share": 0.2398
+    }
+   ],
+   "room2": {
+    "clone_clears_of_50": 10,
+    "final_clears_of_50": 48,
+    "training": {
+     "clear_per_100k": [
+      0.282,
+      0.75,
+      0.886,
+      0.922,
+      0.939
+     ],
+     "first_50k_window_at_half": 150000
+    },
+    "h2_B_k_training": {
+     "clear_per_100k": [
+      0.192,
+      0.504,
+      0.72,
+      0.639,
+      0.786
+     ],
+     "first_50k_window_at_half": 200000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "R-k": [
+     0.092,
+     0.558,
+     0.593,
+     0.648,
+     0.597,
+     0.598,
+     0.681,
+     0.678,
+     0.681,
+     0.629
+    ],
+    "H2_B-k": [
+     -1.693,
+     0.034,
+     0.092,
+     0.057,
+     0.14,
+     0.357,
+     0.494,
+     0.537,
+     0.397,
+     0.749
+    ]
+   }
+  }
+ }
+}
