@@ -56,6 +56,10 @@ B seed 25 cleared 3 of the 82 starts in the first 200 frames, against A seed 25'
 
 Starts 300 or more frames into the room were near ceiling for both arms: 67 to 69 of 69 in each A run and 64 to 69 of 69 in each B run. A's overall Room 2 success of 86.8% also left much less room to improve than Room 1, where A scored 52.2%.
 
+## Later replication (training side)
+
+A later training-side experiment repeated arm A's procedure with eight new seeds (30 to 37). Played from the canonical start after training (50 sampled episodes per final checkpoint), all six arm A runs reported here cleared 82% to 100%, and so did three of the new eight, but the other five cleared 0% to 38%. Pooled, 5 of 14 canonical-start runs from this clone collapsed, so collapse in training is not specific to varied starts. The 86.8% above is the result for the six declared seeds; given this collapse rate it is probably optimistic as an expectation for the procedure, but the new runs were never evaluated on held-out states. Details: [Room 2 training stability](room2-training-stability.md).
+
 ## Where training episodes fail
 
 Everything in this section is descriptive. It uses training records, the room's map data and the seven demonstrations, not the held-out states.
