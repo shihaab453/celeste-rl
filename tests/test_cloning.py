@@ -5,7 +5,10 @@ Run from the repo root:
 """
 from __future__ import annotations
 
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch as th
@@ -121,6 +124,45 @@ def _spaces_env():
             raise RuntimeError("never stepped")
 
     return SpacesOnly()
+
+
+class InitialModelTests(unittest.TestCase):
+    """clone_room1.py --init-from: clone into a saved policy's weights instead of fresh ones."""
+
+    def setUp(self):
+        from scripts.clone_room1 import SpacesOnly, initial_model
+        self.initial_model, self.spaces_only = initial_model, SpacesOnly
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder)
+
+    def saved(self, model) -> Path:
+        path = self.folder / "donor.zip"
+        model.save(path)
+        return path
+
+    def test_without_init_from_nothing_changes(self):
+        fresh = PPO(CelestePolicy, self.spaces_only(), policy_kwargs=policy_kwargs(), device="cpu", seed=3)
+        model = self.initial_model(3)
+        for (name, a), b in zip(fresh.policy.state_dict().items(), model.policy.state_dict().values()):
+            self.assertTrue(th.equal(a, b), name)
+
+    def test_the_donor_weights_replace_the_fresh_ones_and_the_seed_is_restored(self):
+        donor = self.initial_model(9)
+        with th.no_grad():
+            for parameter in donor.policy.parameters():
+                parameter.add_(0.5)
+        model = self.initial_model(3, self.saved(donor))
+        for (name, a), b in zip(donor.policy.state_dict().items(), model.policy.state_dict().values()):
+            self.assertTrue(th.equal(a, b), name)
+        drawn = th.rand(4)
+        th.manual_seed(3)
+        self.assertTrue(th.equal(drawn, th.rand(4)), "SB3's load() re-seeded from the donor and was not undone")
+
+    def test_a_different_architecture_refuses(self):
+        kwargs = {**policy_kwargs(), "net_arch": {"pi": [64], "vf": [64]}}
+        donor = PPO(CelestePolicy, self.spaces_only(), policy_kwargs=kwargs, device="cpu", seed=9)
+        with self.assertRaises(RuntimeError):
+            self.initial_model(3, self.saved(donor))
 
 
 if __name__ == "__main__":

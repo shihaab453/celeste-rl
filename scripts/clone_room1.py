@@ -5,6 +5,7 @@ Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/clone_room1.py --task-definition config/room2.json \
         --demonstrations config/demonstrations-room2.json --heldout config/heldout_starts-room2.json
     .venv-rl/Scripts/python.exe scripts/clone_room1.py --dataset runs/clone/<run>/dataset.npz   # refit, no game
+    ... --init-from runs/train/<run>/checkpoints/latest.zip --init-from-sha256 <sha256>   # start from those weights
 
 Both modes require the explicit demonstration and held-out manifests. A dataset refit also requires the
 `dataset.manifest.json` written beside it, and verifies all three hashes before fitting.
@@ -98,6 +99,21 @@ class SpacesOnly(gym.Env):
         raise RuntimeError("never stepped")
 
 
+def initial_model(seed: int, init_from: Path | None = None) -> PPO:
+    """The policy to clone into: fresh weights, or a saved policy's weights (actor and critic).
+
+    With `init_from` the saved policy's weights replace the fresh ones, and the global generators are re-seeded
+    with `seed` afterwards, because SB3's load() re-seeds them from the saved run's own seed (as in
+    `celeste_rl/training/run.py`). The architecture must match exactly; a mismatch refuses.
+    """
+    model = PPO(CelestePolicy, SpacesOnly(), policy_kwargs=policy_kwargs(), device="cpu", seed=seed)
+    if init_from is not None:
+        donor = SupervisedPPO.load(init_from, device="cpu")
+        model.policy.load_state_dict(donor.policy.state_dict())
+        model.set_random_seed(seed)
+    return model
+
+
 def load_manifests(demonstrations_path: Path, heldout_path: Path, routes_only: bool,
                    expected_task: dict) -> tuple[dict, list[dict], dict]:
     """Validate both frozen manifests and reject content overlap before any game or model work."""
@@ -173,6 +189,9 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval-episodes", type=int, default=50)
     parser.add_argument("--no-play", action="store_true", help="skip stage 3")
+    parser.add_argument("--init-from", type=Path,
+                        help="start cloning from this saved policy's weights instead of fresh ones")
+    parser.add_argument("--init-from-sha256", help="required with --init-from: that file's SHA-256")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
@@ -190,6 +209,8 @@ def main() -> int:
         if args.task_definition:
             parser.error("--heldout is required with --task-definition")
         args.heldout = DEFAULT_HELDOUT
+    if (args.init_from is None) != (args.init_from_sha256 is None):
+        parser.error("--init-from and --init-from-sha256 go together")
 
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
@@ -204,6 +225,15 @@ def main() -> int:
             TaskDefinitionError) as error:
         print(f"Cannot establish demonstration/held-out separation: {error}")
         return 2
+    if args.init_from is not None:
+        try:
+            init_sha256 = hashlib.sha256(args.init_from.read_bytes()).hexdigest()
+        except OSError as error:
+            print(f"Cannot read --init-from: {error}")
+            return 2
+        if init_sha256 != args.init_from_sha256:
+            print(f"--init-from sha256 is {init_sha256}, not the pinned {args.init_from_sha256}")
+            return 2
     output_root = REPO / "runs" / "clone"
     if args.task_definition:
         output_root /= definition.name
@@ -257,7 +287,10 @@ def main() -> int:
         train, holdout = split_by_trajectory(data, args.holdout, args.seed)
         print(f"\n{len(data)} frames over {len(data.trajectories)} demonstrations: "
               f"{len(train.trajectories)} to train on, {len(holdout.trajectories)} held out")
-        model = PPO(CelestePolicy, SpacesOnly(), policy_kwargs=policy_kwargs(), device="cpu", seed=args.seed)
+        model = initial_model(args.seed, args.init_from)
+        if args.init_from is not None:
+            results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256}
+            print(f"Cloning starts from the weights of {args.init_from}")
         results["before"] = {"train": accuracy(model.policy, train), "holdout": accuracy(model.policy, holdout)}
         results["cloning"] = clone(model.policy, train, holdout, args.epochs, args.batch_size,
                                    args.learning_rate, args.seed, report_every=max(1, args.epochs // 10))
