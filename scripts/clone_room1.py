@@ -68,7 +68,8 @@ from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.heldout import HeldoutManifestError, validate_manifest as validate_heldout_manifest  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.observation import observation_space  # noqa: E402
-from celeste_rl.schema import ACTION_INPUTS  # noqa: E402
+from celeste_rl.schema import ACTION_INPUTS, MENU_INPUTS  # noqa: E402
+from celeste_rl.schema import FINGERPRINT as SCHEMA_FINGERPRINT  # noqa: E402
 from celeste_rl.tasks import (  # noqa: E402
     TaskDefinitionError,
     resolve_task_definition,
@@ -109,9 +110,39 @@ def initial_model(seed: int, init_from: Path | None = None) -> PPO:
     model = PPO(CelestePolicy, SpacesOnly(), policy_kwargs=policy_kwargs(), device="cpu", seed=seed)
     if init_from is not None:
         donor = SupervisedPPO.load(init_from, device="cpu")
+        # A strict load checks weight shapes only; equal spaces also rule out a different observation layout.
+        if donor.observation_space != model.observation_space or donor.action_space != model.action_space:
+            raise ValueError(f"{init_from} was saved with different observation or action spaces")
         model.policy.load_state_dict(donor.policy.state_dict())
         model.set_random_seed(seed)
     return model
+
+
+def donor_provenance(init_from: Path) -> dict:
+    """Who trained the --init-from policy, from its training run's manifest or its clone's results.json.
+
+    A training checkpoint (runs/train/<run>/checkpoints/*.zip) must come from finished, clean sessions recorded
+    with the current observation schema and the current disabled inputs; otherwise the weights would be read under
+    a different meaning. A clone (runs/clone/.../cloned.zip) records its commit. Anything else refuses.
+    """
+    manifest_path = init_from.parent.parent / "manifest.json"
+    if init_from.parent.name == "checkpoints" and manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        sessions = manifest["sessions"] if isinstance(manifest["sessions"], list) else [manifest["sessions"]]
+        fingerprints = sorted({s["provenance"]["runtime"]["schema"]["fingerprint"] for s in sessions})
+        disabled = manifest["config"].get("disabled_inputs")
+        if fingerprints != [SCHEMA_FINGERPRINT] or list(disabled or []) != list(MENU_INPUTS) \
+                or any(s["provenance"]["uncommitted_changes"] for s in sessions):
+            raise ValueError(f"{init_from}: trained with schema {fingerprints}, disabled inputs {disabled} or "
+                             f"uncommitted changes; this code uses schema {SCHEMA_FINGERPRINT} and {list(MENU_INPUTS)}")
+        return {"kind": "training run", "manifest": manifest_path.as_posix(), "status": manifest["status"],
+                "commits": sorted({s["provenance"]["commit"] for s in sessions}), "schema_fingerprint":
+                SCHEMA_FINGERPRINT, "disabled_inputs": list(disabled), "accepted_steps": manifest["accepted_steps"]}
+    results_path = init_from.parent / "results.json"
+    if init_from.name == "cloned.zip" and results_path.exists():
+        record = json.loads(results_path.read_text(encoding="utf-8"))
+        return {"kind": "clone", "results": results_path.as_posix(), "commits": [record["commit"]]}
+    raise ValueError(f"{init_from}: no training manifest or clone record beside it, so its provenance is unknown")
 
 
 def load_manifests(demonstrations_path: Path, heldout_path: Path, routes_only: bool,
@@ -234,6 +265,11 @@ def main() -> int:
         if init_sha256 != args.init_from_sha256:
             print(f"--init-from sha256 is {init_sha256}, not the pinned {args.init_from_sha256}")
             return 2
+        try:
+            init_provenance = donor_provenance(args.init_from)
+        except (OSError, KeyError, json.JSONDecodeError, ValueError) as error:
+            print(f"Cannot use --init-from: {error}")
+            return 2
     output_root = REPO / "runs" / "clone"
     if args.task_definition:
         output_root /= definition.name
@@ -289,7 +325,8 @@ def main() -> int:
               f"{len(train.trajectories)} to train on, {len(holdout.trajectories)} held out")
         model = initial_model(args.seed, args.init_from)
         if args.init_from is not None:
-            results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256}
+            results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256,
+                                    "provenance": init_provenance}
             print(f"Cloning starts from the weights of {args.init_from}")
         results["before"] = {"train": accuracy(model.policy, train), "holdout": accuracy(model.policy, holdout)}
         results["cloning"] = clone(model.policy, train, holdout, args.epochs, args.batch_size,

@@ -5,11 +5,13 @@ Run from the repo root:
 """
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
+import gymnasium as gym
 import numpy as np
 import torch as th
 from stable_baselines3 import PPO
@@ -163,6 +165,53 @@ class InitialModelTests(unittest.TestCase):
         donor = PPO(CelestePolicy, self.spaces_only(), policy_kwargs=kwargs, device="cpu", seed=9)
         with self.assertRaises(RuntimeError):
             self.initial_model(3, self.saved(donor))
+
+    def test_different_spaces_refuse_before_any_weight_is_loaded(self):
+        env = self.spaces_only()
+        env.observation_space = gym.spaces.Dict({**env.observation_space.spaces,
+                                                 "context": gym.spaces.Box(0.0, 2.0, (2,), np.float32)})
+        donor = PPO(CelestePolicy, env, policy_kwargs=policy_kwargs(), device="cpu", seed=9)
+        with self.assertRaisesRegex(ValueError, "different observation or action spaces"):
+            self.initial_model(3, self.saved(donor))
+
+
+class DonorProvenanceTests(unittest.TestCase):
+    """clone_room1.py --init-from records who trained the donor and refuses a donor read under another schema."""
+
+    def setUp(self):
+        from scripts.clone_room1 import SCHEMA_FINGERPRINT, donor_provenance
+        self.provenance, self.fingerprint = donor_provenance, SCHEMA_FINGERPRINT
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder)
+
+    def checkpoint(self, fingerprint: str, disabled=("S", "Q", "N"), dirty: bool = False) -> Path:
+        run = self.folder / "run"
+        (run / "checkpoints").mkdir(parents=True)
+        session = {"provenance": {"commit": "abc123", "uncommitted_changes": dirty,
+                                  "runtime": {"schema": {"fingerprint": fingerprint}}}}
+        (run / "manifest.json").write_text(json.dumps({"status": "finished", "accepted_steps": 501760,
+                                                       "config": {"disabled_inputs": list(disabled)},
+                                                       "sessions": [session]}), encoding="utf-8")
+        return run / "checkpoints" / "latest.zip"
+
+    def test_a_training_checkpoint_records_its_commit(self):
+        record = self.provenance(self.checkpoint(self.fingerprint))
+        self.assertEqual((record["kind"], record["commits"]), ("training run", ["abc123"]))
+
+    def test_another_schema_other_disabled_inputs_or_a_dirty_tree_refuse(self):
+        for kwargs in ({"fingerprint": "0000"}, {"fingerprint": self.fingerprint, "disabled": ("S",)},
+                       {"fingerprint": self.fingerprint, "dirty": True}):
+            shutil.rmtree(self.folder / "run", ignore_errors=True)
+            with self.subTest(**{k: str(v) for k, v in kwargs.items()}), self.assertRaises(ValueError):
+                self.provenance(self.checkpoint(**kwargs))
+
+    def test_a_clone_records_its_commit_and_anything_else_refuses(self):
+        clone = self.folder / "clone"
+        clone.mkdir()
+        (clone / "results.json").write_text(json.dumps({"commit": "def456"}), encoding="utf-8")
+        self.assertEqual(self.provenance(clone / "cloned.zip")["commits"], ["def456"])
+        with self.assertRaises(ValueError):
+            self.provenance(self.folder / "loose.zip")
 
 
 if __name__ == "__main__":
