@@ -1,0 +1,521 @@
+{
+  "name": "room2-demos-stall-ab-play-v1",
+  "written": "2026-09-25T13:12:29+01:00",
+  "label": "training side only; the H2 stability gate's measure; nothing reads a held-out set",
+  "training_plan": "config/campaign-room2-demos-stall-ab.json",
+  "training_plan_sha256": "6c8d8581fbd83bc578256e8353d1739b543691b3b236ddf78be62b907af638e5",
+  "training_campaigns": [
+    {
+      "summary": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+      "summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+      "plan_name": "room2-demos-stall-ab-v1",
+      "plan_sha256": "6c8d8581fbd83bc578256e8353d1739b543691b3b236ddf78be62b907af638e5",
+      "commit": "37b943190fb56d3647ffb8d835650c0a185b515e"
+    },
+    {
+      "summary": "runs/campaign/20260925-111120-room2-demos-stall-ab-continuation-v1/summary.json",
+      "summary_sha256": "6cb4385e8f940b68536136b9514de791d86d842d20fd4af536b0f78e6e7f2e83",
+      "plan_name": "room2-demos-stall-ab-continuation-v1",
+      "plan_sha256": "845831a318abed85267fb4ea668136b56e4d24f48b9c87eb0cc1bd2a3b385937",
+      "commit": "4b3b09ae17cad07b12ffd31a8faf1e97d7bb3304"
+    }
+  ],
+  "runs": [
+    {
+      "id": "play-room2-demos-stall-A-k0",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k0/checkpoints/latest.zip",
+      "checkpoint_sha256": "b5e3d17c02e6a17ed7712e2ed7c99be2273217cd16fb7a2ba93ebafe92a2184a",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k0",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k0/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k0",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k0/checkpoints/latest.zip",
+      "checkpoint_sha256": "ed6f2738af1c3e2a1fb6d155e86c1085fa056af6384abc8971e68168c10f413a",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k0",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k0/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k1",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k1/checkpoints/latest.zip",
+      "checkpoint_sha256": "48b7a350e7c4d304d44dd2a9091603cb164ddb6b782e349603e4692aaddd1e7e",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k1",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k1/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k1",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k1/checkpoints/latest.zip",
+      "checkpoint_sha256": "51164e89f3c690db15563e29f192cd57de75ba1e629371cf35da179f49405625",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k1",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k1/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k2",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k2/checkpoints/latest.zip",
+      "checkpoint_sha256": "ec195a5cc050c512196826665a4f5f28e9da4f59f5a084867ce11672c80f41a6",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k2",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k2/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k2",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k2/checkpoints/latest.zip",
+      "checkpoint_sha256": "4ff73bb6066d54bdfe2503cfa7f56bf3aee0937db530b897041037ac410a2025",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k2",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k2/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k3",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k3/checkpoints/latest.zip",
+      "checkpoint_sha256": "88b51c26f98afe2d971bbc16587306da67f0a7d9cecc72c2ee87a8c7c4398e6b",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k3",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k3/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k3",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k3/checkpoints/latest.zip",
+      "checkpoint_sha256": "971fa414ad82c9aee38f71798091ae651d7cfcef8c7e5bf11656f189c0b0eab5",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k3",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k3/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k4",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k4/checkpoints/latest.zip",
+      "checkpoint_sha256": "6b9515bf2cf3a87579ff52065a27dbc7fb5ba3fae776aba4cb5aac7cffa2a930",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k4",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k4/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k4",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k4/checkpoints/latest.zip",
+      "checkpoint_sha256": "3f1d05f237b8c04d6076f37c14eb06e935904a49fcdeedb3041b71f4d93eaba6",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k4",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k4/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k5",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k5/checkpoints/latest.zip",
+      "checkpoint_sha256": "25f29950f647c315af6b33e675e7a82da070d3f0aed9b3ea6fc2294b5a62f82b",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k5",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k5/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k5",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k5/checkpoints/latest.zip",
+      "checkpoint_sha256": "028459ccbd384eff40849418defba93853d15a7f0856b8774a72e2b9f6e1bf9b",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-005033-room2-demos-stall-ab-v1/summary.json",
+        "campaign_summary_sha256": "fdd7b4cd287c8eda6b41836241717769db0c852612940aa036c698f7af481c04",
+        "training_commit": "37b943190fb56d3647ffb8d835650c0a185b515e",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k5",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k5/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k6",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k6/checkpoints/latest.zip",
+      "checkpoint_sha256": "91857af91dacdf41db520b0b4f08ec779f497108e99c567451ddffac73ed32c3",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-111120-room2-demos-stall-ab-continuation-v1/summary.json",
+        "campaign_summary_sha256": "6cb4385e8f940b68536136b9514de791d86d842d20fd4af536b0f78e6e7f2e83",
+        "training_commit": "4b3b09ae17cad07b12ffd31a8faf1e97d7bb3304",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k6",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k6/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k6",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k6/checkpoints/latest.zip",
+      "checkpoint_sha256": "48c1dbc530bb6a874aac3653e5c68e443eeeb02ab67d6dbb4cc095e1958555bf",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-111120-room2-demos-stall-ab-continuation-v1/summary.json",
+        "campaign_summary_sha256": "6cb4385e8f940b68536136b9514de791d86d842d20fd4af536b0f78e6e7f2e83",
+        "training_commit": "4b3b09ae17cad07b12ffd31a8faf1e97d7bb3304",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k6",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k6/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-A-k7",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-A-k7/checkpoints/latest.zip",
+      "checkpoint_sha256": "c9f1b2c7834d61781221f2907179ea4daffae2d5a2590f177e0965a0fe21971d",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-111120-room2-demos-stall-ab-continuation-v1/summary.json",
+        "campaign_summary_sha256": "6cb4385e8f940b68536136b9514de791d86d842d20fd4af536b0f78e6e7f2e83",
+        "training_commit": "4b3b09ae17cad07b12ffd31a8faf1e97d7bb3304",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-A-k7",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-A-k7/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    },
+    {
+      "id": "play-room2-demos-stall-B-k7",
+      "stage": "room2-demos-stall-play",
+      "checkpoint": "runs/train/room2-demos-stall-B-k7/checkpoints/latest.zip",
+      "checkpoint_sha256": "153ab4c1d3eb9ef0a0fb7635186d5b8a8f40ba35f832e354c2d56f9ffe017a1f",
+      "trained_by": {
+        "campaign": "runs/campaign/20260925-111120-room2-demos-stall-ab-continuation-v1/summary.json",
+        "campaign_summary_sha256": "6cb4385e8f940b68536136b9514de791d86d842d20fd4af536b0f78e6e7f2e83",
+        "training_commit": "4b3b09ae17cad07b12ffd31a8faf1e97d7bb3304",
+        "sessions": 1,
+        "accepted_steps": 501760
+      },
+      "run_dir": "runs/evaluation/_planned-play-room2-demos-stall-B-k7",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k7/checkpoints/latest.zip",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0"
+      ]
+    }
+  ]
+}
