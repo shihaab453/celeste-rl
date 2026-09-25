@@ -44,5 +44,36 @@
     "Single checkpoints swing by a few points (about 3 points of sampling noise at 20% success); describe patterns across the four runs."
   ],
   "later": "Before any confirmatory retention experiment, generate a fresh Room 1 held-out set with the existing procedure (--exclude-heldout config/heldout_starts.json) and commit its plan first.",
-  "cost": "Room 1 re-record a few minutes live; 4 mixed clones about 15 minutes each on CPU; 4 fine-tuning runs about 35 minutes each; 24 Room 1 and 8 Room 2 evaluations about 1.1 hours. About 4.5 hours in total."
+  "cost": "Room 1 re-record a few minutes live; 4 mixed clones about 15 minutes each on CPU; 4 fine-tuning runs about 35 minutes each; 24 Room 1 and 8 Room 2 evaluations about 1.1 hours. About 4.5 hours in total. Plus about 10 minutes for the imitation-only reference (3 CPU refits and 4 evaluations).",
+  "imitation_only_reference": {
+    "why": "Phase 3B found the Room 1 clone copied the demonstrations poorly (below a persistence baseline on held-out routes); the donors' Room 1 skill came from PPO on top of it, and no Room 1 clone had ever been scored on the Room 1 held-out set. This reference says what imitating the Room 1 demonstrations alone achieves, so a mixed clone at that level is read as relearning the demonstrations, not keeping the donor's skill.",
+    "clones": "Room 1-only clones from fresh weights: seed 0 is the existing runs/clone/20260918-183508/cloned.zip (the re-recorded dataset's seed-0 refit is identical in all 36 tensors); seeds 1 to 3 refitted offline with scripts/clone_room1.py --dataset runs/clone/20260925-221134/dataset.npz --demonstrations config/demonstrations.json --heldout config/heldout_starts.json --routes-only --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --no-play --seed <k> (Room 1 default task)",
+    "measure": "the primary Room 1 command on each of the 4; reported as the mean and range; included in the committed evaluation plan"
+  },
+  "room2_side_effects": "Balanced mixing changes the Room 2 side as well: Room 2 frames carry half the cloning loss instead of all of it; each epoch has about 26% more frames (7,520 Room 2 plus 1,948 Room 1 training frames for seed 0), so there are more gradient steps; and the minibatch order differs. Any Room 2 difference against R-k therefore cannot be attributed to Room 1 being present.",
+  "floor_reuse_check": "Before any evaluation, confirm that scripts/evaluate_heldout.py and every celeste_rl module it imports are unchanged since f26914d (the floor's evaluation commit); if anything changed, re-evaluate the floor in the same plan. Checked 2026-09-25 at d20f80b: only celeste_rl/cloning.py changed, and nothing the evaluator imports uses it.",
+  "decision_branches": {
+    "measure": "Room 1 route-macro retained share against the floor, (after - floor) / (before - floor), and the distance to the imitation-only reference mean, described across the four runs",
+    "rules_in_order": [
+      "A (mixing keeps the skill): after mixed cloning, the median retained share is at least 0.5 and at least 3 of 4 runs are more than 10 points above the imitation-only reference mean. Then, if the median retained share at 500k is at least 0.25 lower than after cloning, the next step is mixed PPO (each episode picks a room; new code and a review); otherwise mixed imitation suffices for these two rooms for now.",
+      "B (mixing relearns the demonstrations): not A, and at least 3 of 4 runs after mixed cloning are within 10 points of the imitation-only reference mean. The next step is a recipe whose target is the donor's own play, such as self-distillation (record the donor's actions on Room 1 states and mix those in).",
+      "C (mixing did not help): not A or B, and the median retained share after mixed cloning is below 0.2. Mixing at this weight did not help; the owner and the orchestrator choose between self-distillation and a different weight.",
+      "D (unclear): anything else is reported descriptively and taken to the orchestrator and the owner; no branch is picked after the fact."
+    ]
+  },
+  "generator_checks": "The training-plan generator selects exactly one clone per k by donor sha256, seed k, a clean commit, 300 epochs and mix.room_weighting equal (the clone command must include --room-weighting equal, whose default is frames); the smoke-test clone runs/clone/chapter-1-room-2/20260925-221717 (1 epoch) can never match.",
+  "amendments": [
+    {
+      "date": "2026-09-25",
+      "before_any_pilot_data": true,
+      "reason": "orchestrator review of d20f80b: go after adding an imitation-only reference, the Room 2 side effects, pre-stated decision branches, the floor-reuse check and the generator checks",
+      "added": [
+        "imitation_only_reference",
+        "room2_side_effects",
+        "floor_reuse_check",
+        "decision_branches",
+        "generator_checks"
+      ]
+    }
+  ]
 }
