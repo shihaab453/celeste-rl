@@ -184,12 +184,13 @@ class DonorProvenanceTests(unittest.TestCase):
         self.folder = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.folder)
 
-    def checkpoint(self, fingerprint: str, disabled=("S", "Q", "N"), dirty: bool = False) -> Path:
+    def checkpoint(self, fingerprint: str, disabled=("S", "Q", "N"), dirty: bool = False,
+                   status: str = "finished") -> Path:
         run = self.folder / "run"
         (run / "checkpoints").mkdir(parents=True)
         session = {"provenance": {"commit": "abc123", "uncommitted_changes": dirty,
                                   "runtime": {"schema": {"fingerprint": fingerprint}}}}
-        (run / "manifest.json").write_text(json.dumps({"status": "finished", "accepted_steps": 501760,
+        (run / "manifest.json").write_text(json.dumps({"status": status, "accepted_steps": 501760,
                                                        "config": {"disabled_inputs": list(disabled)},
                                                        "sessions": [session]}), encoding="utf-8")
         return run / "checkpoints" / "latest.zip"
@@ -200,7 +201,8 @@ class DonorProvenanceTests(unittest.TestCase):
 
     def test_another_schema_other_disabled_inputs_or_a_dirty_tree_refuse(self):
         for kwargs in ({"fingerprint": "0000"}, {"fingerprint": self.fingerprint, "disabled": ("S",)},
-                       {"fingerprint": self.fingerprint, "dirty": True}):
+                       {"fingerprint": self.fingerprint, "dirty": True},
+                       {"fingerprint": self.fingerprint, "status": "running"}):
             shutil.rmtree(self.folder / "run", ignore_errors=True)
             with self.subTest(**{k: str(v) for k, v in kwargs.items()}), self.assertRaises(ValueError):
                 self.provenance(self.checkpoint(**kwargs))
@@ -208,8 +210,13 @@ class DonorProvenanceTests(unittest.TestCase):
     def test_a_clone_records_its_commit_and_anything_else_refuses(self):
         clone = self.folder / "clone"
         clone.mkdir()
-        (clone / "results.json").write_text(json.dumps({"commit": "def456"}), encoding="utf-8")
+        (clone / "results.json").write_text(json.dumps({"commit": "def456", "uncommitted_changes": False}),
+                                            encoding="utf-8")
         self.assertEqual(self.provenance(clone / "cloned.zip")["commits"], ["def456"])
+        (clone / "results.json").write_text(json.dumps({"commit": "def456", "uncommitted_changes": True}),
+                                            encoding="utf-8")
+        with self.assertRaises(ValueError):
+            self.provenance(clone / "cloned.zip")
         with self.assertRaises(ValueError):
             self.provenance(self.folder / "loose.zip")
 
