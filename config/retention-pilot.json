@@ -1,0 +1,59 @@
+{
+  "name": "retention-pilot-v1",
+  "written": "2026-09-25T16:00:00+01:00",
+  "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+  "question": "When a Room 1 policy is taught Room 2 (cloned on the Room 2 demonstrations starting from its own weights, then fine-tuned with PPO and the stall ending), how much of its Room 1 held-out skill remains after cloning and after each 100,000 steps of fine-tuning?",
+  "decisions_it_may_inform": [
+    "whether forgetting is large enough that the next retention step needs mixed-room training",
+    "the rough size of the Room 1 drop, for a later power estimate"
+  ],
+  "decisions_it_may_not_inform": "anything else, including which Room 1 seeds, clone seeds, checkpoints or Room 2 settings a later experiment uses; one striking run does not set the next design",
+  "donors": {
+    "rule": "Room 1 varied-start fine-tuning finals from config/campaign-heldout-ab-200.json (Phase 3B arm B, seeds 3 to 8): the first four by seed, 3 to 6, fixed before any pilot data",
+    "runs": {
+      "3": {"checkpoint": "runs/train/overnight-B-seed3/checkpoints/latest.zip", "sha256": "169f1118753ed8e4f32ba171a4da8fabf574f70b3efa1f658a1b5060996a2b48"},
+      "4": {"checkpoint": "runs/train/overnight-B-seed4/checkpoints/latest.zip", "sha256": "11b958bd650336bfc5b349b53cb5df385c1953541d14487c623e500d3bbe0210"},
+      "5": {"checkpoint": "runs/train/overnight-B-seed5/checkpoints/latest.zip", "sha256": "f7f4d65fd3b2b71b0d61a8734c36e592f1ac268602e24dcf480feea7b4d4e36b"},
+      "6": {"checkpoint": "runs/train/overnight-B-seed6/checkpoints/latest.zip", "sha256": "654bf26500d5528c0a6904497814bbedcffcb9dc1eb8c3f2848d5d3a0533293c"}
+    },
+    "before": {
+      "measured": "2026-09-25 at 6bf7340, log runs/clone-logs/retention-check-20260925.log; every row identical to the published Phase 3B rows on the 14 shared fields",
+      "room1_heldout_successes_of_200": {"3": 152, "4": 153, "5": 155, "6": 132},
+      "room1_heldout_route_macro": {"3": 0.7643, "4": 0.7691, "5": 0.7735, "6": 0.6593},
+      "room1_heldout_results": {"3": "runs/heldout-evaluation/20260925-150739", "4": "runs/heldout-evaluation/20260925-151012", "5": "runs/heldout-evaluation/20260925-151247", "6": "runs/heldout-evaluation/20260925-151508"},
+      "room2_canonical_clears_of_50": {"3": 0, "4": 1, "5": 0, "6": 0}
+    }
+  },
+  "runs": {
+    "design": "R-k for k = 0 to 3: donor seed 3 + k; 21-route clone seed k; fine-tuning seed 40 + k. Each is nominally paired with H2's B-k (same clone seed, so the same dataset, held-back routes and minibatch order, and the same fine-tuning seed); only the starting weights differ. The pairing is real at the cloning stage and nominal after fine-tuning starts.",
+    "clone_command": "scripts/clone_room1.py --task-definition config/room2.json --dataset runs/clone/chapter-1-room-2/20260924-014351/dataset.npz --demonstrations config/demonstrations-room2-v2.json --heldout config/heldout_starts-room2-v2.json --routes-only --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --no-play --seed <k> --init-from <donor checkpoint> --init-from-sha256 <donor sha256>",
+    "clone_note": "H2's 21-route clone settings; the v2 held-out manifest is used only for the demonstration overlap check, as in H2, and is never evaluated. Clones are fitted by hand in order k = 0 to 3 with a durable log under runs/clone-logs/.",
+    "train_command": "H2 B-k's command with --init-from <R-k clone> and --run-dir runs/train/retention-pilot-R-k<k>: scripts/train_room1.py --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from <R-k clone> --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed <40 + k>",
+    "train_plan": "a later committed campaign plan, generated mechanically from the four clone results, pinning each clone's sha256; run_overnight.py dry run first",
+    "comparison_runs": ["room2-demos-stall-B-k0", "room2-demos-stall-B-k1", "room2-demos-stall-B-k2", "room2-demos-stall-B-k3"]
+  },
+  "measurements": {
+    "primary_room1": {
+      "command": "scripts/evaluate_heldout.py --checkpoint <zip> --starts config/heldout_starts.json --repeats 1 --seed 20260920",
+      "checkpoints": "for every R-k: the clone's cloned.zip and every step checkpoint (step_000100352 to step_000501760); all evaluated, no best checkpoint",
+      "reported": "Room 1 route-macro and state-weighted success per checkpoint, the drop from the donor's before value, and the retained share (after minus floor) / (before minus floor) using the floor below; the shape of the curve described across the four runs, not from one run's dip"
+    },
+    "floor": {
+      "why": "some Room 1 held-out starts are near the exit, where behaviour that never saw Room 1 may still clear; without a floor a drop cannot be read as partial or complete forgetting",
+      "checkpoints": "H2 B-k0 to B-k3 final latest.zip and their 21-route clones (clone seeds 0 to 3), none of which ever saw Room 1: 8 evaluations with the primary command",
+      "floor_value": "the mean route-macro (and state-weighted) over the 4 final checkpoints for the fine-tuned curve points, and over the 4 clones for the post-clone point; both reported"
+    },
+    "secondary_room2": "descriptive only: each R-k clone's and final checkpoint's canonical play (evaluate_checkpoint.py --task-definition config/room2.json --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0), training clear rate per 100,000-step window and the first 50,000-step window at 50%, beside H2 B-k0 to B-k3. Four runs say almost nothing about Room 2 learning speed.",
+    "critic_record": "explained variance over the first 10 PPO updates for R-k and H2 B-k, because of the critic confound below",
+    "evaluation_plan": "a later committed plan pinning every evaluated checkpoint's sha256 (clones, step checkpoints and floor), run with run_overnight.py after a dry run"
+  },
+  "aggregates_only": "The Room 1 held-out set (config/heldout_starts.json) already carries the published Phase 3B result. This pilot reports only aggregate success per checkpoint; nobody looks at per-route or per-state Room 1 results.",
+  "declared_confounds": [
+    "Critic: --init-from copies the Room 1 value head too. Cloning trains the shared features and the action layers but gives the value layers no gradient, so fine-tuning starts with a Room 1 value head on changed features, while H2 B-k started with an untrained value head. A Room 2 difference mixes Room 1 knowledge with a different critic start.",
+    "No room label: positions are room-relative and the observation has no room identifier; the policy can tell the rooms apart only from its 32 by 32 tile window.",
+    "Pairing with H2 B-k is exact through cloning and nominal after fine-tuning starts.",
+    "Single checkpoints can swing by about 20 points; describe patterns across the four runs."
+  ],
+  "later": "Before any confirmatory retention experiment, generate a fresh Room 1 held-out set with the existing procedure (--exclude-heldout config/heldout_starts.json) and commit its plan first, so nothing this pilot saw shapes the confirmatory measure.",
+  "reviewed": "orchestrator verdict on the design 2026-09-25 (go, with the floor, the declared confounds and these fixed choices); code: bcb9972 and its review follow-up 1fc6664"
+}
