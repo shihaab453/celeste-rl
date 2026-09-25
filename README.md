@@ -142,7 +142,9 @@ no-demonstration attempt and the demonstration-assisted comparison. The Room 2 m
    sampled. The diagnosis uses training records and demonstrations, not the held-out states, and any
    follow-up experiment will disclose that it was designed after seeing where held-out failures clustered.
 2. **Two-room retention.** Mix Rooms 1 and 2 during training and measure both separately, so learning Room 2
-   cannot silently destroy Room 1 competence.
+   cannot silently destroy Room 1 competence. A first descriptive pilot found that teaching a Room 1 policy Room 2
+   by imitation on Room 2 alone erased almost all of its Room 1 skill
+   ([retention pilot](docs/room1-retention-pilot.md)).
 3. **How much of the demonstration set is needed.** The cloned Room 1 policy scores below a
    repeat-your-last-action baseline on held-out routes. Reducing the route count is useful only once the full
    method reaches the reliability bar in more than one room.
