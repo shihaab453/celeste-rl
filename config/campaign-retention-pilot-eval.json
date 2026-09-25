@@ -1,0 +1,872 @@
+{
+  "name": "retention-pilot-eval-v1",
+  "written": "2026-09-25T19:29:32+01:00",
+  "pilot_plan": "config/retention-pilot.json",
+  "pilot_plan_sha256": "6f07add90fab22fc6c03487d27c0065fe2a1f05f0fc608c5da3921e253214ae5",
+  "training_plan": "config/campaign-retention-pilot-train.json",
+  "training_plan_sha256": "a7039c1a9319f8b40e867d58d8d6982c9fddee64bb97339f409392aa2c2f29f5",
+  "training_campaign": "runs/campaign/20260925-170459-retention-pilot-train-v1/summary.json",
+  "training_campaign_sha256": "3da7ef89e30f66c0cfeb58da4d00a1f1285ed205235ab2bb3e57aea23e11aa69",
+  "training_commit": "c2034107448ac577dd6a133aacbc8ba04989e2cf",
+  "clones": {
+    "0": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-160757",
+      "sha256": "ad2fa36d80cf748b6f21f2197e90f4f354ad7439b585fa731afd482d6305d86e",
+      "commit": "fdfc3af1d801a83d57b64c38cc3ed79f048ad35e",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip"
+    },
+    "1": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-162143",
+      "sha256": "d40b204a9d4a911ad175836aa8b9332c897bd90d9d668462fa2f71ecbddde2b2",
+      "commit": "fdfc3af1d801a83d57b64c38cc3ed79f048ad35e",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip"
+    },
+    "2": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-163551",
+      "sha256": "d22c7596f1451389e8ec5607ca27d57d7c74ac5e324b656da856de7ff8144b3b",
+      "commit": "fdfc3af1d801a83d57b64c38cc3ed79f048ad35e",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip"
+    },
+    "3": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-164948",
+      "sha256": "e2134fea237ecf53825e42b5b909dfe272e76ad2e020b8725367f78840475312",
+      "commit": "fdfc3af1d801a83d57b64c38cc3ed79f048ad35e",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip"
+    }
+  },
+  "label": "descriptive retention pilot evaluations; Room 1 aggregates only; the Room 2 v2 set is never read",
+  "runs": [
+    {
+      "id": "room1-R-k0-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-160757/cloned.zip",
+      "checkpoint_sha256": "ad2fa36d80cf748b6f21f2197e90f4f354ad7439b585fa731afd482d6305d86e",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-160757/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k0-step_000100352",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "0d90d21dc2f3c5abeb2508e33ee39e0eb8cbed0ea9e8752a35b03a56e39e63f5",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k0-step_000200704",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "27281ad2aa734b220a7058a85e9216ba2fcb42b03a44eb7ea2278d659b59e4ff",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k0-step_000301056",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "84a720963273fb11017087d63e2d851310204ab494d4fee5213ff9adbf9d02ae",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k0-step_000401408",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "a3c976317049bae9b01d9754b0086ce80906f8f8c822db409b903d2cf2b6b3bd",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k0-step_000501760",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "3eab212624f7afc9aca79052dde02efc713a97758d1ac362805b62ed8d7f8d01",
+      "run_dir": "runs/evaluation/_planned-room1-R-k0-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-R-k0-clone",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-160757/cloned.zip",
+      "checkpoint_sha256": "ad2fa36d80cf748b6f21f2197e90f4f354ad7439b585fa731afd482d6305d86e",
+      "run_dir": "runs/evaluation/_planned-room2-R-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-160757/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-R-k0-final",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/train/retention-pilot-R-k0/checkpoints/latest.zip",
+      "checkpoint_sha256": "3eab212624f7afc9aca79052dde02efc713a97758d1ac362805b62ed8d7f8d01",
+      "run_dir": "runs/evaluation/_planned-room2-R-k0-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k0/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-R-k1-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-162143/cloned.zip",
+      "checkpoint_sha256": "d40b204a9d4a911ad175836aa8b9332c897bd90d9d668462fa2f71ecbddde2b2",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-162143/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k1-step_000100352",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "82a48958c26fc4ba147ecb00cf44e04b09035c9a68e76fad798f2783875a6f1b",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k1-step_000200704",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "b8af39311f7c0ec57909b7a298239d2a2a13e11834404956b5fd304b56c64355",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k1-step_000301056",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "50a7a037de0063ab9316ae718cc5367c7d09f4d0fb045dde2f0e3e7e2cfe4efe",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k1-step_000401408",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "76d08e52c8ac3c7e91066bd05cfe7d96551fca8a944eabe52b6fd12b41f99b1d",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k1-step_000501760",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "e9f1c9601091145abdfc7476c0be2eb0126bba2cfa413c705d09609a0b88589e",
+      "run_dir": "runs/evaluation/_planned-room1-R-k1-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-R-k1-clone",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-162143/cloned.zip",
+      "checkpoint_sha256": "d40b204a9d4a911ad175836aa8b9332c897bd90d9d668462fa2f71ecbddde2b2",
+      "run_dir": "runs/evaluation/_planned-room2-R-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-162143/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-R-k1-final",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/train/retention-pilot-R-k1/checkpoints/latest.zip",
+      "checkpoint_sha256": "e9f1c9601091145abdfc7476c0be2eb0126bba2cfa413c705d09609a0b88589e",
+      "run_dir": "runs/evaluation/_planned-room2-R-k1-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k1/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-R-k2-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-163551/cloned.zip",
+      "checkpoint_sha256": "d22c7596f1451389e8ec5607ca27d57d7c74ac5e324b656da856de7ff8144b3b",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-163551/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k2-step_000100352",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "964de8971b5c196ed94770bbbc8418902134a3cdee22985bd3cbae138843a50b",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k2-step_000200704",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "ecd407d9f6572093f7e482cb66a6339c561a5b718758b6e0bc98fe187438a306",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k2-step_000301056",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "441885b0419a1537c8180a4ac82935ef2bdf871a7e6096bc1541043876bb5e51",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k2-step_000401408",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "33877de1f5c05c1762c1170df5f0983ad7b294cbf36fa0aad2d3962c331e60e4",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k2-step_000501760",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "e1fe0b6a79a7b146c9163bfd354306a2a0b355595f6c0092410747e5ec42bb5c",
+      "run_dir": "runs/evaluation/_planned-room1-R-k2-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-R-k2-clone",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-163551/cloned.zip",
+      "checkpoint_sha256": "d22c7596f1451389e8ec5607ca27d57d7c74ac5e324b656da856de7ff8144b3b",
+      "run_dir": "runs/evaluation/_planned-room2-R-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-163551/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-R-k2-final",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/train/retention-pilot-R-k2/checkpoints/latest.zip",
+      "checkpoint_sha256": "e1fe0b6a79a7b146c9163bfd354306a2a0b355595f6c0092410747e5ec42bb5c",
+      "run_dir": "runs/evaluation/_planned-room2-R-k2-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k2/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-R-k3-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-164948/cloned.zip",
+      "checkpoint_sha256": "e2134fea237ecf53825e42b5b909dfe272e76ad2e020b8725367f78840475312",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-164948/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k3-step_000100352",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "a3fa2ec95a1c1a72172db3c720b833ab5bed3cf566c80d2fd136e06e01e5337b",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k3-step_000200704",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "024f4ab7f5813d138813488db07234df6b528ffef96a97a287bb02e2bda27dad",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k3-step_000301056",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "2688acbee75c220eda124b57623d9d35805968d76e1790e3384e6b9718248871",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k3-step_000401408",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "623084e00b8dc5f62625a95add70fbc279dd12a35fb4e02b877f7aa7de49b24c",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-R-k3-step_000501760",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "b952e40a97f47e3ab3901c4c7fe85708f2ba240ec21ac9a1f13b964507d0b1c0",
+      "run_dir": "runs/evaluation/_planned-room1-R-k3-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-R-k3-clone",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-164948/cloned.zip",
+      "checkpoint_sha256": "e2134fea237ecf53825e42b5b909dfe272e76ad2e020b8725367f78840475312",
+      "run_dir": "runs/evaluation/_planned-room2-R-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-164948/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-R-k3-final",
+      "stage": "retention-pilot-room2",
+      "checkpoint": "runs/train/retention-pilot-R-k3/checkpoints/latest.zip",
+      "checkpoint_sha256": "b952e40a97f47e3ab3901c4c7fe85708f2ba240ec21ac9a1f13b964507d0b1c0",
+      "run_dir": "runs/evaluation/_planned-room2-R-k3-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/retention-pilot-R-k3/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k0-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+      "checkpoint_sha256": "3ec554413ee05b2824d1b85fee95909d1602234bb7f5f987ccb4974caaee5192",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k0-final",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/room2-demos-stall-B-k0/checkpoints/latest.zip",
+      "checkpoint_sha256": "ed6f2738af1c3e2a1fb6d155e86c1085fa056af6384abc8971e68168c10f413a",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k0-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k0/checkpoints/latest.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k1-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260924-110841/cloned.zip",
+      "checkpoint_sha256": "41f68590ef10ad28d4308a8a2dcef8f1f7e7e551fb36ea35f7eb9d31b75ff0ba",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260924-110841/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k1-final",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/room2-demos-stall-B-k1/checkpoints/latest.zip",
+      "checkpoint_sha256": "51164e89f3c690db15563e29f192cd57de75ba1e629371cf35da179f49405625",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k1-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k1/checkpoints/latest.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k2-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260924-112753/cloned.zip",
+      "checkpoint_sha256": "6506cbe539f2ec3c60d6b5516ce0d831322c3f03861bc521a8c2514b9c4b356b",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260924-112753/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k2-final",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/room2-demos-stall-B-k2/checkpoints/latest.zip",
+      "checkpoint_sha256": "4ff73bb6066d54bdfe2503cfa7f56bf3aee0937db530b897041037ac410a2025",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k2-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k2/checkpoints/latest.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k3-clone",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260924-114615/cloned.zip",
+      "checkpoint_sha256": "cab2041d0fa0836aefa2aac99b88195ef24dd101eaf037585eb215b5b3bdc6d3",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260924-114615/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "floor-room1-H2-B-k3-final",
+      "stage": "retention-pilot-room1",
+      "checkpoint": "runs/train/room2-demos-stall-B-k3/checkpoints/latest.zip",
+      "checkpoint_sha256": "971fa414ad82c9aee38f71798091ae651d7cfcef8c7e5bf11656f189c0b0eab5",
+      "run_dir": "runs/evaluation/_planned-floor-room1-H2-B-k3-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/room2-demos-stall-B-k3/checkpoints/latest.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    }
+  ]
+}
