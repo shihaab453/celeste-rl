@@ -1,0 +1,48 @@
+{
+  "name": "mixed-imitation-pilot-v1",
+  "written": "2026-09-25T22:20:00+01:00",
+  "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+  "question": "Does cloning a Room 1 policy on Room 1 and Room 2 demonstrations together, each room weighted equally, keep its Room 1 held-out skill, where Room 2-only cloning erased it (retention pilot)? And does PPO on Room 2 afterwards wear that skill down?",
+  "decisions_it_may_inform": [
+    "whether mixing at the imitation step is enough, or the next step needs mixed PPO (each episode picks a room; new multi-room training code and a review)",
+    "the rough size of the Room 1 effect, for a later power estimate"
+  ],
+  "decisions_it_may_not_inform": "anything else, including which seeds, clone seeds, checkpoints, mixing ratio or Room 2 settings a later experiment uses; one striking run does not set the next design",
+  "changed_from_retention_pilot": "only the imitation data and its weighting: the Room 1 demonstrations are added and each room gets the same total weight in the cloning loss. Everything else is held fixed.",
+  "held_fixed": {
+    "donors": "config/retention-pilot.json donors: Room 1 varied-start seeds 3 to 6, same checkpoints and sha256, same before values",
+    "clone_settings": "--routes-only --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --no-play --seed k, --init-from the donor",
+    "room2_data": "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz with config/demonstrations-room2-v2.json and config/heldout_starts-room2-v2.json (overlap check only); split alone with seed k, so the same 5 held-back Room 2 routes as the retention pilot's R-k and H2's B-k",
+    "fine_tuning": "the retention pilot's R-k command with --init-from <M-k clone> and --run-dir runs/train/mixed-imitation-pilot-M-k<k>: rew-v2, shaping 2.0, 500,000 steps, checkpoints every 100,000, --stall-frames 296, --seed 40 + k, Room 2 canonical starts only",
+    "measurement_commands": "Room 1 held-out: scripts/evaluate_heldout.py --checkpoint <zip> --starts config/heldout_starts.json --repeats 1 --seed 20260920 (aggregates only); Room 2 canonical: scripts/evaluate_checkpoint.py --task-definition config/room2.json --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0"
+  },
+  "room1_data": {
+    "why_rerecorded": "the existing Room 1 clone dataset (runs/clone/20260918-183508/dataset.npz) predates dataset manifests, so a verified --mix-room refit refuses it",
+    "procedure": "before any pilot data: scripts/clone_room1.py --demonstrations config/demonstrations.json --heldout config/heldout_starts.json --routes-only --no-play (Room 1 default task), which replays the 7 route demonstrations and writes dataset.npz with its manifest; the recorded frames are compared with the old dataset (equal counts and arrays expected; any difference is reported and stops the pilot). DONE 2026-09-25 22:11 to 22:16 at bbb3d69 (log runs/clone-logs/room1-rerecord-20260925.log): all 7 routes replayed to success, 2,688 frames, every array identical to the old dataset; the incidental seed-0 clone equals the original Room 1 clone runs/clone/20260918-183508 in all 36 tensors",
+    "dataset": "runs/clone/20260925-221134/dataset.npz",
+    "dataset_sha256": "6b9bd94dffbb0afe45d1ba59bc19bbe5e85c45da2424adee424a2d7199d8aa2b",
+    "split": "Room 1 is split alone with seed k: 2 of its 7 routes held back"
+  },
+  "runs": {
+    "design": "M-k for k = 0 to 3: donor seed 3 + k; mixed clone seed k; fine-tuning seed 40 + k. Nominally paired with the retention pilot's R-k (identical except the added Room 1 data and the weighting) and with H2 B-k.",
+    "clone_command": "scripts/clone_room1.py --task-definition config/room2.json --dataset runs/clone/chapter-1-room-2/20260924-014351/dataset.npz --demonstrations config/demonstrations-room2-v2.json --heldout config/heldout_starts-room2-v2.json --mix-room default config/demonstrations.json config/heldout_starts.json runs/clone/20260925-221134/dataset.npz --room-weighting equal --routes-only --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --no-play --seed <k> --init-from <donor> --init-from-sha256 <donor sha256>",
+    "plans": "clones fitted by hand with a durable log; then a mechanically generated, committed training plan pinning the four clone hashes (dry run first); then a committed evaluation plan pinning every checkpoint"
+  },
+  "measurements": {
+    "primary_room1": "Room 1 held-out route-macro and state-weighted success for every M-k clone and every step checkpoint (100k to 500k), all evaluated, no best checkpoint; drop from the donor's before value; retained share (after - floor) / (before - floor)",
+    "floor": "the retention pilot's floor, reused: the same 8 checkpoints (H2 B-k0 to B-k3 clones and finals) with the same command, already evaluated (docs/results/retention-pilot.json); clone floor for the post-clone point, final floor for the fine-tuned points",
+    "comparison": "the retention pilot's R-k curve at every point (same donors, seeds and Room 2 data; only the mixing differs), described across the four runs",
+    "per_room_imitation": "held-back input and frame accuracy per room for each M-k clone (recorded by clone_room1.py): Room 2 against the R-k clone (same seed, Room 2 only), Room 1 against the donor's own accuracy on the same Room 1 held-back frames before cloning",
+    "secondary_room2": "descriptive: Room 2 canonical clears of 50 for each M-k clone and final; training clear rate per 100k window and first 50k window at 50%, beside R-k and H2 B-k",
+    "critic_record": "explained variance over the first 10 PPO updates for M-k beside R-k"
+  },
+  "aggregates_only": "The Room 1 held-out set already carries the published Phase 3B result and the retention pilot; only aggregate success per checkpoint is reported, never per-route or per-state results.",
+  "declared_confounds": [
+    "Critic: the Room 1 value head is copied with the weights, as in the retention pilot.",
+    "Room 1 demonstrations are only 7 routes (5 fitted per clone), against 16 fitted Room 2 routes; equal weighting gives each Room 1 frame about 4 times the weight of a Room 2 frame (the exact ratio depends on each seed's split and is recorded per clone).",
+    "The Room 1 demonstrations and the donors' original clone came from the same 7 routes, so the donors have already been fitted to them once; mixing may partly act as a reminder of data they saw.",
+    "Single checkpoints swing by a few points (about 3 points of sampling noise at 20% success); describe patterns across the four runs."
+  ],
+  "later": "Before any confirmatory retention experiment, generate a fresh Room 1 held-out set with the existing procedure (--exclude-heldout config/heldout_starts.json) and commit its plan first.",
+  "cost": "Room 1 re-record a few minutes live; 4 mixed clones about 15 minutes each on CPU; 4 fine-tuning runs about 35 minutes each; 24 Room 1 and 8 Room 2 evaluations about 1.1 hours. About 4.5 hours in total."
+}
