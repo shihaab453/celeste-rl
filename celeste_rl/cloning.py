@@ -124,13 +124,44 @@ def accuracy(policy, data: Demonstrations, batch_size: int = 512) -> dict:
     }
 
 
+def combine(parts: list[Demonstrations]) -> tuple[Demonstrations, np.ndarray]:
+    """Stack several rooms' demonstrations into one set, with trajectory ids kept distinct across rooms.
+
+    Part k's trajectory ids are offset by k * 100,000 so a later whole-trajectory split can never mix rooms.
+    Returns the combined set and each frame's part index (its room).
+    """
+    offsets = [index * 100_000 for index in range(len(parts))]
+    if any(part.trajectory.max() >= 100_000 for part in parts):
+        raise ValueError("trajectory ids must stay below 100,000 to be offset per room")
+    obs = {key: np.concatenate([part.obs[key] for part in parts]) for key in OBS_KEYS}
+    combined = Demonstrations(obs, np.concatenate([part.actions for part in parts]),
+                              np.concatenate([part.trajectory + offset for part, offset in zip(parts, offsets)]),
+                              [item for part in parts for item in part.provenance])
+    rooms = np.concatenate([np.full(len(part), index) for index, part in enumerate(parts)])
+    return combined, rooms
+
+
+def equal_room_weights(rooms: np.ndarray) -> np.ndarray:
+    """Per-frame weights that give every room the same total weight, with a mean weight of 1."""
+    labels, counts = np.unique(rooms, return_counts=True)
+    per_room = {label: len(rooms) / (len(labels) * count) for label, count in zip(labels, counts)}
+    return np.array([per_room[room] for room in rooms], dtype=np.float32)
+
+
 def clone(policy, train: Demonstrations, holdout: Demonstrations | None, epochs: int, batch_size: int,
-          learning_rate: float, seed: int, report_every: int = 10) -> dict:
-    """Fit `policy` to the demonstrated actions with binary cross entropy. Returns the fitting history."""
+          learning_rate: float, seed: int, report_every: int = 10, weights: np.ndarray | None = None) -> dict:
+    """Fit `policy` to the demonstrated actions with binary cross entropy. Returns the fitting history.
+
+    `weights` (one per training frame) weights each frame's loss, for example `equal_room_weights` so a room with
+    fewer frames counts as much as a larger one. Without it the fit is exactly the original unweighted one.
+    """
     th.manual_seed(seed)
     optimizer = th.optim.Adam(policy.parameters(), lr=learning_rate)
     observations = {key: th.as_tensor(value) for key, value in train.obs.items()}
     targets = th.as_tensor(train.actions).float()
+    if weights is not None and len(weights) != len(train):
+        raise ValueError(f"{len(weights)} weights for {len(train)} training frames")
+    frame_weights = None if weights is None else th.as_tensor(weights, dtype=th.float32)
     generator = th.Generator().manual_seed(seed)
     history = []
     for epoch in range(epochs):
@@ -140,8 +171,12 @@ def clone(policy, train: Demonstrations, holdout: Demonstrations | None, epochs:
         for start in range(0, len(train), batch_size):
             index = order[start:start + batch_size]
             batch = {key: value[index] for key, value in observations.items()}
-            loss = F.binary_cross_entropy_with_logits(
-                policy.get_distribution(batch).distribution.logits, targets[index])
+            logits = policy.get_distribution(batch).distribution.logits
+            if frame_weights is None:
+                loss = F.binary_cross_entropy_with_logits(logits, targets[index])
+            else:
+                per_frame = F.binary_cross_entropy_with_logits(logits, targets[index], reduction="none").mean(dim=1)
+                loss = (per_frame * frame_weights[index]).sum() / frame_weights[index].sum()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()

@@ -16,7 +16,15 @@ import numpy as np
 import torch as th
 from stable_baselines3 import PPO
 
-from celeste_rl.cloning import OBS_KEYS, Demonstrations, accuracy, clone, split_by_trajectory
+from celeste_rl.cloning import (
+    OBS_KEYS,
+    Demonstrations,
+    accuracy,
+    clone,
+    combine,
+    equal_room_weights,
+    split_by_trajectory,
+)
 from celeste_rl.endings import RoomTask
 from celeste_rl.env import CelesteRoomEnv
 from celeste_rl.observation import observation_space
@@ -107,6 +115,57 @@ class CloneTests(unittest.TestCase):
         self.assertIn("holdout", last)
         self.assertEqual(last["train"]["trajectories"], 3)
         self.assertEqual(last["holdout"]["trajectories"], 1)
+
+
+class MixedRoomTests(unittest.TestCase):
+    """clone_room1.py --mix-room: two rooms' demonstrations in one fit, optionally weighted equally per room."""
+
+    def test_combine_keeps_trajectories_of_different_rooms_apart(self):
+        a, b = demonstrations(3, 10, seed=1), demonstrations(2, 25, seed=2)
+        combined, rooms = combine([a, b])
+        self.assertEqual(len(combined), 80)
+        self.assertEqual(len(combined.trajectories), 5)
+        self.assertEqual(rooms.tolist(), [0] * 30 + [1] * 50)
+        self.assertTrue(np.array_equal(combined.actions[30:], b.actions))
+        # A whole-trajectory split of the combined set can never mix rooms.
+        for trajectory in combined.trajectories:
+            self.assertEqual(len(set(rooms[combined.trajectory == trajectory].tolist())), 1)
+
+    def test_equal_room_weights_give_each_room_the_same_total(self):
+        rooms = np.array([0] * 30 + [1] * 90)
+        weights = equal_room_weights(rooms)
+        self.assertAlmostEqual(float(weights[rooms == 0].sum()), float(weights[rooms == 1].sum()), places=4)
+        self.assertAlmostEqual(float(weights.mean()), 1.0, places=5)
+
+    def test_unit_weights_fit_like_no_weights(self):
+        data = demonstrations(3, 40)
+        results = []
+        for weights in (None, np.ones(len(data), dtype=np.float32)):
+            model = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=0)
+            results.append(clone(model.policy, data, None, epochs=5, batch_size=32, learning_rate=1e-3, seed=0,
+                                 weights=weights)["history"][-1])
+        self.assertAlmostEqual(results[0]["loss"], results[1]["loss"], places=4)
+
+    def test_weights_must_match_the_training_frames(self):
+        data = demonstrations(2, 10)
+        model = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=0)
+        with self.assertRaises(ValueError):
+            clone(model.policy, data, None, epochs=1, batch_size=8, learning_rate=1e-3, seed=0,
+                  weights=np.ones(5, dtype=np.float32))
+
+    def test_a_heavier_room_is_fitted_harder(self):
+        # Two rooms with identical observations but opposite actions: the weighting decides which one wins.
+        a = demonstrations(2, 20, seed=3)
+        b = Demonstrations({key: value.copy() for key, value in a.obs.items()}, 1 - a.actions, a.trajectory.copy())
+        combined, rooms = combine([a, b])
+        fits = {}
+        for name, weights in (("favour a", np.where(rooms == 0, 1.9, 0.1).astype(np.float32)),
+                              ("favour b", np.where(rooms == 0, 0.1, 1.9).astype(np.float32))):
+            model = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=0)
+            clone(model.policy, combined, None, epochs=20, batch_size=16, learning_rate=1e-3, seed=0,
+                  weights=weights)
+            fits[name] = accuracy(model.policy, a)["input_accuracy"]
+        self.assertGreater(fits["favour a"], fits["favour b"])
 
 
 def _spaces_env():

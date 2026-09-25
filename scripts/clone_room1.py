@@ -55,7 +55,15 @@ from stable_baselines3 import PPO  # noqa: E402
 from celeste_rl import runtime  # noqa: E402
 from celeste_rl.actions import parse_line  # noqa: E402
 from celeste_rl.bridge import CelesteBridge  # noqa: E402
-from celeste_rl.cloning import OBS_KEYS, Demonstrations, accuracy, clone, split_by_trajectory  # noqa: E402
+from celeste_rl.cloning import (  # noqa: E402
+    OBS_KEYS,
+    Demonstrations,
+    accuracy,
+    clone,
+    combine,
+    equal_room_weights,
+    split_by_trajectory,
+)
 from celeste_rl.demonstrations import (  # noqa: E402
     DemonstrationManifestError,
     materialize_demonstrations,
@@ -206,6 +214,16 @@ def load(path: Path) -> Demonstrations:
                           stored["trajectory"])
 
 
+def verified_dataset(path: Path, demonstrations_manifest: dict, demonstration_entries: list[dict],
+                     heldout_manifest: dict, identity: dict) -> tuple[Demonstrations, dict]:
+    """Load recorded pairs only after their dataset manifest matches both frozen manifests and the task."""
+    audit = verify_dataset_manifest(path, demonstrations_manifest["sha256"], heldout_manifest["sha256"], identity)
+    declared_hashes = {entry["route_sha256"] for entry in demonstration_entries}
+    if not set(audit["demonstration_route_sha256s"]).issubset(declared_hashes):
+        raise DemonstrationManifestError("dataset provenance contains a route absent from the demonstration manifest")
+    return load(path), audit
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
@@ -228,6 +246,13 @@ def main() -> int:
     parser.add_argument("--init-from", type=Path,
                         help="start cloning from this saved policy's weights instead of fresh ones")
     parser.add_argument("--init-from-sha256", help="required with --init-from: that file's SHA-256")
+    parser.add_argument("--mix-room", nargs=4, type=Path,
+                        metavar=("TASK_DEFINITION", "DEMONSTRATIONS", "HELDOUT", "DATASET"),
+                        help="refit only: also fit this room's recorded pairs, verified against its own manifests "
+                             "(use 'default' as TASK_DEFINITION for the original Room 1 task)")
+    parser.add_argument("--room-weighting", choices=("frames", "equal"), default="frames",
+                        help="with --mix-room: 'frames' weights every frame alike; 'equal' gives each room the same "
+                             "total weight in the loss")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
@@ -247,6 +272,10 @@ def main() -> int:
         args.heldout = DEFAULT_HELDOUT
     if (args.init_from is None) != (args.init_from_sha256 is None):
         parser.error("--init-from and --init-from-sha256 go together")
+    if args.mix_room is not None and args.dataset is None:
+        parser.error("--mix-room works only with --dataset (a refit), so both rooms' pairs are verified records")
+    if args.room_weighting != "frames" and args.mix_room is None:
+        parser.error("--room-weighting needs --mix-room")
 
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
@@ -257,6 +286,22 @@ def main() -> int:
         demonstrations_manifest, demonstration_entries, heldout_manifest = load_manifests(
             args.demonstrations, args.heldout, args.routes_only, identity)
         materialized_demonstrations = materialize_demonstrations(demonstration_entries, REPO, identity)
+        mix = None
+        if args.mix_room is not None:
+            mix_task, mix_demonstrations, mix_heldout, mix_dataset = args.mix_room
+            mix_identity = task_identity(resolve_task_definition(None if str(mix_task) == "default" else mix_task))
+            if mix_identity == identity:
+                raise TaskDefinitionError("--mix-room names the same task as the main room")
+            mix_demonstrations_manifest, mix_entries, mix_heldout_manifest = load_manifests(
+                mix_demonstrations, mix_heldout, args.routes_only, mix_identity)
+            mix = {"identity": mix_identity, "dataset": mix_dataset,
+                   "demonstrations_manifest": mix_demonstrations_manifest, "demonstration_entries": mix_entries,
+                   "heldout_manifest": mix_heldout_manifest,
+                   "record": {"demonstrations": str(mix_demonstrations),
+                              "demonstrations_sha256": mix_demonstrations_manifest["sha256"],
+                              "demonstrations_file_sha256": hashlib.sha256(mix_demonstrations.read_bytes()).hexdigest(),
+                              "heldout": str(mix_heldout), "heldout_sha256": mix_heldout_manifest["sha256"],
+                              "heldout_file_sha256": hashlib.sha256(mix_heldout.read_bytes()).hexdigest()}}
     except (OSError, json.JSONDecodeError, DemonstrationManifestError, HeldoutManifestError,
             TaskDefinitionError) as error:
         print(f"Cannot establish demonstration/held-out separation: {error}")
@@ -297,15 +342,16 @@ def main() -> int:
     game = env = None
     try:
         if args.dataset:
-            audit = verify_dataset_manifest(args.dataset, demonstrations_manifest["sha256"],
-                                            heldout_manifest["sha256"], identity)
-            declared_hashes = {entry["route_sha256"] for entry in demonstration_entries}
-            if not set(audit["demonstration_route_sha256s"]).issubset(declared_hashes):
-                raise DemonstrationManifestError(
-                    "dataset provenance contains a route absent from the demonstration manifest")
-            data = load(args.dataset)
+            data, audit = verified_dataset(args.dataset, demonstrations_manifest, demonstration_entries,
+                                           heldout_manifest, identity)
             results["provenance"] = [{"dataset": str(args.dataset), **audit}]
             print(f"Refitting {len(data)} frames from {args.dataset}")
+            if mix is not None:
+                mix_data, mix_audit = verified_dataset(mix["dataset"], mix["demonstrations_manifest"],
+                                                       mix["demonstration_entries"], mix["heldout_manifest"],
+                                                       mix["identity"])
+                results["provenance"].append({"dataset": str(mix["dataset"]), **mix_audit})
+                print(f"Mixing in {len(mix_data)} frames from {mix['dataset']} ({mix['identity']['name']})")
         else:
             print(f"{len(materialized_demonstrations)} demonstrations to replay")
             game = GameSession(args.game_dir)
@@ -328,14 +374,42 @@ def main() -> int:
         train, holdout = split_by_trajectory(data, args.holdout, args.seed)
         print(f"\n{len(data)} frames over {len(data.trajectories)} demonstrations: "
               f"{len(train.trajectories)} to train on, {len(holdout.trajectories)} held out")
+        weights = rooms = None
+        if mix is not None:
+            # Each room is split on its own with the same seed, so the primary room holds back exactly the routes
+            # it would hold back alone; then the parts are stacked with room-distinct trajectory ids.
+            mix_train, mix_holdout = split_by_trajectory(mix_data, args.holdout, args.seed)
+            print(f"{len(mix_data)} {mix['identity']['name']} frames over {len(mix_data.trajectories)} "
+                  f"demonstrations: {len(mix_train.trajectories)} to train on, "
+                  f"{len(mix_holdout.trajectories)} held out")
+            rooms = {identity["name"]: (train, holdout), mix["identity"]["name"]: (mix_train, mix_holdout)}
+            train, train_rooms = combine([train, mix_train])
+            holdout, _ = combine([holdout, mix_holdout])
+            if args.room_weighting == "equal":
+                weights = equal_room_weights(train_rooms)
+            results["mix"] = {"room_weighting": args.room_weighting, "rooms": list(rooms),
+                              "task": mix["identity"], "manifests": mix["record"],
+                              "train_frames": {name: len(parts[0]) for name, parts in rooms.items()}}
         model = initial_model(args.seed, args.init_from)
         if args.init_from is not None:
             results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256,
                                     "provenance": init_provenance}
             print(f"Cloning starts from the weights of {args.init_from}")
         results["before"] = {"train": accuracy(model.policy, train), "holdout": accuracy(model.policy, holdout)}
+        if rooms is not None:
+            results["before_per_room"] = {name: {"train": accuracy(model.policy, parts[0]),
+                                                 "holdout": accuracy(model.policy, parts[1])}
+                                          for name, parts in rooms.items()}
         results["cloning"] = clone(model.policy, train, holdout, args.epochs, args.batch_size,
-                                   args.learning_rate, args.seed, report_every=max(1, args.epochs // 10))
+                                   args.learning_rate, args.seed, report_every=max(1, args.epochs // 10),
+                                   weights=weights)
+        if rooms is not None:
+            results["after_per_room"] = {name: {"train": accuracy(model.policy, parts[0]),
+                                                "holdout": accuracy(model.policy, parts[1])}
+                                         for name, parts in rooms.items()}
+            for name, measured in results["after_per_room"].items():
+                print(f"  {name}: held-back input accuracy {measured['holdout']['input_accuracy']:.4f}, "
+                      f"frame accuracy {measured['holdout']['frame_accuracy']:.4f}")
         final = results["cloning"]["history"][-1]
         print(f"\n{'':>10} {'input acc':>10} {'baseline':>9} {'frame acc':>10} {'baseline':>9}")
         for name in ("train", "holdout"):
