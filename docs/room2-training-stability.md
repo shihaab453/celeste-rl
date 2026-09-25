@@ -47,8 +47,11 @@ episodes in any 100,000-step window.
 Arm A of the more-routes attempt used the same clone and settings as the original arm A. Only the seeds and the
 checkpoint interval differ. An exact rerun of original seed 20 at the later code, with the later checkpoint interval,
 reproduced its first 143,360 steps episode for episode, so neither the code changes nor the checkpoint interval
-explain the difference in that stretch. No cause was found. Chance, among several ways of looking, is the most
-likely explanation.
+explain the difference in that stretch. Every collapsed no-option run in the new batch had its first timeout inside
+that stretch (between 8,192 and 32,768 steps). If collapse were equally likely in both batches, all five collapses
+landing among the eight new seeds would happen about 3% of the time by this measure (7% by the training-episode
+measure). This was one of several comparisons made after the collapses were seen, so chance is the most likely
+explanation. No other cause was found.
 
 ## Clone replication
 
@@ -69,7 +72,8 @@ particular fit.
 
 The stall ending is a training-only option. When it is on, an episode ends as `stalled` once its best progress
 toward the exit has not improved for 296 frames. That is about twice the longest such stretch in any of the 21
-demonstrations. A stalled episode is an ordinary failure with the same return as a death or a timeout. The
+demonstrations. The value was set after the no-option runs' episodes had been seen (the plan says so; a first
+rule based on those episodes gave 815). A stalled episode is an ordinary failure with the same return as a death or a timeout. The
 evaluators never turn it on, and every result in this report is played without it.
 
 The option does not reward attempts over stalling. It makes a stuck episode end sooner, so a stuck run gets more
@@ -98,11 +102,12 @@ it has these limits:
   of the time even with no effect.
 - Runs with and without the option share a seed but go their own way within 1 to 28 episodes, so a seed-by-seed
   "rescue" cannot be claimed. Only the group counts can be compared.
-- Seed 34 cleared fewer with the option (33 against 46 of 50; two-sided Fisher p = 0.0026), and in the healthy
-  seeds, clears with the option took longer (median clear length for seed 36: 453 frames against 363). The
-  pilot's harm check compares only the healthy runs' medians, so it cannot flag harm confined to a few healthy
-  seeds.
-- Game throughput dropped by about a third partway through the pilot. Two of the no-option checkpoints were
+- Seed 34 cleared fewer with the option (33 against 46 of 50; two-sided Fisher p = 0.0026). Clears with the
+  option also took longer in 4 of the 5 seeds where both versions cleared at least 16 of 50 (median clear length
+  for seed 36: 453 frames against 363). The pilot's harm check compares only the healthy runs' medians, so it
+  cannot flag harm confined to a few healthy seeds.
+- The 296-frame threshold was chosen after seeing the no-option runs (above).
+- Game throughput dropped by about 30% partway through the pilot. Two of the no-option checkpoints were
   replayed afterwards, and all 51 episodes of each matched the earlier plays exactly, so the drop did not change
   results.
 
@@ -167,17 +172,22 @@ collapsed never learned the crossing in the first place:
 
 "First reached at" is the end of the first 50,000-step window whose clear rate was at least 50%.
 
-- Every collapsed run except one never passed 26% in any 100,000-step window. The exception is seed 37 without
-  the option: it cleared 71% to 96% of its training episodes from 100k to 400k, 74% in the last window, and then 16
-  of 50 in final play.
+- Every collapsed run except one never passed 26% in any 100,000-step window; one of them (seed 30 without the
+  option) was only starting to rise at the end (33% in its last 50,000 steps). The exception is seed 37 without
+  the option: it cleared 71% to 96% of its training episodes from 100k to 400k, 74% in the last window (55% in the
+  last 50,000 steps), and then 16 of 50 in final play.
+- Most collapsed runs froze just before the crossing, near x 348. With the option, pilot seed 33 failed
+  differently: most of its late stalls never got past the room entry (113 of its last 170 stalls stayed at x 263
+  or less).
 - Runs that did get going sometimes did so late: 5 of the 35 runs that reached 50% first did so at 400,000
   steps or later. So a single checkpoint at 500,000 steps partly measures whether a run got going before the deadline.
 - An early stall share does not reliably predict failure. Among runs with the option, the ones that never got
   going, or only in their last window, stalled in 36% to 56% of their first 100,000 steps' episodes, but H2's
   B-k5 stalled in 50% and then learned.
 - The weak clones do not freeze before the crossing on their own. Before fine-tuning, the three weakest clones
-  (4, 1 and 4 clears of 50) mostly died at the crossing, between x 360 and 459 (41 of 46, 42 of 49 and 40 of 46
-  failures). The freeze just before it was learned during fine-tuning.
+  (4, 1 and 4 clears of 50) mostly failed at the crossing: the furthest point reached (`max_x`) was between x 360
+  and 459 in 41 of 46, 46 of 49 and 40 of 46 failures, nearly all deaths (41, 42 and 40). The freeze just before
+  it was learned during fine-tuning.
 - Among runs with the option, the three clones with 4 or fewer clears of 50 started slowly (H2's A-k3 and A-k7
   never reached 50%, B-k7 only in its last window). Among the 25 runs with the option from stronger clones, two did
   (pilot A33 never, pilot B30 only in its last window). This pattern was found after the fact, in 28 runs. It is a
@@ -190,11 +200,17 @@ collapsed never learned the crossing in the first place:
 ## What this does and does not show
 
 - It shows that fine-tuning in Room 2 often fails to get going within 500,000 steps, and that the stall ending
-  passed a small screen for reducing that.
+  passed a small screen for reducing collapse in final play.
+- It does not show that the stall ending is harmless: one healthy seed fell from 46 to 33 of 50 with it, and
+  clears took longer in most seeds.
 - It does not show that the stall ending improves held-out success. No run with the option has been evaluated on
   held-out states.
 - It does not show that more routes prevent collapse. With the option, 21-route clones collapsed 0 times in 12
   and 7-route clones 3 times in 16 (one-sided Fisher p = 0.17).
+- "0 of 12" is less safe than it sounds: 6 of those 12 runs first reached a 50% training clear rate only at 350,000
+  steps or later (pilot B30, B31, B32; H2 B-k4, B-k5, B-k7). With a shorter budget or a less lucky final snapshot,
+  several would have counted as collapses. Any plan that carries this combination forward needs a larger training
+  budget or a predeclared rule for runs that have not started by a fixed step.
 - It does not show that weak clones cause collapse.
 - The more-routes held-out question is still open. Answering it needs both arms to train stably first.
 

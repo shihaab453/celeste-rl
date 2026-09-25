@@ -151,6 +151,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 32
+     },
+     "460 or more": {
+      "death": 8
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-210315"
    }
   },
@@ -171,6 +180,17 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 424.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 27,
+      "timeout": 1
+     },
+     "460 or more": {
+      "death": 10,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-121940"
    }
   },
@@ -191,6 +211,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 398.5,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 7
+     },
+     "360 to 459": {
+      "death": 25
+     },
+     "460 or more": {
+      "death": 4,
+      "timeout": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122231"
    }
   },
@@ -211,6 +243,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 1
+     },
+     "360 to 459": {
+      "death": 41
+     },
+     "460 or more": {
+      "timeout": 2,
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122520"
    }
   },
@@ -231,6 +275,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 408.5,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 2
+     },
+     "360 to 459": {
+      "death": 23,
+      "timeout": 3
+     },
+     "460 or more": {
+      "death": 8
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122745"
    }
   },
@@ -251,6 +307,19 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 1
+     },
+     "360 to 459": {
+      "death": 22,
+      "timeout": 1
+     },
+     "460 or more": {
+      "death": 4,
+      "timeout": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-082352"
    }
   },
@@ -271,6 +340,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 409.5,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 29
+     },
+     "460 or more": {
+      "timeout": 1,
+      "death": 6
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-082728"
    }
   },
@@ -291,6 +370,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 42,
+      "timeout": 4
+     },
+     "460 or more": {
+      "death": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083038"
    }
   },
@@ -314,6 +403,19 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 2
+     },
+     "360 to 459": {
+      "death": 34,
+      "timeout": 3
+     },
+     "460 or more": {
+      "death": 3,
+      "timeout": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-015734"
    }
   },
@@ -337,6 +439,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 396.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 10
+     },
+     "360 to 459": {
+      "death": 26,
+      "timeout": 1
+     },
+     "460 or more": {
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122101"
    }
   },
@@ -360,6 +474,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 407.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 1
+     },
+     "360 to 459": {
+      "death": 36
+     },
+     "460 or more": {
+      "death": 3,
+      "timeout": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122405"
    }
   },
@@ -383,6 +509,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 1
+     },
+     "360 to 459": {
+      "death": 23
+     },
+     "460 or more": {
+      "timeout": 1,
+      "death": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122632"
    }
   },
@@ -406,6 +544,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 6
+     },
+     "360 to 459": {
+      "death": 26,
+      "timeout": 1
+     },
+     "460 or more": {
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-122910"
    }
   },
@@ -429,6 +579,19 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 8
+     },
+     "360 to 459": {
+      "death": 18,
+      "timeout": 2
+     },
+     "460 or more": {
+      "death": 6,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-082530"
    }
   },
@@ -452,6 +615,19 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 7
+     },
+     "360 to 459": {
+      "timeout": 1,
+      "death": 19
+     },
+     "460 or more": {
+      "death": 4,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-082847"
    }
   },
@@ -475,6 +651,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 4
+     },
+     "360 to 459": {
+      "death": 40
+     },
+     "460 or more": {
+      "death": 1,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083209"
    }
   }
@@ -494,6 +682,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 449.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 3
+     },
+     "460 or more": {
+      "death": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-185356"
    },
    "collapsed": false,
@@ -554,6 +751,11 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": null,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-191232"
    },
    "collapsed": false,
@@ -614,6 +816,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 442.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 7
+     },
+     "460 or more": {
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-193121"
    },
    "collapsed": false,
@@ -674,6 +885,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 406.5,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 4
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-194917"
    },
    "collapsed": false,
@@ -734,6 +952,16 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 492.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 3
+     },
+     "460 or more": {
+      "death": 3,
+      "timeout": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-200845"
    },
    "collapsed": false,
@@ -794,6 +1022,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 8
+     },
+     "460 or more": {
+      "death": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260923-203544"
    },
    "collapsed": false,
@@ -854,6 +1091,15 @@
     "episodes": 50,
     "plays_found": 3,
     "median_failure_max_x": 442.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 28
+     },
+     "460 or more": {
+      "death": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-145333"
    },
    "collapsed": true,
@@ -914,6 +1160,18 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 337.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 31
+     },
+     "360 to 459": {
+      "death": 17,
+      "timeout": 1
+     },
+     "460 or more": {
+      "death": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-232223"
    },
    "collapsed": true,
@@ -974,6 +1232,16 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 357.5,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 28
+     },
+     "360 to 459": {
+      "death": 12,
+      "timeout": 10
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-145428"
    },
    "collapsed": true,
@@ -1034,6 +1302,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 348.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 44
+     },
+     "360 to 459": {
+      "timeout": 2,
+      "death": 4
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-232518"
    },
    "collapsed": true,
@@ -1094,6 +1372,16 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 394.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 17
+     },
+     "360 to 459": {
+      "death": 24,
+      "timeout": 9
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-145652"
    },
    "collapsed": true,
@@ -1154,6 +1442,13 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 340.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 50
+     },
+     "360 to 459": {},
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-232852"
    },
    "collapsed": true,
@@ -1214,6 +1509,18 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 419.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 5
+     },
+     "360 to 459": {
+      "death": 41,
+      "timeout": 1
+     },
+     "460 or more": {
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-145901"
    },
    "collapsed": true,
@@ -1274,6 +1581,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 358.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 34
+     },
+     "360 to 459": {
+      "death": 14,
+      "timeout": 2
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-233233"
    },
    "collapsed": true,
@@ -1334,6 +1651,13 @@
     "episodes": 50,
     "plays_found": 3,
     "median_failure_max_x": 401.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 4
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-150038"
    },
    "collapsed": false,
@@ -1446,6 +1770,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 438.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {
+      "death": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-150135"
    },
    "collapsed": false,
@@ -1558,6 +1891,11 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": null,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-150232"
    },
    "collapsed": false,
@@ -1670,6 +2008,18 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 426.5,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 3
+     },
+     "360 to 459": {
+      "death": 21
+     },
+     "460 or more": {
+      "death": 6,
+      "timeout": 4
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-150327"
    },
    "collapsed": true,
@@ -1782,6 +2132,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 5
+     },
+     "460 or more": {
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-230427"
    },
    "collapsed": false,
@@ -1842,6 +2201,13 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 424.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 5
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-230556"
    },
    "collapsed": false,
@@ -1902,6 +2268,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 451.5,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 1
+     },
+     "460 or more": {
+      "death": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-230713"
    },
    "collapsed": false,
@@ -1962,6 +2337,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 403.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 23
+     },
+     "360 to 459": {
+      "death": 27
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-230831"
    },
    "collapsed": true,
@@ -2022,6 +2406,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 442.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 9
+     },
+     "460 or more": {
+      "death": 8
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231056"
    },
    "collapsed": false,
@@ -2082,6 +2475,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 491.5,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231211"
    },
    "collapsed": false,
@@ -2142,6 +2544,11 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": null,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231332"
    },
    "collapsed": false,
@@ -2202,6 +2609,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 443.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 9
+     },
+     "460 or more": {
+      "death": 7,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231457"
    },
    "collapsed": false,
@@ -2262,6 +2679,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 422.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 11
+     },
+     "460 or more": {
+      "death": 5
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231632"
    },
    "collapsed": false,
@@ -2322,6 +2748,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 402.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 7
+     },
+     "460 or more": {
+      "death": 1,
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231803"
    },
    "collapsed": false,
@@ -2382,6 +2818,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 5
+     },
+     "460 or more": {
+      "death": 2,
+      "timeout": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-231942"
    },
    "collapsed": false,
@@ -2442,6 +2888,13 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 422.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 1
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260924-232111"
    },
    "collapsed": false,
@@ -2502,6 +2955,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 414.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 3
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083418"
    },
    "collapsed": false,
@@ -2562,6 +3022,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 401.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083533"
    },
    "collapsed": false,
@@ -2622,6 +3089,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 442.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 7
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083641"
    },
    "collapsed": false,
@@ -2682,6 +3156,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 421.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 10
+     },
+     "460 or more": {
+      "timeout": 1
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083800"
    },
    "collapsed": false,
@@ -2742,6 +3225,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 404.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 1
+     },
+     "360 to 459": {
+      "death": 12
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-083920"
    },
    "collapsed": false,
@@ -2802,6 +3294,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 423.5,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084054"
    },
    "collapsed": false,
@@ -2862,6 +3361,15 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 348.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 48
+     },
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084205"
    },
    "collapsed": true,
@@ -2922,6 +3430,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 409.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 2
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084539"
    },
    "collapsed": false,
@@ -2982,6 +3497,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 491.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {
+      "death": 2
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084714"
    },
    "collapsed": false,
@@ -3042,6 +3564,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 425.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 3
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084827"
    },
    "collapsed": false,
@@ -3102,6 +3631,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 389.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 1
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-084935"
    },
    "collapsed": false,
@@ -3162,6 +3698,13 @@
     "episodes": 50,
     "plays_found": 2,
     "median_failure_max_x": 518.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {
+      "death": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-085045"
    },
    "collapsed": false,
@@ -3222,6 +3765,11 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": null,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {},
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-132957"
    },
    "collapsed": false,
@@ -3282,6 +3830,13 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 414.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 1
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-133101"
    },
    "collapsed": false,
@@ -3342,6 +3897,16 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 348.0,
+    "failures_by_max_x": {
+     "below 360": {
+      "timeout": 40
+     },
+     "360 to 459": {
+      "timeout": 7,
+      "death": 3
+     },
+     "460 or more": {}
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-133203"
    },
    "collapsed": true,
@@ -3402,6 +3967,15 @@
     "episodes": 50,
     "plays_found": 1,
     "median_failure_max_x": 430.0,
+    "failures_by_max_x": {
+     "below 360": {},
+     "360 to 459": {
+      "death": 5
+     },
+     "460 or more": {
+      "death": 3
+     }
+    },
     "first_play": "runs/evaluation/chapter-1-room-2/20260925-133456"
    },
    "collapsed": false,

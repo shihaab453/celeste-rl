@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from summarize_room2_stability import (  # noqa: E402
+    failure_band,
     first_window_reaching,
     fisher_one_sided,
     training_windows,
@@ -37,6 +38,12 @@ class WindowTests(unittest.TestCase):
                     episode(120_000, "success")]
         self.assertEqual(first_window_reaching(episodes), 100_000)
         self.assertIsNone(first_window_reaching([episode(10_000, "death"), episode(300_000, "stalled")]))
+
+
+class FailureBandTests(unittest.TestCase):
+    def test_bands_split_at_the_crossing(self):
+        self.assertEqual([failure_band(x) for x in (359, 360, 459, 460)],
+                         ["below 360", "360 to 459", "360 to 459", "460 or more"])
 
 
 class FisherTests(unittest.TestCase):

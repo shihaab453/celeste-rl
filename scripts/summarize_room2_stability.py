@@ -80,6 +80,14 @@ def fisher_one_sided(a_events: int, a_n: int, b_events: int, b_n: int) -> float:
     return sum(comb(a_n, k) * comb(b_n, events - k) for k in range(a_events, min(events, a_n) + 1)) / comb(total, events)
 
 
+FAILURE_BANDS = ("below 360", "360 to 459", "460 or more")  # world x of the pit, spiked block and spiked gap
+
+
+def failure_band(max_x: int) -> str:
+    """Where a failed play got to, by its running maximum world x: before, inside or past the crossing."""
+    return FAILURE_BANDS[0] if max_x < 360 else FAILURE_BANDS[1] if max_x <= 459 else FAILURE_BANDS[2]
+
+
 def mean_entropy(progress: list[dict], first: bool) -> float:
     rows = [(int(row["accepted_steps"]), -float(row["entropy_loss"])) for row in progress if row["entropy_loss"]]
     last_step = rows[-1][0]
@@ -114,9 +122,15 @@ class Plays:
             raise SummaryError(f"plays of {checkpoint} disagree or are incomplete")
         endings = [ending for ending, _, _ in outcomes[0]]
         failures = sorted(max_x for ending, _, max_x in outcomes[0] if ending != "success")
+        bands = {band: {} for band in FAILURE_BANDS}
+        for ending, _, max_x in outcomes[0]:
+            if ending != "success":
+                cell = bands[failure_band(max_x)]
+                cell[ending] = cell.get(ending, 0) + 1
         return {"clears": endings.count("success"), "timeouts": endings.count("timeout"),
                 "deaths": endings.count("death"), "episodes": len(endings), "plays_found": len(folders),
                 "median_failure_max_x": float(np.median(failures)) if failures else None,
+                "failures_by_max_x": bands,
                 "first_play": folders[0].relative_to(REPO).as_posix()}
 
 
