@@ -1,0 +1,203 @@
+{
+  "name": "mixed-imitation-pilot-train-v1",
+  "written": "2026-09-25T23:55:28+01:00",
+  "pilot_plan": "config/mixed-imitation-pilot.json",
+  "pilot_plan_sha256": "4754b546d9ced2eac12ca1b4fe30dabc523e672fe6592c37bced58ae5f170ea1",
+  "clones": {
+    "0": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-222804",
+      "sha256": "0ba2f09dedb6f5c947facf3929a7701d6fa90c7d997befd0072f8f59bcdfcd06",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7520,
+        "chapter-1-room-1": 1948
+      }
+    },
+    "1": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-224921",
+      "sha256": "2fdac4783dc5cab7b78566da9939f76459a6ff0810541fea4943c034be034bb8",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7384,
+        "chapter-1-room-1": 2056
+      }
+    },
+    "2": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-230604",
+      "sha256": "7e20aa98935f1cbe45765702d66635bd8c5cdbb0fd284b750f2cf45417a367d3",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7309,
+        "chapter-1-room-1": 1989
+      }
+    },
+    "3": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-232320",
+      "sha256": "13bc4fef36b5af67a5e9d3a5dd788a00ff39604ad313dff48846dc25406ac0a8",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7444,
+        "chapter-1-room-1": 1989
+      }
+    }
+  },
+  "label": "training for the descriptive mixed-imitation pilot; nothing reads a held-out set",
+  "runs": [
+    {
+      "id": "mixed-imitation-pilot-M-k0",
+      "stage": "mixed-imitation-pilot-train",
+      "arm": "M",
+      "k": 0,
+      "seed": 40,
+      "init_from": "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip",
+      "clone_sha256": "0ba2f09dedb6f5c947facf3929a7701d6fa90c7d997befd0072f8f59bcdfcd06",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-imitation-pilot-M-k0",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 3, mixed clone seed 0 (Room 1 + Room 2, equal weight), stall option; pairs with retention R-k0",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "40",
+        "--run-dir",
+        "runs/train/mixed-imitation-pilot-M-k0"
+      ]
+    },
+    {
+      "id": "mixed-imitation-pilot-M-k1",
+      "stage": "mixed-imitation-pilot-train",
+      "arm": "M",
+      "k": 1,
+      "seed": 41,
+      "init_from": "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip",
+      "clone_sha256": "2fdac4783dc5cab7b78566da9939f76459a6ff0810541fea4943c034be034bb8",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-imitation-pilot-M-k1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 4, mixed clone seed 1 (Room 1 + Room 2, equal weight), stall option; pairs with retention R-k1",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "41",
+        "--run-dir",
+        "runs/train/mixed-imitation-pilot-M-k1"
+      ]
+    },
+    {
+      "id": "mixed-imitation-pilot-M-k2",
+      "stage": "mixed-imitation-pilot-train",
+      "arm": "M",
+      "k": 2,
+      "seed": 42,
+      "init_from": "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip",
+      "clone_sha256": "7e20aa98935f1cbe45765702d66635bd8c5cdbb0fd284b750f2cf45417a367d3",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-imitation-pilot-M-k2",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 5, mixed clone seed 2 (Room 1 + Room 2, equal weight), stall option; pairs with retention R-k2",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "42",
+        "--run-dir",
+        "runs/train/mixed-imitation-pilot-M-k2"
+      ]
+    },
+    {
+      "id": "mixed-imitation-pilot-M-k3",
+      "stage": "mixed-imitation-pilot-train",
+      "arm": "M",
+      "k": 3,
+      "seed": 43,
+      "init_from": "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip",
+      "clone_sha256": "13bc4fef36b5af67a5e9d3a5dd788a00ff39604ad313dff48846dc25406ac0a8",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-imitation-pilot-M-k3",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 6, mixed clone seed 3 (Room 1 + Room 2, equal weight), stall option; pairs with retention R-k3",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "43",
+        "--run-dir",
+        "runs/train/mixed-imitation-pilot-M-k3"
+      ]
+    }
+  ]
+}
