@@ -1,0 +1,3652 @@
+{
+ "label": "Room 2 training stability, descriptive and training side only; nothing reads a held-out set",
+ "collapse_rule": "final checkpoint clears fewer than 25 of 50 stochastic canonical episodes played without the stall rule at seed 20260924",
+ "collapses": {
+  "h2/A": {
+   "collapsed": 2,
+   "played": 8,
+   "runs": 8
+  },
+  "h2/B": {
+   "collapsed": 0,
+   "played": 8,
+   "runs": 8
+  },
+  "objective6/A": {
+   "collapsed": 5,
+   "played": 8,
+   "runs": 8
+  },
+  "objective6/B": {
+   "collapsed": 4,
+   "played": 4,
+   "runs": 8
+  },
+  "original-A/A": {
+   "collapsed": 0,
+   "played": 6,
+   "runs": 6
+  },
+  "stall-pilot/A": {
+   "collapsed": 1,
+   "played": 8,
+   "runs": 8
+  },
+  "stall-pilot/B": {
+   "collapsed": 0,
+   "played": 4,
+   "runs": 4
+  }
+ },
+ "descriptive_tests": {
+  "h2_A_vs_B_one_sided_fisher": 0.23333333333333334,
+  "with_option_7route_vs_21route": {
+   "7-route": [
+    3,
+    16
+   ],
+   "21-route": [
+    0,
+    12
+   ],
+   "one_sided_fisher": 0.17094017094017094
+  }
+ },
+ "stall_pilot_screen": {
+  "plan_sha256": "8215fc709cc2b5dd894a9ad56c7614e65d15b922512cd68036cbd9bd054a747d",
+  "analysis_code_git_blob": "f2124c87d2b040fae0ce53cbdef51b40f443db97",
+  "screen": {
+   "passes": true,
+   "label": "a screen only: 8 runs cannot show a small improvement"
+  },
+  "groups": {
+   "A": {
+    "counts_toward_screen": true,
+    "treatment_collapses": 1,
+    "control_collapses": 5,
+    "runs": 8,
+    "fisher_one_sided_p": 0.05944055944055944,
+    "healthy_median_clear_rate": {
+     "treatment": 0.9,
+     "control": 0.94
+    },
+    "harm_flag": false,
+    "pairing_failures": []
+   },
+   "B-exploratory": {
+    "counts_toward_screen": false,
+    "treatment_collapses": 0,
+    "control_collapses": 4,
+    "runs": 4,
+    "fisher_one_sided_p": 0.014285714285714285,
+    "healthy_median_clear_rate": {
+     "treatment": 0.82,
+     "control": null
+    },
+    "harm_flag": false,
+    "pairing_failures": []
+   }
+  }
+ },
+ "h2_gate": {
+  "plan": "config/campaign-room2-demos-stall-ab.json",
+  "plan_sha256": "6c8d8581fbd83bc578256e8353d1739b543691b3b236ddf78be62b907af638e5",
+  "script_git_blob": "257b718613e3d3f25e917c6c4108a33dfe05dd7c",
+  "rates": {
+   "A": {
+    "room2-demos-stall-A-k0": 0.94,
+    "room2-demos-stall-A-k1": 0.86,
+    "room2-demos-stall-A-k2": 0.74,
+    "room2-demos-stall-A-k3": 0.0,
+    "room2-demos-stall-A-k4": 0.96,
+    "room2-demos-stall-A-k5": 0.98,
+    "room2-demos-stall-A-k6": 1.0,
+    "room2-demos-stall-A-k7": 0.0
+   },
+   "B": {
+    "room2-demos-stall-B-k0": 0.96,
+    "room2-demos-stall-B-k1": 0.78,
+    "room2-demos-stall-B-k2": 0.96,
+    "room2-demos-stall-B-k3": 0.96,
+    "room2-demos-stall-B-k4": 0.94,
+    "room2-demos-stall-B-k5": 0.94,
+    "room2-demos-stall-B-k6": 0.98,
+    "room2-demos-stall-B-k7": 0.84
+   }
+  },
+  "arms": {
+   "A": {
+    "runs": 8,
+    "collapsed": [
+     "room2-demos-stall-A-k3",
+     "room2-demos-stall-A-k7"
+    ],
+    "collapses": 2,
+    "passes": false
+   },
+   "B": {
+    "runs": 8,
+    "collapsed": [],
+    "collapses": 0,
+    "passes": true
+   }
+  },
+  "passes": false
+ },
+ "h2_clones": {
+  "A-k0": {
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "sha256": "5b00c8c285af7802c4b5760d97875aa81631feb0f3778136cf115fa9f4dbdb1b",
+   "seed": 0,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-164006",
+    "20260922-164552"
+   ],
+   "play": {
+    "clears": 10,
+    "timeouts": 0,
+    "deaths": 40,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-210315"
+   }
+  },
+  "A-k1": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-110413",
+   "sha256": "44196be92ec07adffcfaf2462e291f1cf35be6ee47224ede112ffdbbe8a6aa73",
+   "seed": 1,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260920-021356",
+    "20260922-164712"
+   ],
+   "play": {
+    "clears": 11,
+    "timeouts": 2,
+    "deaths": 37,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 424.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-121940"
+   }
+  },
+  "A-k2": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-112303",
+   "sha256": "bb72804b4885d55b5fb82af071fc7c6468ba0341f4f9418b069e438fa8fbc8f2",
+   "seed": 2,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-164712",
+    "20260922-164815"
+   ],
+   "play": {
+    "clears": 12,
+    "timeouts": 9,
+    "deaths": 29,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 398.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122231"
+   }
+  },
+  "A-k3": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-114140",
+   "sha256": "ca19f531620b3c0956801d5ff8455c5f5ac669ecaa5d6797aec67544f659d31a",
+   "seed": 3,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-164712",
+    "20260922-164815"
+   ],
+   "play": {
+    "clears": 4,
+    "timeouts": 3,
+    "deaths": 43,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122520"
+   }
+  },
+  "A-k4": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-120004",
+   "sha256": "7d1d0a6996c91a8aaf9b5db85ae38ef792615bfe385ce8346439db81f8ede7ae",
+   "seed": 4,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-163841",
+    "20260922-164006"
+   ],
+   "play": {
+    "clears": 14,
+    "timeouts": 5,
+    "deaths": 31,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 408.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122745"
+   }
+  },
+  "A-k5": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-233959",
+   "sha256": "ac7d9bf41b6a6741df445768ebfcc878306c0b54dbf04696810a6b239c108493",
+   "seed": 5,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-163841",
+    "20260922-164552"
+   ],
+   "play": {
+    "clears": 20,
+    "timeouts": 4,
+    "deaths": 26,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-082352"
+   }
+  },
+  "A-k6": {
+   "clone": "runs/clone/chapter-1-room-2/20260925-000151",
+   "sha256": "ba3c6f6e04f46ab1ef1b5ca878217150ca869c67d01bd6ad4aeee1625847f093",
+   "seed": 6,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260922-164006",
+    "20260922-164111"
+   ],
+   "play": {
+    "clears": 14,
+    "timeouts": 1,
+    "deaths": 35,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 409.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-082728"
+   }
+  },
+  "A-k7": {
+   "clone": "runs/clone/chapter-1-room-2/20260925-002433",
+   "sha256": "b25e8de960552e6962276c70f052e3e33898ec3a2dd7819a04d6cd9c27e50dcf",
+   "seed": 7,
+   "routes": 7,
+   "fitted": 5,
+   "held_back": [
+    "20260920-021356",
+    "20260922-164712"
+   ],
+   "play": {
+    "clears": 1,
+    "timeouts": 4,
+    "deaths": 45,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083038"
+   }
+  },
+  "B-k0": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "sha256": "3ec554413ee05b2824d1b85fee95909d1602234bb7f5f987ccb4974caaee5192",
+   "seed": 0,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-164006",
+    "20260922-164552",
+    "20260924-013324",
+    "20260924-013921",
+    "20260924-014025"
+   ],
+   "play": {
+    "clears": 5,
+    "timeouts": 8,
+    "deaths": 37,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-015734"
+   }
+  },
+  "B-k1": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-110841",
+   "sha256": "41f68590ef10ad28d4308a8a2dcef8f1f7e7e551fb36ea35f7eb9d31b75ff0ba",
+   "seed": 1,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-163841",
+    "20260924-013144",
+    "20260924-013423",
+    "20260924-013826",
+    "20260924-014213"
+   ],
+   "play": {
+    "clears": 11,
+    "timeouts": 11,
+    "deaths": 28,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 396.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122101"
+   }
+  },
+  "B-k2": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-112753",
+   "sha256": "6506cbe539f2ec3c60d6b5516ce0d831322c3f03861bc521a8c2514b9c4b356b",
+   "seed": 2,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260924-013423",
+    "20260924-013605",
+    "20260924-013727",
+    "20260924-013921",
+    "20260924-014051"
+   ],
+   "play": {
+    "clears": 8,
+    "timeouts": 3,
+    "deaths": 39,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 407.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122405"
+   }
+  },
+  "B-k3": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-114615",
+   "sha256": "cab2041d0fa0836aefa2aac99b88195ef24dd101eaf037585eb215b5b3bdc6d3",
+   "seed": 3,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-164111",
+    "20260924-013226",
+    "20260924-013249",
+    "20260924-013921",
+    "20260924-013952"
+   ],
+   "play": {
+    "clears": 22,
+    "timeouts": 2,
+    "deaths": 26,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122632"
+   }
+  },
+  "B-k4": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-120404",
+   "sha256": "a394736511c070b0395e7bea6985be9214f956a49e6980176a171df87679bb04",
+   "seed": 4,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260920-021356",
+    "20260924-013144",
+    "20260924-013249",
+    "20260924-013826",
+    "20260924-014051"
+   ],
+   "play": {
+    "clears": 16,
+    "timeouts": 8,
+    "deaths": 26,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-122910"
+   }
+  },
+  "B-k5": {
+   "clone": "runs/clone/chapter-1-room-2/20260924-234449",
+   "sha256": "829eb2e45afed700da7fc26c6935239b76b48d952bb33fc376ac6093e2bfb28f",
+   "seed": 5,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-164111",
+    "20260924-013144",
+    "20260924-013605",
+    "20260924-013826",
+    "20260924-014213"
+   ],
+   "play": {
+    "clears": 15,
+    "timeouts": 11,
+    "deaths": 24,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-082530"
+   }
+  },
+  "B-k6": {
+   "clone": "runs/clone/chapter-1-room-2/20260925-000723",
+   "sha256": "af14b4748e47307c7e0855a4681672487076925fd48a2e058728e52527d1835c",
+   "seed": 6,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-163841",
+    "20260922-164006",
+    "20260922-164552",
+    "20260924-014051",
+    "20260924-014213"
+   ],
+   "play": {
+    "clears": 18,
+    "timeouts": 9,
+    "deaths": 23,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-082847"
+   }
+  },
+  "B-k7": {
+   "clone": "runs/clone/chapter-1-room-2/20260925-002955",
+   "sha256": "cfaa320151144be92d554a99f7eb534adc8b1817eea399ff13ff9dc1062da966",
+   "seed": 7,
+   "routes": 21,
+   "fitted": 16,
+   "held_back": [
+    "20260922-164111",
+    "20260924-013226",
+    "20260924-013324",
+    "20260924-013637",
+    "20260924-013826"
+   ],
+   "play": {
+    "clears": 4,
+    "timeouts": 5,
+    "deaths": 41,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083209"
+   }
+  }
+ },
+ "runs": [
+  {
+   "id": "room2-A-seed20",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 46,
+    "timeouts": 0,
+    "deaths": 4,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 449.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-185356"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 159,
+     "success": 18,
+     "stalled": 0,
+     "timeout": 12,
+     "death": 129
+    },
+    {
+     "episodes": 107,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 30,
+     "death": 77
+    },
+    {
+     "episodes": 173,
+     "success": 76,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 95
+    },
+    {
+     "episodes": 209,
+     "success": 194,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 13
+    },
+    {
+     "episodes": 204,
+     "success": 196,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 8
+    }
+   ],
+   "first_50k_window_reaching_half": 300000,
+   "entropy": {
+    "first_100k": 0.2875,
+    "last_100k": 0.5789
+   }
+  },
+  {
+   "id": "room2-A-seed21",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 50,
+    "timeouts": 0,
+    "deaths": 0,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": null,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-191232"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 192,
+     "success": 70,
+     "stalled": 0,
+     "timeout": 6,
+     "death": 116
+    },
+    {
+     "episodes": 149,
+     "success": 124,
+     "stalled": 0,
+     "timeout": 7,
+     "death": 18
+    },
+    {
+     "episodes": 175,
+     "success": 158,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 15
+    },
+    {
+     "episodes": 193,
+     "success": 187,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 6
+    },
+    {
+     "episodes": 222,
+     "success": 209,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 13
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3227,
+    "last_100k": 0.694
+   }
+  },
+  {
+   "id": "room2-A-seed22",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 41,
+    "timeouts": 0,
+    "deaths": 9,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 442.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-193121"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 161,
+     "success": 52,
+     "stalled": 0,
+     "timeout": 11,
+     "death": 98
+    },
+    {
+     "episodes": 172,
+     "success": 91,
+     "stalled": 0,
+     "timeout": 10,
+     "death": 71
+    },
+    {
+     "episodes": 196,
+     "success": 140,
+     "stalled": 0,
+     "timeout": 7,
+     "death": 49
+    },
+    {
+     "episodes": 187,
+     "success": 155,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 30
+    },
+    {
+     "episodes": 175,
+     "success": 146,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 27
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.2838,
+    "last_100k": 0.6572
+   }
+  },
+  {
+   "id": "room2-A-seed23",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 46,
+    "timeouts": 0,
+    "deaths": 4,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 406.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-194917"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 199,
+     "success": 78,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 119
+    },
+    {
+     "episodes": 195,
+     "success": 171,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 24
+    },
+    {
+     "episodes": 189,
+     "success": 177,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 12
+    },
+    {
+     "episodes": 186,
+     "success": 183,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 3
+    },
+    {
+     "episodes": 168,
+     "success": 154,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 14
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3601,
+    "last_100k": 0.6933
+   }
+  },
+  {
+   "id": "room2-A-seed24",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 42,
+    "timeouts": 2,
+    "deaths": 6,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 492.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-200845"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 139,
+     "success": 7,
+     "stalled": 0,
+     "timeout": 19,
+     "death": 113
+    },
+    {
+     "episodes": 81,
+     "success": 10,
+     "stalled": 0,
+     "timeout": 36,
+     "death": 35
+    },
+    {
+     "episodes": 146,
+     "success": 110,
+     "stalled": 0,
+     "timeout": 13,
+     "death": 23
+    },
+    {
+     "episodes": 203,
+     "success": 187,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 16
+    },
+    {
+     "episodes": 185,
+     "success": 170,
+     "stalled": 0,
+     "timeout": 1,
+     "death": 14
+    }
+   ],
+   "first_50k_window_reaching_half": 250000,
+   "entropy": {
+    "first_100k": 0.2386,
+    "last_100k": 1.1817
+   }
+  },
+  {
+   "id": "room2-A-seed25",
+   "experiment": "original-A",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 41,
+    "timeouts": 0,
+    "deaths": 9,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260923-203544"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 178,
+     "success": 30,
+     "stalled": 0,
+     "timeout": 6,
+     "death": 142
+    },
+    {
+     "episodes": 116,
+     "success": 8,
+     "stalled": 0,
+     "timeout": 17,
+     "death": 91
+    },
+    {
+     "episodes": 135,
+     "success": 60,
+     "stalled": 0,
+     "timeout": 15,
+     "death": 60
+    },
+    {
+     "episodes": 219,
+     "success": 184,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 35
+    },
+    {
+     "episodes": 211,
+     "success": 189,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 22
+    }
+   ],
+   "first_50k_window_reaching_half": 300000,
+   "entropy": {
+    "first_100k": 0.3327,
+    "last_100k": 0.8953
+   }
+  },
+  {
+   "id": "room2-demos-A-seed30",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 19,
+    "timeouts": 0,
+    "deaths": 31,
+    "episodes": 50,
+    "plays_found": 3,
+    "median_failure_max_x": 442.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-145333"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 137,
+     "success": 14,
+     "stalled": 0,
+     "timeout": 23,
+     "death": 100
+    },
+    {
+     "episodes": 64,
+     "success": 2,
+     "stalled": 0,
+     "timeout": 47,
+     "death": 15
+    },
+    {
+     "episodes": 60,
+     "success": 1,
+     "stalled": 0,
+     "timeout": 52,
+     "death": 7
+    },
+    {
+     "episodes": 84,
+     "success": 7,
+     "stalled": 0,
+     "timeout": 34,
+     "death": 43
+    },
+    {
+     "episodes": 223,
+     "success": 58,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 163
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.2265,
+    "last_100k": 0.9078
+   }
+  },
+  {
+   "id": "room2-demos-B-seed30",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 32,
+    "deaths": 18,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 337.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-232223"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 85,
+     "success": 4,
+     "stalled": 0,
+     "timeout": 39,
+     "death": 42
+    },
+    {
+     "episodes": 59,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 5
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 3
+    },
+    {
+     "episodes": 60,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 52,
+     "death": 8
+    },
+    {
+     "episodes": 64,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 10
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.1718,
+    "last_100k": 0.2158
+   }
+  },
+  {
+   "id": "room2-demos-A-seed31",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 38,
+    "deaths": 12,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 357.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-145428"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 135,
+     "success": 11,
+     "stalled": 0,
+     "timeout": 22,
+     "death": 102
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 2
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 0
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 1
+    },
+    {
+     "episodes": 58,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 55,
+     "death": 3
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.2794,
+    "last_100k": 4.0402
+   }
+  },
+  {
+   "id": "room2-demos-B-seed31",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 46,
+    "deaths": 4,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 348.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-232518"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 75,
+     "success": 4,
+     "stalled": 0,
+     "timeout": 39,
+     "death": 32
+    },
+    {
+     "episodes": 62,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 50,
+     "death": 12
+    },
+    {
+     "episodes": 59,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 5
+    },
+    {
+     "episodes": 59,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 52,
+     "death": 7
+    },
+    {
+     "episodes": 62,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 53,
+     "death": 9
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.2136,
+    "last_100k": 0.3355
+   }
+  },
+  {
+   "id": "room2-demos-A-seed32",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 26,
+    "deaths": 24,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 394.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-145652"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 171,
+     "success": 25,
+     "stalled": 0,
+     "timeout": 6,
+     "death": 140
+    },
+    {
+     "episodes": 87,
+     "success": 2,
+     "stalled": 0,
+     "timeout": 36,
+     "death": 49
+    },
+    {
+     "episodes": 68,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 50,
+     "death": 18
+    },
+    {
+     "episodes": 74,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 38,
+     "death": 36
+    },
+    {
+     "episodes": 69,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 38,
+     "death": 31
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.3104,
+    "last_100k": 1.7865
+   }
+  },
+  {
+   "id": "room2-demos-B-seed32",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 50,
+    "deaths": 0,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 340.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-232852"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 107,
+     "success": 10,
+     "stalled": 0,
+     "timeout": 33,
+     "death": 64
+    },
+    {
+     "episodes": 59,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 52,
+     "death": 7
+    },
+    {
+     "episodes": 60,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 54,
+     "death": 6
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 0
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 57,
+     "death": 0
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.1615,
+    "last_100k": 0.0392
+   }
+  },
+  {
+   "id": "room2-demos-A-seed33",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 1,
+    "timeouts": 6,
+    "deaths": 43,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 419.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-145901"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 107,
+     "success": 9,
+     "stalled": 0,
+     "timeout": 35,
+     "death": 63
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 55,
+     "death": 2
+    },
+    {
+     "episodes": 62,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 49,
+     "death": 13
+    },
+    {
+     "episodes": 86,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 31,
+     "death": 55
+    },
+    {
+     "episodes": 94,
+     "success": 2,
+     "stalled": 0,
+     "timeout": 21,
+     "death": 71
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.1492,
+    "last_100k": 0.8189
+   }
+  },
+  {
+   "id": "room2-demos-B-seed33",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 36,
+    "deaths": 14,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 358.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-233233"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 89,
+     "success": 4,
+     "stalled": 0,
+     "timeout": 41,
+     "death": 44
+    },
+    {
+     "episodes": 61,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 51,
+     "death": 10
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 0
+    },
+    {
+     "episodes": 59,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 51,
+     "death": 8
+    },
+    {
+     "episodes": 66,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 46,
+     "death": 20
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.1506,
+    "last_100k": 0.3683
+   }
+  },
+  {
+   "id": "room2-demos-A-seed34",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 46,
+    "timeouts": 0,
+    "deaths": 4,
+    "episodes": 50,
+    "plays_found": 3,
+    "median_failure_max_x": 401.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-150038"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 162,
+     "success": 9,
+     "stalled": 0,
+     "timeout": 15,
+     "death": 138
+    },
+    {
+     "episodes": 108,
+     "success": 2,
+     "stalled": 0,
+     "timeout": 30,
+     "death": 76
+    },
+    {
+     "episodes": 145,
+     "success": 14,
+     "stalled": 0,
+     "timeout": 24,
+     "death": 107
+    },
+    {
+     "episodes": 166,
+     "success": 56,
+     "stalled": 0,
+     "timeout": 9,
+     "death": 101
+    },
+    {
+     "episodes": 231,
+     "success": 187,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 44
+    }
+   ],
+   "first_50k_window_reaching_half": 450000,
+   "entropy": {
+    "first_100k": 0.2694,
+    "last_100k": 0.9377
+   }
+  },
+  {
+   "id": "room2-demos-B-seed34",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": null,
+   "collapsed": null,
+   "training_windows": [
+    {
+     "episodes": 91,
+     "success": 3,
+     "stalled": 0,
+     "timeout": 39,
+     "death": 49
+    },
+    {
+     "episodes": 70,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 50,
+     "death": 20
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 0
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 0
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 57,
+     "death": 0
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.2285,
+    "last_100k": 0.1057
+   }
+  },
+  {
+   "id": "room2-demos-A-seed35",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 47,
+    "timeouts": 0,
+    "deaths": 3,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 438.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-150135"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 142,
+     "success": 20,
+     "stalled": 0,
+     "timeout": 20,
+     "death": 102
+    },
+    {
+     "episodes": 124,
+     "success": 39,
+     "stalled": 0,
+     "timeout": 30,
+     "death": 55
+    },
+    {
+     "episodes": 123,
+     "success": 72,
+     "stalled": 0,
+     "timeout": 19,
+     "death": 32
+    },
+    {
+     "episodes": 122,
+     "success": 66,
+     "stalled": 0,
+     "timeout": 21,
+     "death": 35
+    },
+    {
+     "episodes": 207,
+     "success": 175,
+     "stalled": 0,
+     "timeout": 4,
+     "death": 28
+    }
+   ],
+   "first_50k_window_reaching_half": 250000,
+   "entropy": {
+    "first_100k": 0.2122,
+    "last_100k": 0.7718
+   }
+  },
+  {
+   "id": "room2-demos-B-seed35",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": null,
+   "collapsed": null,
+   "training_windows": [
+    {
+     "episodes": 100,
+     "success": 6,
+     "stalled": 0,
+     "timeout": 31,
+     "death": 63
+    },
+    {
+     "episodes": 66,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 45,
+     "death": 21
+    },
+    {
+     "episodes": 101,
+     "success": 3,
+     "stalled": 0,
+     "timeout": 19,
+     "death": 79
+    },
+    {
+     "episodes": 165,
+     "success": 13,
+     "stalled": 0,
+     "timeout": 9,
+     "death": 143
+    },
+    {
+     "episodes": 169,
+     "success": 10,
+     "stalled": 0,
+     "timeout": 4,
+     "death": 155
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.2503,
+    "last_100k": 0.5549
+   }
+  },
+  {
+   "id": "room2-demos-A-seed36",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 50,
+    "timeouts": 0,
+    "deaths": 0,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": null,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-150232"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 142,
+     "success": 13,
+     "stalled": 0,
+     "timeout": 28,
+     "death": 101
+    },
+    {
+     "episodes": 81,
+     "success": 5,
+     "stalled": 0,
+     "timeout": 42,
+     "death": 34
+    },
+    {
+     "episodes": 179,
+     "success": 120,
+     "stalled": 0,
+     "timeout": 5,
+     "death": 54
+    },
+    {
+     "episodes": 205,
+     "success": 193,
+     "stalled": 0,
+     "timeout": 3,
+     "death": 9
+    },
+    {
+     "episodes": 266,
+     "success": 255,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 11
+    }
+   ],
+   "first_50k_window_reaching_half": 300000,
+   "entropy": {
+    "first_100k": 0.1812,
+    "last_100k": 0.503
+   }
+  },
+  {
+   "id": "room2-demos-B-seed36",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": null,
+   "collapsed": null,
+   "training_windows": [
+    {
+     "episodes": 89,
+     "success": 6,
+     "stalled": 0,
+     "timeout": 40,
+     "death": 43
+    },
+    {
+     "episodes": 56,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 55,
+     "death": 1
+    },
+    {
+     "episodes": 57,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 53,
+     "death": 4
+    },
+    {
+     "episodes": 58,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 55,
+     "death": 3
+    },
+    {
+     "episodes": 58,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 56,
+     "death": 2
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.1855,
+    "last_100k": 0.0949
+   }
+  },
+  {
+   "id": "room2-demos-A-seed37",
+   "experiment": "objective6",
+   "arm": "A",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 16,
+    "timeouts": 7,
+    "deaths": 27,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 426.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-150327"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 198,
+     "success": 27,
+     "stalled": 0,
+     "timeout": 8,
+     "death": 163
+    },
+    {
+     "episodes": 180,
+     "success": 128,
+     "stalled": 0,
+     "timeout": 7,
+     "death": 45
+    },
+    {
+     "episodes": 186,
+     "success": 179,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 7
+    },
+    {
+     "episodes": 205,
+     "success": 180,
+     "stalled": 0,
+     "timeout": 2,
+     "death": 23
+    },
+    {
+     "episodes": 206,
+     "success": 153,
+     "stalled": 0,
+     "timeout": 9,
+     "death": 44
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.336,
+    "last_100k": 1.25
+   }
+  },
+  {
+   "id": "room2-demos-B-seed37",
+   "experiment": "objective6",
+   "arm": "B",
+   "stall_option": false,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": null,
+   "collapsed": null,
+   "training_windows": [
+    {
+     "episodes": 97,
+     "success": 6,
+     "stalled": 0,
+     "timeout": 33,
+     "death": 58
+    },
+    {
+     "episodes": 67,
+     "success": 1,
+     "stalled": 0,
+     "timeout": 49,
+     "death": 17
+    },
+    {
+     "episodes": 60,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 53,
+     "death": 7
+    },
+    {
+     "episodes": 64,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 47,
+     "death": 17
+    },
+    {
+     "episodes": 61,
+     "success": 0,
+     "stalled": 0,
+     "timeout": 51,
+     "death": 10
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.189,
+    "last_100k": 0.3261
+   }
+  },
+  {
+   "id": "room2-stall-A-seed30",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 44,
+    "timeouts": 1,
+    "deaths": 5,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-230427"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 233,
+     "success": 56,
+     "stalled": 36,
+     "timeout": 0,
+     "death": 141
+    },
+    {
+     "episodes": 234,
+     "success": 154,
+     "stalled": 16,
+     "timeout": 0,
+     "death": 64
+    },
+    {
+     "episodes": 225,
+     "success": 198,
+     "stalled": 11,
+     "timeout": 0,
+     "death": 16
+    },
+    {
+     "episodes": 228,
+     "success": 190,
+     "stalled": 21,
+     "timeout": 0,
+     "death": 17
+    },
+    {
+     "episodes": 222,
+     "success": 172,
+     "stalled": 20,
+     "timeout": 0,
+     "death": 30
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.349,
+    "last_100k": 0.8127
+   }
+  },
+  {
+   "id": "room2-stall-A-seed31",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 45,
+    "timeouts": 0,
+    "deaths": 5,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 424.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-230556"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 249,
+     "success": 45,
+     "stalled": 22,
+     "timeout": 0,
+     "death": 182
+    },
+    {
+     "episodes": 233,
+     "success": 159,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 67
+    },
+    {
+     "episodes": 247,
+     "success": 208,
+     "stalled": 8,
+     "timeout": 0,
+     "death": 31
+    },
+    {
+     "episodes": 259,
+     "success": 238,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 21
+    },
+    {
+     "episodes": 279,
+     "success": 250,
+     "stalled": 1,
+     "timeout": 0,
+     "death": 28
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3462,
+    "last_100k": 1.1685
+   }
+  },
+  {
+   "id": "room2-stall-A-seed32",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 48,
+    "timeouts": 0,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 451.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-230713"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 251,
+     "success": 43,
+     "stalled": 33,
+     "timeout": 0,
+     "death": 175
+    },
+    {
+     "episodes": 221,
+     "success": 150,
+     "stalled": 15,
+     "timeout": 0,
+     "death": 56
+    },
+    {
+     "episodes": 221,
+     "success": 197,
+     "stalled": 13,
+     "timeout": 0,
+     "death": 11
+    },
+    {
+     "episodes": 212,
+     "success": 186,
+     "stalled": 17,
+     "timeout": 0,
+     "death": 9
+    },
+    {
+     "episodes": 238,
+     "success": 217,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 12
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3421,
+    "last_100k": 0.5238
+   }
+  },
+  {
+   "id": "room2-stall-A-seed33",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 23,
+    "deaths": 27,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 403.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-230831"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 197,
+     "success": 4,
+     "stalled": 70,
+     "timeout": 0,
+     "death": 123
+    },
+    {
+     "episodes": 185,
+     "success": 0,
+     "stalled": 96,
+     "timeout": 0,
+     "death": 89
+    },
+    {
+     "episodes": 193,
+     "success": 1,
+     "stalled": 93,
+     "timeout": 0,
+     "death": 99
+    },
+    {
+     "episodes": 234,
+     "success": 0,
+     "stalled": 117,
+     "timeout": 0,
+     "death": 117
+    },
+    {
+     "episodes": 286,
+     "success": 0,
+     "stalled": 173,
+     "timeout": 0,
+     "death": 113
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.3322,
+    "last_100k": 0.7981
+   }
+  },
+  {
+   "id": "room2-stall-A-seed34",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 33,
+    "timeouts": 0,
+    "deaths": 17,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 442.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231056"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 222,
+     "success": 13,
+     "stalled": 63,
+     "timeout": 0,
+     "death": 146
+    },
+    {
+     "episodes": 215,
+     "success": 76,
+     "stalled": 40,
+     "timeout": 0,
+     "death": 99
+    },
+    {
+     "episodes": 226,
+     "success": 188,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 29
+    },
+    {
+     "episodes": 214,
+     "success": 177,
+     "stalled": 17,
+     "timeout": 0,
+     "death": 20
+    },
+    {
+     "episodes": 238,
+     "success": 185,
+     "stalled": 18,
+     "timeout": 0,
+     "death": 35
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3157,
+    "last_100k": 1.0874
+   }
+  },
+  {
+   "id": "room2-stall-A-seed35",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 46,
+    "timeouts": 0,
+    "deaths": 4,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 491.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231211"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 206,
+     "success": 15,
+     "stalled": 53,
+     "timeout": 0,
+     "death": 138
+    },
+    {
+     "episodes": 239,
+     "success": 128,
+     "stalled": 24,
+     "timeout": 0,
+     "death": 87
+    },
+    {
+     "episodes": 247,
+     "success": 227,
+     "stalled": 6,
+     "timeout": 0,
+     "death": 14
+    },
+    {
+     "episodes": 237,
+     "success": 209,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 19
+    },
+    {
+     "episodes": 218,
+     "success": 201,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 8
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3104,
+    "last_100k": 0.5064
+   }
+  },
+  {
+   "id": "room2-stall-A-seed36",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 50,
+    "timeouts": 0,
+    "deaths": 0,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": null,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231332"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 214,
+     "success": 10,
+     "stalled": 76,
+     "timeout": 0,
+     "death": 128
+    },
+    {
+     "episodes": 168,
+     "success": 1,
+     "stalled": 133,
+     "timeout": 0,
+     "death": 34
+    },
+    {
+     "episodes": 174,
+     "success": 10,
+     "stalled": 96,
+     "timeout": 0,
+     "death": 68
+    },
+    {
+     "episodes": 171,
+     "success": 104,
+     "stalled": 34,
+     "timeout": 0,
+     "death": 33
+    },
+    {
+     "episodes": 204,
+     "success": 155,
+     "stalled": 17,
+     "timeout": 0,
+     "death": 32
+    }
+   ],
+   "first_50k_window_reaching_half": 400000,
+   "entropy": {
+    "first_100k": 0.3041,
+    "last_100k": 0.6284
+   }
+  },
+  {
+   "id": "room2-stall-A-seed37",
+   "experiment": "stall-pilot",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 33,
+    "timeouts": 1,
+    "deaths": 16,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 443.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231457"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 219,
+     "success": 7,
+     "stalled": 53,
+     "timeout": 0,
+     "death": 159
+    },
+    {
+     "episodes": 207,
+     "success": 2,
+     "stalled": 93,
+     "timeout": 0,
+     "death": 112
+    },
+    {
+     "episodes": 195,
+     "success": 53,
+     "stalled": 29,
+     "timeout": 0,
+     "death": 113
+    },
+    {
+     "episodes": 224,
+     "success": 183,
+     "stalled": 11,
+     "timeout": 0,
+     "death": 30
+    },
+    {
+     "episodes": 210,
+     "success": 187,
+     "stalled": 8,
+     "timeout": 0,
+     "death": 15
+    }
+   ],
+   "first_50k_window_reaching_half": 350000,
+   "entropy": {
+    "first_100k": 0.3534,
+    "last_100k": 0.7948
+   }
+  },
+  {
+   "id": "room2-stall-B-seed30",
+   "experiment": "stall-pilot",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 34,
+    "timeouts": 0,
+    "deaths": 16,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 422.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231632"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 192,
+     "success": 2,
+     "stalled": 107,
+     "timeout": 0,
+     "death": 83
+    },
+    {
+     "episodes": 195,
+     "success": 0,
+     "stalled": 159,
+     "timeout": 0,
+     "death": 36
+    },
+    {
+     "episodes": 190,
+     "success": 1,
+     "stalled": 110,
+     "timeout": 0,
+     "death": 79
+    },
+    {
+     "episodes": 228,
+     "success": 17,
+     "stalled": 44,
+     "timeout": 0,
+     "death": 167
+    },
+    {
+     "episodes": 211,
+     "success": 103,
+     "stalled": 25,
+     "timeout": 0,
+     "death": 83
+    }
+   ],
+   "first_50k_window_reaching_half": 500000,
+   "entropy": {
+    "first_100k": 0.2884,
+    "last_100k": 0.524
+   }
+  },
+  {
+   "id": "room2-stall-B-seed31",
+   "experiment": "stall-pilot",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 41,
+    "timeouts": 1,
+    "deaths": 8,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 402.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231803"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 221,
+     "success": 17,
+     "stalled": 82,
+     "timeout": 0,
+     "death": 122
+    },
+    {
+     "episodes": 224,
+     "success": 17,
+     "stalled": 93,
+     "timeout": 0,
+     "death": 114
+    },
+    {
+     "episodes": 254,
+     "success": 81,
+     "stalled": 25,
+     "timeout": 0,
+     "death": 148
+    },
+    {
+     "episodes": 243,
+     "success": 125,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 111
+    },
+    {
+     "episodes": 219,
+     "success": 138,
+     "stalled": 8,
+     "timeout": 0,
+     "death": 73
+    }
+   ],
+   "first_50k_window_reaching_half": 350000,
+   "entropy": {
+    "first_100k": 0.3097,
+    "last_100k": 0.5797
+   }
+  },
+  {
+   "id": "room2-stall-B-seed32",
+   "experiment": "stall-pilot",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 41,
+    "timeouts": 2,
+    "deaths": 7,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-231942"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 231,
+     "success": 14,
+     "stalled": 96,
+     "timeout": 0,
+     "death": 121
+    },
+    {
+     "episodes": 212,
+     "success": 13,
+     "stalled": 100,
+     "timeout": 0,
+     "death": 99
+    },
+    {
+     "episodes": 242,
+     "success": 53,
+     "stalled": 51,
+     "timeout": 0,
+     "death": 138
+    },
+    {
+     "episodes": 218,
+     "success": 136,
+     "stalled": 28,
+     "timeout": 0,
+     "death": 54
+    },
+    {
+     "episodes": 223,
+     "success": 162,
+     "stalled": 21,
+     "timeout": 0,
+     "death": 40
+    }
+   ],
+   "first_50k_window_reaching_half": 350000,
+   "entropy": {
+    "first_100k": 0.2822,
+    "last_100k": 0.53
+   }
+  },
+  {
+   "id": "room2-stall-B-seed33",
+   "experiment": "stall-pilot",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 49,
+    "timeouts": 0,
+    "deaths": 1,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 422.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260924-232111"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 232,
+     "success": 18,
+     "stalled": 104,
+     "timeout": 0,
+     "death": 110
+    },
+    {
+     "episodes": 249,
+     "success": 78,
+     "stalled": 51,
+     "timeout": 0,
+     "death": 120
+    },
+    {
+     "episodes": 264,
+     "success": 205,
+     "stalled": 8,
+     "timeout": 0,
+     "death": 51
+    },
+    {
+     "episodes": 281,
+     "success": 262,
+     "stalled": 5,
+     "timeout": 0,
+     "death": 14
+    },
+    {
+     "episodes": 287,
+     "success": 269,
+     "stalled": 4,
+     "timeout": 0,
+     "death": 14
+    }
+   ],
+   "first_50k_window_reaching_half": 250000,
+   "entropy": {
+    "first_100k": 0.2792,
+    "last_100k": 0.4511
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k0",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260922-210737",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 47,
+    "timeouts": 0,
+    "deaths": 3,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 414.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083418"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 240,
+     "success": 48,
+     "stalled": 48,
+     "timeout": 0,
+     "death": 144
+    },
+    {
+     "episodes": 232,
+     "success": 153,
+     "stalled": 19,
+     "timeout": 0,
+     "death": 60
+    },
+    {
+     "episodes": 255,
+     "success": 219,
+     "stalled": 10,
+     "timeout": 0,
+     "death": 26
+    },
+    {
+     "episodes": 260,
+     "success": 248,
+     "stalled": 6,
+     "timeout": 0,
+     "death": 6
+    },
+    {
+     "episodes": 271,
+     "success": 254,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 8
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3404,
+    "last_100k": 0.5958
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k0",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-014351",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 48,
+    "timeouts": 0,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 401.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083533"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 239,
+     "success": 33,
+     "stalled": 67,
+     "timeout": 0,
+     "death": 139
+    },
+    {
+     "episodes": 251,
+     "success": 122,
+     "stalled": 40,
+     "timeout": 0,
+     "death": 89
+    },
+    {
+     "episodes": 265,
+     "success": 252,
+     "stalled": 6,
+     "timeout": 0,
+     "death": 7
+    },
+    {
+     "episodes": 264,
+     "success": 253,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 2
+    },
+    {
+     "episodes": 274,
+     "success": 264,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 3
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3584,
+    "last_100k": 0.4068
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k1",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-110413",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 43,
+    "timeouts": 0,
+    "deaths": 7,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 442.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083641"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 225,
+     "success": 33,
+     "stalled": 76,
+     "timeout": 0,
+     "death": 116
+    },
+    {
+     "episodes": 228,
+     "success": 107,
+     "stalled": 35,
+     "timeout": 0,
+     "death": 86
+    },
+    {
+     "episodes": 253,
+     "success": 214,
+     "stalled": 16,
+     "timeout": 0,
+     "death": 23
+    },
+    {
+     "episodes": 258,
+     "success": 234,
+     "stalled": 10,
+     "timeout": 0,
+     "death": 14
+    },
+    {
+     "episodes": 251,
+     "success": 205,
+     "stalled": 12,
+     "timeout": 0,
+     "death": 34
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3177,
+    "last_100k": 0.5983
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k1",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-110841",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 39,
+    "timeouts": 1,
+    "deaths": 10,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 421.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083800"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 246,
+     "success": 23,
+     "stalled": 85,
+     "timeout": 0,
+     "death": 138
+    },
+    {
+     "episodes": 276,
+     "success": 57,
+     "stalled": 57,
+     "timeout": 0,
+     "death": 162
+    },
+    {
+     "episodes": 251,
+     "success": 178,
+     "stalled": 15,
+     "timeout": 0,
+     "death": 58
+    },
+    {
+     "episodes": 240,
+     "success": 213,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 20
+    },
+    {
+     "episodes": 240,
+     "success": 206,
+     "stalled": 14,
+     "timeout": 0,
+     "death": 20
+    }
+   ],
+   "first_50k_window_reaching_half": 250000,
+   "entropy": {
+    "first_100k": 0.2681,
+    "last_100k": 0.3354
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k2",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-112303",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 37,
+    "timeouts": 1,
+    "deaths": 12,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 404.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-083920"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 232,
+     "success": 12,
+     "stalled": 76,
+     "timeout": 0,
+     "death": 144
+    },
+    {
+     "episodes": 204,
+     "success": 29,
+     "stalled": 64,
+     "timeout": 0,
+     "death": 111
+    },
+    {
+     "episodes": 218,
+     "success": 110,
+     "stalled": 24,
+     "timeout": 0,
+     "death": 84
+    },
+    {
+     "episodes": 230,
+     "success": 180,
+     "stalled": 10,
+     "timeout": 0,
+     "death": 40
+    },
+    {
+     "episodes": 218,
+     "success": 168,
+     "stalled": 14,
+     "timeout": 0,
+     "death": 36
+    }
+   ],
+   "first_50k_window_reaching_half": 300000,
+   "entropy": {
+    "first_100k": 0.3185,
+    "last_100k": 1.0237
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k2",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-112753",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 48,
+    "timeouts": 0,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 423.5,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084054"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 278,
+     "success": 68,
+     "stalled": 37,
+     "timeout": 0,
+     "death": 173
+    },
+    {
+     "episodes": 242,
+     "success": 173,
+     "stalled": 19,
+     "timeout": 0,
+     "death": 50
+    },
+    {
+     "episodes": 256,
+     "success": 224,
+     "stalled": 9,
+     "timeout": 0,
+     "death": 23
+    },
+    {
+     "episodes": 242,
+     "success": 211,
+     "stalled": 21,
+     "timeout": 0,
+     "death": 10
+    },
+    {
+     "episodes": 280,
+     "success": 248,
+     "stalled": 10,
+     "timeout": 0,
+     "death": 22
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3382,
+    "last_100k": 0.4045
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k3",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-114140",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 48,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 348.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084205"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 199,
+     "success": 7,
+     "stalled": 93,
+     "timeout": 0,
+     "death": 99
+    },
+    {
+     "episodes": 192,
+     "success": 0,
+     "stalled": 162,
+     "timeout": 0,
+     "death": 30
+    },
+    {
+     "episodes": 172,
+     "success": 0,
+     "stalled": 163,
+     "timeout": 0,
+     "death": 9
+    },
+    {
+     "episodes": 189,
+     "success": 0,
+     "stalled": 183,
+     "timeout": 0,
+     "death": 6
+    },
+    {
+     "episodes": 250,
+     "success": 0,
+     "stalled": 249,
+     "timeout": 0,
+     "death": 1
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.3448,
+    "last_100k": 0.5118
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k3",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-114615",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 48,
+    "timeouts": 0,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 409.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084539"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 255,
+     "success": 49,
+     "stalled": 32,
+     "timeout": 0,
+     "death": 174
+    },
+    {
+     "episodes": 234,
+     "success": 118,
+     "stalled": 23,
+     "timeout": 0,
+     "death": 93
+    },
+    {
+     "episodes": 214,
+     "success": 154,
+     "stalled": 13,
+     "timeout": 0,
+     "death": 47
+    },
+    {
+     "episodes": 205,
+     "success": 131,
+     "stalled": 19,
+     "timeout": 0,
+     "death": 55
+    },
+    {
+     "episodes": 187,
+     "success": 147,
+     "stalled": 15,
+     "timeout": 0,
+     "death": 25
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.3135,
+    "last_100k": 0.447
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k4",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-120004",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 48,
+    "timeouts": 0,
+    "deaths": 2,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 491.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084714"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 240,
+     "success": 71,
+     "stalled": 40,
+     "timeout": 0,
+     "death": 129
+    },
+    {
+     "episodes": 226,
+     "success": 155,
+     "stalled": 23,
+     "timeout": 0,
+     "death": 48
+    },
+    {
+     "episodes": 243,
+     "success": 215,
+     "stalled": 17,
+     "timeout": 0,
+     "death": 11
+    },
+    {
+     "episodes": 262,
+     "success": 233,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 22
+    },
+    {
+     "episodes": 268,
+     "success": 245,
+     "stalled": 6,
+     "timeout": 0,
+     "death": 17
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.4349,
+    "last_100k": 0.6051
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k4",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-120404",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 47,
+    "timeouts": 0,
+    "deaths": 3,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 425.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084827"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 227,
+     "success": 17,
+     "stalled": 77,
+     "timeout": 0,
+     "death": 133
+    },
+    {
+     "episodes": 233,
+     "success": 14,
+     "stalled": 80,
+     "timeout": 0,
+     "death": 139
+    },
+    {
+     "episodes": 298,
+     "success": 92,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 199
+    },
+    {
+     "episodes": 263,
+     "success": 187,
+     "stalled": 2,
+     "timeout": 0,
+     "death": 74
+    },
+    {
+     "episodes": 270,
+     "success": 239,
+     "stalled": 4,
+     "timeout": 0,
+     "death": 27
+    }
+   ],
+   "first_50k_window_reaching_half": 350000,
+   "entropy": {
+    "first_100k": 0.2677,
+    "last_100k": 0.4237
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k5",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-233959",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 49,
+    "timeouts": 0,
+    "deaths": 1,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 389.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-084935"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 238,
+     "success": 48,
+     "stalled": 62,
+     "timeout": 0,
+     "death": 128
+    },
+    {
+     "episodes": 237,
+     "success": 173,
+     "stalled": 26,
+     "timeout": 0,
+     "death": 38
+    },
+    {
+     "episodes": 236,
+     "success": 213,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 16
+    },
+    {
+     "episodes": 248,
+     "success": 241,
+     "stalled": 5,
+     "timeout": 0,
+     "death": 2
+    },
+    {
+     "episodes": 264,
+     "success": 259,
+     "stalled": 0,
+     "timeout": 0,
+     "death": 5
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3583,
+    "last_100k": 0.7403
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k5",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260924-234449",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 47,
+    "timeouts": 0,
+    "deaths": 3,
+    "episodes": 50,
+    "plays_found": 2,
+    "median_failure_max_x": 518.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-085045"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 232,
+     "success": 17,
+     "stalled": 116,
+     "timeout": 0,
+     "death": 99
+    },
+    {
+     "episodes": 252,
+     "success": 11,
+     "stalled": 74,
+     "timeout": 0,
+     "death": 167
+    },
+    {
+     "episodes": 234,
+     "success": 57,
+     "stalled": 38,
+     "timeout": 0,
+     "death": 139
+    },
+    {
+     "episodes": 215,
+     "success": 113,
+     "stalled": 20,
+     "timeout": 0,
+     "death": 82
+    },
+    {
+     "episodes": 234,
+     "success": 184,
+     "stalled": 10,
+     "timeout": 0,
+     "death": 40
+    }
+   ],
+   "first_50k_window_reaching_half": 400000,
+   "entropy": {
+    "first_100k": 0.2518,
+    "last_100k": 0.4681
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k6",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260925-000151",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 50,
+    "timeouts": 0,
+    "deaths": 0,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": null,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-132957"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 224,
+     "success": 37,
+     "stalled": 58,
+     "timeout": 0,
+     "death": 129
+    },
+    {
+     "episodes": 206,
+     "success": 148,
+     "stalled": 18,
+     "timeout": 0,
+     "death": 40
+    },
+    {
+     "episodes": 218,
+     "success": 191,
+     "stalled": 11,
+     "timeout": 0,
+     "death": 16
+    },
+    {
+     "episodes": 216,
+     "success": 200,
+     "stalled": 8,
+     "timeout": 0,
+     "death": 8
+    },
+    {
+     "episodes": 236,
+     "success": 219,
+     "stalled": 5,
+     "timeout": 0,
+     "death": 12
+    }
+   ],
+   "first_50k_window_reaching_half": 150000,
+   "entropy": {
+    "first_100k": 0.3855,
+    "last_100k": 0.7247
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k6",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260925-000723",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 49,
+    "timeouts": 0,
+    "deaths": 1,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 414.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-133101"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 236,
+     "success": 35,
+     "stalled": 61,
+     "timeout": 0,
+     "death": 140
+    },
+    {
+     "episodes": 261,
+     "success": 141,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 113
+    },
+    {
+     "episodes": 236,
+     "success": 192,
+     "stalled": 7,
+     "timeout": 0,
+     "death": 37
+    },
+    {
+     "episodes": 228,
+     "success": 198,
+     "stalled": 6,
+     "timeout": 0,
+     "death": 24
+    },
+    {
+     "episodes": 252,
+     "success": 240,
+     "stalled": 2,
+     "timeout": 0,
+     "death": 10
+    }
+   ],
+   "first_50k_window_reaching_half": 200000,
+   "entropy": {
+    "first_100k": 0.2666,
+    "last_100k": 0.479
+   }
+  },
+  {
+   "id": "room2-demos-stall-A-k7",
+   "experiment": "h2",
+   "arm": "A",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260925-002433",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 0,
+    "timeouts": 47,
+    "deaths": 3,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 348.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-133203"
+   },
+   "collapsed": true,
+   "training_windows": [
+    {
+     "episodes": 184,
+     "success": 15,
+     "stalled": 81,
+     "timeout": 0,
+     "death": 88
+    },
+    {
+     "episodes": 183,
+     "success": 1,
+     "stalled": 153,
+     "timeout": 0,
+     "death": 29
+    },
+    {
+     "episodes": 219,
+     "success": 0,
+     "stalled": 216,
+     "timeout": 0,
+     "death": 3
+    },
+    {
+     "episodes": 210,
+     "success": 0,
+     "stalled": 201,
+     "timeout": 0,
+     "death": 9
+    },
+    {
+     "episodes": 216,
+     "success": 0,
+     "stalled": 207,
+     "timeout": 0,
+     "death": 9
+    }
+   ],
+   "first_50k_window_reaching_half": null,
+   "entropy": {
+    "first_100k": 0.3441,
+    "last_100k": 0.9268
+   }
+  },
+  {
+   "id": "room2-demos-stall-B-k7",
+   "experiment": "h2",
+   "arm": "B",
+   "stall_option": true,
+   "clone": "runs/clone/chapter-1-room-2/20260925-002955",
+   "accepted_steps": 501760,
+   "final_play": {
+    "clears": 42,
+    "timeouts": 0,
+    "deaths": 8,
+    "episodes": 50,
+    "plays_found": 1,
+    "median_failure_max_x": 430.0,
+    "first_play": "runs/evaluation/chapter-1-room-2/20260925-133456"
+   },
+   "collapsed": false,
+   "training_windows": [
+    {
+     "episodes": 236,
+     "success": 4,
+     "stalled": 86,
+     "timeout": 0,
+     "death": 146
+    },
+    {
+     "episodes": 227,
+     "success": 1,
+     "stalled": 98,
+     "timeout": 0,
+     "death": 128
+    },
+    {
+     "episodes": 266,
+     "success": 5,
+     "stalled": 66,
+     "timeout": 0,
+     "death": 195
+    },
+    {
+     "episodes": 268,
+     "success": 15,
+     "stalled": 43,
+     "timeout": 0,
+     "death": 210
+    },
+    {
+     "episodes": 256,
+     "success": 117,
+     "stalled": 32,
+     "timeout": 0,
+     "death": 107
+    }
+   ],
+   "first_50k_window_reaching_half": 500000,
+   "entropy": {
+    "first_100k": 0.3331,
+    "last_100k": 0.4493
+   }
+  }
+ ],
+ "inputs_sha256": {
+  "config/campaign-room2-demos-ab.json": "d8e55ab958560bb27218392bf0ce682d1fe0c1ec92b62570a10015d936e18cb0",
+  "config/campaign-room2-demos-stall-ab.json": "6c8d8581fbd83bc578256e8353d1739b543691b3b236ddf78be62b907af638e5",
+  "config/campaign-room2-stall-pilot.json": "8215fc709cc2b5dd894a9ad56c7614e65d15b922512cd68036cbd9bd054a747d",
+  "config/campaign-room2-train-ab.json": "3800847686da1441a1b2eafda92d15cec5081bd92daa279ef6873df526285f6f",
+  "runs/campaign/20260924-163719-room2-stall-pilot-v1/stall-pilot-analysis.json": "e95b3512861913b6d846a5467ca302b66d5a2e9661a5cf00c0294ca3f0500b0c",
+  "runs/campaign/20260925-131433-room2-demos-stall-ab-play-v1/stability-gate.json": "db3e5f75ac51a8ab8a3655bf869afd43fe0a1829a31601c7217aab2aabf424f4",
+  "runs/clone/chapter-1-room-2/20260922-210737/dataset.npz": "0b3a3d2c3311d61d4e7464ead59fa7480b1655ff895613538222d0364e7727a9",
+  "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz": "ea17c59c0dddb999b7362b39c5030fb5eccc4c874d4094a64e2e1f4b7356373f",
+  "runs/evaluation/chapter-1-room-2/20260923-185356/episodes.jsonl": "6626506a36b3273cf662080fca17ee41d5e8fcea4ff56dea31410722acda9f63",
+  "runs/evaluation/chapter-1-room-2/20260923-191232/episodes.jsonl": "c7233363ad7a836676340c915d99f9f27278cadd200da216bb91868061928115",
+  "runs/evaluation/chapter-1-room-2/20260923-193121/episodes.jsonl": "87610598eec22e644db145572d0a42a1832be5152d58bcdc7b0c6381859bc977",
+  "runs/evaluation/chapter-1-room-2/20260923-194917/episodes.jsonl": "423376aa6423149fffd5e0adb45e38e028e441ab97972178566e7dffee515a8e",
+  "runs/evaluation/chapter-1-room-2/20260923-200845/episodes.jsonl": "cdef6a5a0f8ed1af2faf0f74a21d6adf94280c9e9d65590f95840123090d9060",
+  "runs/evaluation/chapter-1-room-2/20260923-203544/episodes.jsonl": "024f03e5b2685e399bfdf2e1eab5a1c4e9bef2e9d904d5800c0ec13e0cdc4870",
+  "runs/evaluation/chapter-1-room-2/20260923-210315/episodes.jsonl": "4ca94927340b903c8f8eee2f291a2bd6af59da44079730ca1cb59ca0c6286b51",
+  "runs/evaluation/chapter-1-room-2/20260924-015734/episodes.jsonl": "5526c6850c7d7a02ea1176169597341ddf9f314bdcfa26779510f51fd88b5b3b",
+  "runs/evaluation/chapter-1-room-2/20260924-121940/episodes.jsonl": "e10acf95761615619ba907db14502b12a074b2f43292782ea7fee9159d1d64cc",
+  "runs/evaluation/chapter-1-room-2/20260924-122101/episodes.jsonl": "b5d257501e84d88f1df460d9b359e0b8471ba03631b55917c029b3606a41d751",
+  "runs/evaluation/chapter-1-room-2/20260924-122231/episodes.jsonl": "ae9be7b963b1ed4ed472dfcf02fdee509bb81d3bd41c04a7a1b64f6889d6b522",
+  "runs/evaluation/chapter-1-room-2/20260924-122405/episodes.jsonl": "098544c4bebaf221f89d0153dee1cd9d57cfcdd7824d95e7697e4d0bd8c9a501",
+  "runs/evaluation/chapter-1-room-2/20260924-122520/episodes.jsonl": "50907092c2c7eacc1c4a0ce946372630a7b8bd1a809749d5dd767279fc048a5a",
+  "runs/evaluation/chapter-1-room-2/20260924-122632/episodes.jsonl": "e610e33ee06886eb1004d9d6fa7b72c82806121faa0b8ac54fe36f1eaf012371",
+  "runs/evaluation/chapter-1-room-2/20260924-122745/episodes.jsonl": "c324d33573a684613abe06ecd6804c973de80f4bfb1ce32c01a5bd4a98b0d76c",
+  "runs/evaluation/chapter-1-room-2/20260924-122910/episodes.jsonl": "b9512afad98e57ab96e64c24a69a1717f3a72d12c52b686907151d4fcf21002a",
+  "runs/evaluation/chapter-1-room-2/20260924-145333/episodes.jsonl": "c5a45155e2c29e3aa774c758689ced1870a583d440e865b9aadfec845e7b6553",
+  "runs/evaluation/chapter-1-room-2/20260924-145428/episodes.jsonl": "31849e9d26ceff58944661af68ad7e0a8ff74928deb4468fee659919990977f9",
+  "runs/evaluation/chapter-1-room-2/20260924-145652/episodes.jsonl": "ebbac17e959f813dd3be52eeec98a83195b772787333ae24cedef94fd10fa432",
+  "runs/evaluation/chapter-1-room-2/20260924-145901/episodes.jsonl": "4e8222acb22afe44ef7f27bbdec6c75e9844b92923d9a9c8f95c6cf5c3bc22de",
+  "runs/evaluation/chapter-1-room-2/20260924-150038/episodes.jsonl": "4414affa92708218b9cca65d712490e5bcb105bb24443851fb9f11ee60c68c27",
+  "runs/evaluation/chapter-1-room-2/20260924-150135/episodes.jsonl": "a63913340ea01f901b91e434ba5cddac856ead9c0fd85e648f03d23c5a431072",
+  "runs/evaluation/chapter-1-room-2/20260924-150232/episodes.jsonl": "cdeb3c15610ee8e22681ba3fdbe24b5f7e129ab1fa1e610b1bd1d35c77441cf4",
+  "runs/evaluation/chapter-1-room-2/20260924-150327/episodes.jsonl": "2fd9b8b1514b0532b14a32f6f868d3b8459bee928e336538bfe9213ab0ba22f9",
+  "runs/evaluation/chapter-1-room-2/20260924-150641/episodes.jsonl": "07354d5f53ed078ef5bd694fd1d063be05204f662b334302a1c713671a56bb6b",
+  "runs/evaluation/chapter-1-room-2/20260924-150740/episodes.jsonl": "a09797e7c3ceb094595bf22a1010477461c35ca6bc48770bae3131687a55012e",
+  "runs/evaluation/chapter-1-room-2/20260924-151138/episodes.jsonl": "cab37e16dab004ffff6d6d634bd48532b72eafd42bffbe2c255215083106ff99",
+  "runs/evaluation/chapter-1-room-2/20260924-151347/episodes.jsonl": "c53a86252dc9d7c59b7275e64c1bdec0d2ea2748bc9427e758013327aa16eefd",
+  "runs/evaluation/chapter-1-room-2/20260924-151524/episodes.jsonl": "47128733e063022b95918ff4f7815d53067721d917c98c0170d18da9bf9896c0",
+  "runs/evaluation/chapter-1-room-2/20260924-151622/episodes.jsonl": "229520439001e346925e78fe0947e31b6417b6b71606786f34d0c02d5ce39088",
+  "runs/evaluation/chapter-1-room-2/20260924-151719/episodes.jsonl": "ee6b9498fd890cb440fca6eda16d592f443790c4ebf0ec36d16396505555cdc9",
+  "runs/evaluation/chapter-1-room-2/20260924-151814/episodes.jsonl": "90d554f123bcb19eee1cd96918995d6e833d95c564fb57c18a0c4b58844c4943",
+  "runs/evaluation/chapter-1-room-2/20260924-163024/episodes.jsonl": "4b8a5c77ffd4fad8608af84f3e92617378e9be230d6abb6fe510adf1445fef0e",
+  "runs/evaluation/chapter-1-room-2/20260924-163126/episodes.jsonl": "dead17f352a33a0f4702a05ee62314a8cf55e4a11ed45d9b2f006dd1aa5980d1",
+  "runs/evaluation/chapter-1-room-2/20260924-163226/episodes.jsonl": "5649cee8e7a5b93a32793c75302da485a2993965bcc2def90225c074a5e140e3",
+  "runs/evaluation/chapter-1-room-2/20260924-163333/episodes.jsonl": "b7c97318f949f79ef49da59a8aff76564038f3fe9bcf5167a06c26fd5cc98c36",
+  "runs/evaluation/chapter-1-room-2/20260924-163441/episodes.jsonl": "de3d45fcb8feda805d5bece92a29f92b0b03ebc2a19e0a515759fa59f3a477dd",
+  "runs/evaluation/chapter-1-room-2/20260924-163605/episodes.jsonl": "beac2d66171e2525ed33f1ff9f3944bb5ab59dc76bd4e8447628f32bc5c13c5a",
+  "runs/evaluation/chapter-1-room-2/20260924-230427/episodes.jsonl": "d1d36fd79ad4cc72679df16940aa8941ac9eec18b2065572e1b406207c13216e",
+  "runs/evaluation/chapter-1-room-2/20260924-230556/episodes.jsonl": "b198134d5e6069e85a6b4b670f9fc9ff8c59d19b45da1cdfe1b1790a931b1c0d",
+  "runs/evaluation/chapter-1-room-2/20260924-230713/episodes.jsonl": "7df1f07246ada872b9e8b2f229fd37ab88228f230d5ec3aa468492465ba789c8",
+  "runs/evaluation/chapter-1-room-2/20260924-230831/episodes.jsonl": "4c311b36618b5eb4fdc02d573741d4673984f3f2a364a4bd97860698b7a12d9e",
+  "runs/evaluation/chapter-1-room-2/20260924-231056/episodes.jsonl": "d9151dd07e05058e1d0c6f172b583bc5fe5cae5d91de7d91371a0e61a289afbb",
+  "runs/evaluation/chapter-1-room-2/20260924-231211/episodes.jsonl": "fe940eb0fdfd1bf50a43701c71c31c990ae5917b12465a06d738316d95b59bec",
+  "runs/evaluation/chapter-1-room-2/20260924-231332/episodes.jsonl": "da36198a7d5d8c102e963459433fb10a91950ed4da94bae3fddac86c963033cf",
+  "runs/evaluation/chapter-1-room-2/20260924-231457/episodes.jsonl": "0992122708d50dbddfc8e797e61035aa9048b89d9440dfdfb6480e51b0979d0e",
+  "runs/evaluation/chapter-1-room-2/20260924-231632/episodes.jsonl": "56bfe22daffcf8aa790a892c1ed47f0d784b73516f944ebbff9f89d3acb41b4a",
+  "runs/evaluation/chapter-1-room-2/20260924-231803/episodes.jsonl": "e777ae2927471527e7878721f7f23b8673ba142d81dabd4458b3c8426aba3d93",
+  "runs/evaluation/chapter-1-room-2/20260924-231942/episodes.jsonl": "2482a20a502ec5b3b5d36ca779d3d44470b262439061d17745e2e26cc7a41156",
+  "runs/evaluation/chapter-1-room-2/20260924-232111/episodes.jsonl": "db56de0f6750319de625bdd76d2ce3469a67e9dc1e3d3d2383fcbf049bd84092",
+  "runs/evaluation/chapter-1-room-2/20260924-232223/episodes.jsonl": "af57558cbe63ca21988988ae144119d151db96f20c265d2bd01397e0f0d904f2",
+  "runs/evaluation/chapter-1-room-2/20260924-232518/episodes.jsonl": "e0475e71b478877e538821e6b4e51aa28f85ce8e9b3df9708d713384a2358c9b",
+  "runs/evaluation/chapter-1-room-2/20260924-232852/episodes.jsonl": "8f8a61b427cb35c8687df3c30d999ceb4858bdee507add4f36c14b6b44a3b544",
+  "runs/evaluation/chapter-1-room-2/20260924-233233/episodes.jsonl": "3d00c016b22778a5b330153e5fc094ca2493e4d784d2b32c920bb23d9b68da5a",
+  "runs/evaluation/chapter-1-room-2/20260925-082352/episodes.jsonl": "4b226aecc8fe079a9ba9a9f721a3aa1db9edcab19b1b7a5256230b174f8aaf11",
+  "runs/evaluation/chapter-1-room-2/20260925-082530/episodes.jsonl": "64ca42fec6d0133e4dbd22d848ba96a1d2de6672afd0082437bffbaf0ccc042c",
+  "runs/evaluation/chapter-1-room-2/20260925-082728/episodes.jsonl": "709b99f19e0ccfad6341b10ee578da6c416712c84e860e4e214ab99859864746",
+  "runs/evaluation/chapter-1-room-2/20260925-082847/episodes.jsonl": "9a0ee503090f704a84cd0a329cacfc58ee189ee5de536e36c9869872de2bda5a",
+  "runs/evaluation/chapter-1-room-2/20260925-083038/episodes.jsonl": "4ee91da32440631804b81e2c2a15a44276ac05cab5610b192939beece210d2b0",
+  "runs/evaluation/chapter-1-room-2/20260925-083209/episodes.jsonl": "732fdc9a00ea2fb593c1c7c34ab2af3b646b9b1fa8d7d09ed158f4a64db74eac",
+  "runs/evaluation/chapter-1-room-2/20260925-083418/episodes.jsonl": "1b6c83f1382ee536847570c209aca3842dbe1772a3b17164fb5703bc071c8df9",
+  "runs/evaluation/chapter-1-room-2/20260925-083533/episodes.jsonl": "f693917b142202362bf81cc9b1e366c5197a98d873426a16821e12525620e6a6",
+  "runs/evaluation/chapter-1-room-2/20260925-083641/episodes.jsonl": "dfd543c1161ada62f3fa0dcb234950f1c268cfabf212de581c71ec429f6fd08b",
+  "runs/evaluation/chapter-1-room-2/20260925-083800/episodes.jsonl": "fb398bab8b9931a398251a3c1a7096d4b75daf20c4d5ec359365405e488e51f6",
+  "runs/evaluation/chapter-1-room-2/20260925-083920/episodes.jsonl": "fece101ca4c5c9a7ef13241b747d4d09a2887b52b18b851671f509ec1cfa260e",
+  "runs/evaluation/chapter-1-room-2/20260925-084054/episodes.jsonl": "3b7beca565891e184186e8e7a3f469175b2cdd244ccdce19cce3dceff0d50b14",
+  "runs/evaluation/chapter-1-room-2/20260925-084205/episodes.jsonl": "c2e31bc5022b579e1c07f52cefbc9b6a84a966240e68403b43605f1f2ee988be",
+  "runs/evaluation/chapter-1-room-2/20260925-084539/episodes.jsonl": "ded8de72764a1ffa6e41c6bdb31c5303f74f5e11f5d136949bd088bc08565c19",
+  "runs/evaluation/chapter-1-room-2/20260925-084714/episodes.jsonl": "fe45d8e4b3eb61591e2fe4cfe8cd249f2a924e78e7fa46668429080c1125057e",
+  "runs/evaluation/chapter-1-room-2/20260925-084827/episodes.jsonl": "c3d4de6982d190810386c31eb7f543f23c68f0956dd5de3e07016f1572314e41",
+  "runs/evaluation/chapter-1-room-2/20260925-084935/episodes.jsonl": "ebbbed599e6bdaea32cc16f0a444cf4bb39d33cd38b4c3ad552990bda5057860",
+  "runs/evaluation/chapter-1-room-2/20260925-085045/episodes.jsonl": "068b3d20bb4e89e94ca5eba4248abfef835da799d9d6a6b8ad84d5b43860bc23",
+  "runs/evaluation/chapter-1-room-2/20260925-110752/episodes.jsonl": "47128733e063022b95918ff4f7815d53067721d917c98c0170d18da9bf9896c0",
+  "runs/evaluation/chapter-1-room-2/20260925-110914/episodes.jsonl": "07354d5f53ed078ef5bd694fd1d063be05204f662b334302a1c713671a56bb6b",
+  "runs/evaluation/chapter-1-room-2/20260925-131439/episodes.jsonl": "1b6c83f1382ee536847570c209aca3842dbe1772a3b17164fb5703bc071c8df9",
+  "runs/evaluation/chapter-1-room-2/20260925-131548/episodes.jsonl": "f693917b142202362bf81cc9b1e366c5197a98d873426a16821e12525620e6a6",
+  "runs/evaluation/chapter-1-room-2/20260925-131649/episodes.jsonl": "dfd543c1161ada62f3fa0dcb234950f1c268cfabf212de581c71ec429f6fd08b",
+  "runs/evaluation/chapter-1-room-2/20260925-131759/episodes.jsonl": "fb398bab8b9931a398251a3c1a7096d4b75daf20c4d5ec359365405e488e51f6",
+  "runs/evaluation/chapter-1-room-2/20260925-131908/episodes.jsonl": "fece101ca4c5c9a7ef13241b747d4d09a2887b52b18b851671f509ec1cfa260e",
+  "runs/evaluation/chapter-1-room-2/20260925-132028/episodes.jsonl": "3b7beca565891e184186e8e7a3f469175b2cdd244ccdce19cce3dceff0d50b14",
+  "runs/evaluation/chapter-1-room-2/20260925-132130/episodes.jsonl": "c2e31bc5022b579e1c07f52cefbc9b6a84a966240e68403b43605f1f2ee988be",
+  "runs/evaluation/chapter-1-room-2/20260925-132422/episodes.jsonl": "ded8de72764a1ffa6e41c6bdb31c5303f74f5e11f5d136949bd088bc08565c19",
+  "runs/evaluation/chapter-1-room-2/20260925-132543/episodes.jsonl": "fe45d8e4b3eb61591e2fe4cfe8cd249f2a924e78e7fa46668429080c1125057e",
+  "runs/evaluation/chapter-1-room-2/20260925-132646/episodes.jsonl": "c3d4de6982d190810386c31eb7f543f23c68f0956dd5de3e07016f1572314e41",
+  "runs/evaluation/chapter-1-room-2/20260925-132748/episodes.jsonl": "ebbbed599e6bdaea32cc16f0a444cf4bb39d33cd38b4c3ad552990bda5057860",
+  "runs/evaluation/chapter-1-room-2/20260925-132850/episodes.jsonl": "068b3d20bb4e89e94ca5eba4248abfef835da799d9d6a6b8ad84d5b43860bc23",
+  "runs/evaluation/chapter-1-room-2/20260925-132957/episodes.jsonl": "bb00ea40dae5079ee736c5f988b43d0938a88009fe035481046083fe2ee12ea7",
+  "runs/evaluation/chapter-1-room-2/20260925-133101/episodes.jsonl": "da1e97339dc0621fe5ae5dd06994788d18f02762965c42cb02ccdc90bd2500b2",
+  "runs/evaluation/chapter-1-room-2/20260925-133203/episodes.jsonl": "692767a31d7826d8c5029d520d92fdc8514a6312636c3729616ed766f876a575",
+  "runs/evaluation/chapter-1-room-2/20260925-133456/episodes.jsonl": "3340bbb42e92d44113a38e08f8c84d718c63b2bfba7f28c65f76e2f86c5af8ae",
+  "runs/train/room2-ab-A-seed20/episodes.jsonl": "b63e16fc281efe628cfacfc4cd39c9861c022ff77eef40b7e65774d6e4102967",
+  "runs/train/room2-ab-A-seed20/progress.csv": "c8bc0ece61cbfe77af19ff308a06f68b715784c694537c3714e07e93e564e5f6",
+  "runs/train/room2-ab-A-seed21/episodes.jsonl": "620d1b021aa60c4e28ea28d265bb71d599bea5649fd82c02abfcc3d7f848b3c1",
+  "runs/train/room2-ab-A-seed21/progress.csv": "2e1411355dcd5d7096f6391dc0274848cca603366772ded4f0b76590372029fe",
+  "runs/train/room2-ab-A-seed22/episodes.jsonl": "e2e544c25c41d8f83b91d4c47fbc3ea54070b55648bd38c29b299ca7f996733f",
+  "runs/train/room2-ab-A-seed22/progress.csv": "546d67545290f6b83335bc2f136abcf4b45a6a0f0b16e47849cc72fe469390ab",
+  "runs/train/room2-ab-A-seed23/episodes.jsonl": "2c26bad16e7648133b2f18abce7b297e1dbce8d07d13edeabd2751edfd3df558",
+  "runs/train/room2-ab-A-seed23/progress.csv": "6b03e857427dd898331825511e388dc8ff1c5e0614c0a2a98376c3cda910da4b",
+  "runs/train/room2-ab-A-seed24/episodes.jsonl": "9a6384bde62485c1fe59475a62889ecefdc877eb9f6db80e8e3739e3585f8ec2",
+  "runs/train/room2-ab-A-seed24/progress.csv": "29697406d13a3781c8a0fb21dd6ac70865c4021248b268b8233b617eacb17816",
+  "runs/train/room2-ab-A-seed25/episodes.jsonl": "b7a18771d22af951f0e4b61d39d902840b142156735339f62af4ee75c08bdcbb",
+  "runs/train/room2-ab-A-seed25/progress.csv": "b2690859dfa4ee65ef5e397dd58cb9226c4760235f9433e64b94294bf64b7a9c",
+  "runs/train/room2-demos-A-seed30/episodes.jsonl": "35e9368adcdb17cd8bd6fbf29fe513509c5e761e36b2c3f69c6c586a00daa22b",
+  "runs/train/room2-demos-A-seed30/progress.csv": "17ba65eed61c5f84007d25c1e4dfb9504f9f6fd1575c1ef619860ef809aaf393",
+  "runs/train/room2-demos-A-seed31/episodes.jsonl": "af4a07cdecc507befdeb22c52f718d175893757388bffafdb77f06bd24d34c60",
+  "runs/train/room2-demos-A-seed31/progress.csv": "48274b6aa3b3d8c1bd989af08631f676343d92185504c5227e56faf9defd5202",
+  "runs/train/room2-demos-A-seed32/episodes.jsonl": "8b6cb585215fdd2b2d54dca4788d806f74aa8ab168f90b05eb79f31401e2d119",
+  "runs/train/room2-demos-A-seed32/progress.csv": "b00c75c9feab327651664af62dc77f01d4f746f6bbea48de05c13887b2c528af",
+  "runs/train/room2-demos-A-seed33/episodes.jsonl": "93938f68e4726066b5eb12bd69ce16d5c2f6d57ab182db6cfd71e3c2fb093427",
+  "runs/train/room2-demos-A-seed33/progress.csv": "3e32b1fce3afa0cc36874035426545b86260f897bef8da1b070eb8cfcc4624f3",
+  "runs/train/room2-demos-A-seed34/episodes.jsonl": "3f484d68db4910d129b2f2d413f62cac6badf71b2dfdd3f41cdd530a5a3e100b",
+  "runs/train/room2-demos-A-seed34/progress.csv": "ae26e1d7c81faba66331aad8a977c236f0b7d8a835bf304d6cae379347730a36",
+  "runs/train/room2-demos-A-seed35/episodes.jsonl": "d7546c69d4c55a2abf6a07fd2d7210a7a026ef8c6f8821afeef9dd14f0104976",
+  "runs/train/room2-demos-A-seed35/progress.csv": "4ab830ed8a4c12d192f2d45db4418e3cbfe81ad877acac609be921c5a901cb98",
+  "runs/train/room2-demos-A-seed36/episodes.jsonl": "2898253fc664fe75260c608b9a0987ab672ac4afc0efd48ec1d7517111413e0c",
+  "runs/train/room2-demos-A-seed36/progress.csv": "5ef5697909742d15edffd5a232d628f3065d1d98828d8fce7aa9073403d8c079",
+  "runs/train/room2-demos-A-seed37/episodes.jsonl": "dd86f1e69a9e3e2d3bfe94599bf6a2502a07149d7b160f958eddfdc2c95d7ea8",
+  "runs/train/room2-demos-A-seed37/progress.csv": "d5f308c9c7c5d72269ff9703db08cc5cb97fb93f9fd48ffd0c8abd9d55fcdc5f",
+  "runs/train/room2-demos-B-seed30/episodes.jsonl": "fbc2457e843587e41693b311b5de285fe4b602790b9200fb255904715ac9c088",
+  "runs/train/room2-demos-B-seed30/progress.csv": "82f580478d348aedbf5be12f581d7997db523988a3bfcb5983260401bbd75c24",
+  "runs/train/room2-demos-B-seed31/episodes.jsonl": "3e7f0cef30b2a02994406d5e5ea0295452c6bb58b7e74201d080488be3a76ce5",
+  "runs/train/room2-demos-B-seed31/progress.csv": "4bbb98815aa12ea8b3951cf8f0627286af18ea517fe4eb24878c19fac0e85c9a",
+  "runs/train/room2-demos-B-seed32/episodes.jsonl": "9164c6048c8bc869ec7439cd0c76633607934e7a1aa85e594cec9914626db019",
+  "runs/train/room2-demos-B-seed32/progress.csv": "c2cd595147f68f5c170592ea6dce0b2265f43ee03ed7890354bb7b6341dd3fc6",
+  "runs/train/room2-demos-B-seed33/episodes.jsonl": "ee846f21d90921554b7ff228c3156b854379e7105b0ddf360950301deb02410e",
+  "runs/train/room2-demos-B-seed33/progress.csv": "0f87c1f79556cba9e7b4137b38ce8305a92c552b85f29405c45c72f0e2119451",
+  "runs/train/room2-demos-B-seed34/episodes.jsonl": "1a5fd1e3e24bff3b5969126eb1f88497d47a7efab4b5f338838d32877ea05b4e",
+  "runs/train/room2-demos-B-seed34/progress.csv": "620273544593768fa5cf391f266eb11aea1c343bb8c7bcc8541fc6d726f2f0c6",
+  "runs/train/room2-demos-B-seed35/episodes.jsonl": "ff9f645323e6fbfae9ad9ef2dfda83d7301a09bd42aa524058893505bfbcff6a",
+  "runs/train/room2-demos-B-seed35/progress.csv": "3a0aa61ed783871953de40ce52620153cedac680965b585b64f81a5f165263cf",
+  "runs/train/room2-demos-B-seed36/episodes.jsonl": "e7818cf50be09a2c97797094056b525646afa678016d07708e3a3083c1f557e6",
+  "runs/train/room2-demos-B-seed36/progress.csv": "d65364cd5a860a78e22667862ecd38c81c6749680fb8ce5803b9088f22db1695",
+  "runs/train/room2-demos-B-seed37/episodes.jsonl": "f352a9ea6ca767f45fc1d57758df29f9acb5786839241cedb9b80d0d35cbfce9",
+  "runs/train/room2-demos-B-seed37/progress.csv": "66d06d43e6b199f18b4ff424c6c633c696f48cbee24dfd6102c58acf7e9cf34c",
+  "runs/train/room2-demos-stall-A-k0/episodes.jsonl": "dcf0a39a719cade58b8d10b816d11b801b6779bd4ef3ff2bb4184b7ad8dae74c",
+  "runs/train/room2-demos-stall-A-k0/progress.csv": "05414aa5e191cbc6f410a84d52c6eb908352bd214679ab33c01cb0d32a7ea1d2",
+  "runs/train/room2-demos-stall-A-k1/episodes.jsonl": "cfe47d39639a317a28a7f1ba430f943e2840428648062e5766df9cd2f94414bc",
+  "runs/train/room2-demos-stall-A-k1/progress.csv": "b9b59625d49c9516e977b753fa8cef632773b4989d3b6a91311fef9fd33f7f51",
+  "runs/train/room2-demos-stall-A-k2/episodes.jsonl": "47aef23e662a2bdbd571893f70ce4cd205b4cea7a7386acb7bb11f09b6e54444",
+  "runs/train/room2-demos-stall-A-k2/progress.csv": "1418060d2e59ca66554a5a9b5e855c162b837f992774f03ab0ddd1b18a3dacbf",
+  "runs/train/room2-demos-stall-A-k3/episodes.jsonl": "aa60ad8fa5977c6a57297ac029bea8b0d0d51ae37774f8aac442a6fcd060463a",
+  "runs/train/room2-demos-stall-A-k3/progress.csv": "68329a84e9881ece43fdc2a4874ce2c9e97dedbb4be9312121fb4d5f0a48b6a9",
+  "runs/train/room2-demos-stall-A-k4/episodes.jsonl": "9aab7f3776fcab3938efa3f3f3c203cdf46e33e2350d8ffaf0bab9b162632f4d",
+  "runs/train/room2-demos-stall-A-k4/progress.csv": "4a6e31b891be4635700e94e3ac31ac466384d0a287dbc0648fbc4caf7d48dcdd",
+  "runs/train/room2-demos-stall-A-k5/episodes.jsonl": "f4271694b3d624b429bcf59a25d9dde8809b054abad718e0dbe6e92fe8aa1718",
+  "runs/train/room2-demos-stall-A-k5/progress.csv": "8162b5d94342751968fd87456d614521a3d6591f83accb011ecda9e420bf9616",
+  "runs/train/room2-demos-stall-A-k6/episodes.jsonl": "870725968a68783df3487a898eb5087b27d593d3075d0e33d35d3eb00aecb1a1",
+  "runs/train/room2-demos-stall-A-k6/progress.csv": "18caebae0718454c29acea5855989eaecba652a0eb45187298778cf1867e82c7",
+  "runs/train/room2-demos-stall-A-k7/episodes.jsonl": "d2160f5eb6d49afdb710148b0c14929fc37abcf5e61b2b42754cc77c0e41b5e7",
+  "runs/train/room2-demos-stall-A-k7/progress.csv": "1ad949e4e05e87890cf640402048b08f445ea34c6044b35603e934e2f2eaf185",
+  "runs/train/room2-demos-stall-B-k0/episodes.jsonl": "afc379dd136bb68ab684d1af31654f6bc025206647478459d6575fe888ee749a",
+  "runs/train/room2-demos-stall-B-k0/progress.csv": "c7077878a4db459ad02d90c4a13282d61f74bc2fa1f027bba1ae3a5449274e94",
+  "runs/train/room2-demos-stall-B-k1/episodes.jsonl": "750780c9db4512a9ef7fcb03087148ba8b69baae1c55ae0ebb25e087c926c23b",
+  "runs/train/room2-demos-stall-B-k1/progress.csv": "e308022d9b7e0c439b88c555794d2162a88f3b66090aff1040e6878483c903c1",
+  "runs/train/room2-demos-stall-B-k2/episodes.jsonl": "d2a5b635664b49efe89a33861fe468047d28b9f04f8cdd292a625dfbdf76b4ec",
+  "runs/train/room2-demos-stall-B-k2/progress.csv": "e4601de3c0175a66f76abb0c8c264be55ab5d227e81cbc6a56e49eafea8e1d15",
+  "runs/train/room2-demos-stall-B-k3/episodes.jsonl": "651b8d99ca2cfe8695620c2a3cf87b8c6b4846b3182b6dd20032db1f3fcd94b2",
+  "runs/train/room2-demos-stall-B-k3/progress.csv": "d36c42a5fba313e682a21bce1ae137b5424d1b31c3040bd020214c8a5ecb4b0e",
+  "runs/train/room2-demos-stall-B-k4/episodes.jsonl": "2dcc313da72380a6e59767dcbe280d9662494db5b6c5f45c31d7d43fec4d04c5",
+  "runs/train/room2-demos-stall-B-k4/progress.csv": "686ba3bcae1eb95ee8fb1ce3fbf28bed18c7fd8a688e7c21595486409bfa5dd1",
+  "runs/train/room2-demos-stall-B-k5/episodes.jsonl": "bcbb81059d7efb187e429ed7ed46cb9587cdeecb34b26e6d704f39ac5e21de2e",
+  "runs/train/room2-demos-stall-B-k5/progress.csv": "682296e629127322e09b95b1d4af4ee531b398651e4590fbb37b9d52270536ab",
+  "runs/train/room2-demos-stall-B-k6/episodes.jsonl": "7ad7f81565bb444718be8bee51068f99df23e4b42d81c23c175e2cd401aed5ba",
+  "runs/train/room2-demos-stall-B-k6/progress.csv": "c95705371a6401eaf4666a397650610c20a0a28a054b790e6e90d8f5f27628e1",
+  "runs/train/room2-demos-stall-B-k7/episodes.jsonl": "0605fcd3d271746dc2db59282462b6f90dda576061839418a2e66e4e53bfe71c",
+  "runs/train/room2-demos-stall-B-k7/progress.csv": "d0e160dba4bbe063465b80ef389979deb08ba94fda9c7391917e40c93b3c34cf",
+  "runs/train/room2-stall-A-seed30/episodes.jsonl": "de525ad22a168bfb150fccb1df2c2e1b155eb123334ae5aaa648ea8639fbc815",
+  "runs/train/room2-stall-A-seed30/progress.csv": "a9eeac2d45809550e524540acd4be6ff6f485a55a7038cd10605590bb5fd4867",
+  "runs/train/room2-stall-A-seed31/episodes.jsonl": "a73d39db2c4d1e4850f3cce6fbdcc293f49a933fd6cd2340e7b5ec78b9ba4b05",
+  "runs/train/room2-stall-A-seed31/progress.csv": "ebe3c1645fc3f4b521a5a07b2cb34908d120f5f35a61031d2439d93c725d1f52",
+  "runs/train/room2-stall-A-seed32/episodes.jsonl": "3e499232b5df4e25ad724b8aebf716903a68996d4e3b560861eb64db08c881b5",
+  "runs/train/room2-stall-A-seed32/progress.csv": "09068e359e9ef275fcd4bfee25d7f9030e44aeb4ed909ff6b31bc8cb91a6efe6",
+  "runs/train/room2-stall-A-seed33/episodes.jsonl": "f167bd7bc480c26b70b90b33c8d04d75489b581106cb83924e894236e80e5c45",
+  "runs/train/room2-stall-A-seed33/progress.csv": "62eeb02ac7a5bdebdc7d196ae1bcc2f3d12661c02fa9fb318a00076fca1a39cd",
+  "runs/train/room2-stall-A-seed34/episodes.jsonl": "633bdcbc7e828e85670a05fa5c0fed98f5f6fb3f02ea7bd3be6fd2b14d392a4d",
+  "runs/train/room2-stall-A-seed34/progress.csv": "7d766c3b944b7677c105ff90e1af845b9923a17cd1bc4fdc289d5857dec2475e",
+  "runs/train/room2-stall-A-seed35/episodes.jsonl": "c892db503019e69e50ea7e254da7eeec114715d5c4bbc8a915cae80b6d4d4001",
+  "runs/train/room2-stall-A-seed35/progress.csv": "1a78a8a58c7032d01525827c48737d0fec54bc239b01d7582b9ed09aa489168b",
+  "runs/train/room2-stall-A-seed36/episodes.jsonl": "acfb3a0a1b8bb4834e4305c538aba588214b27cb79cb09612be19d4e85c742dc",
+  "runs/train/room2-stall-A-seed36/progress.csv": "d0695d9e09b506eb825e3e62672eccfa9b5061da96d124f1d4ac777d4fdb139e",
+  "runs/train/room2-stall-A-seed37/episodes.jsonl": "47d141477e4b4b6a587ff7e593858b0d7f7f747457e9b9f54f121a82c486f065",
+  "runs/train/room2-stall-A-seed37/progress.csv": "0901c45c3b5c54336c78dd940420bb89f2a7c58489792bc635bc3d35ba24c4d0",
+  "runs/train/room2-stall-B-seed30/episodes.jsonl": "c4ea00fa27dbdf1a0e4fc84f6583435fc41890d98bad205ed3a8fc11fe6e7903",
+  "runs/train/room2-stall-B-seed30/progress.csv": "28cca3ce6b080da381217cfac2994cc7e886d99dd7eb436b19283aee826137eb",
+  "runs/train/room2-stall-B-seed31/episodes.jsonl": "2088f6e5a2b980be956180c876cfaecaadc1ff4246508af1471837f5087011b5",
+  "runs/train/room2-stall-B-seed31/progress.csv": "3659e87f6f474afb3b524a397a5d9136c9a42cbda4693bfa85b2f28d4ee59743",
+  "runs/train/room2-stall-B-seed32/episodes.jsonl": "be5bb5f1914ad97c157296845413b0b3be6e6738574e261b3f5b5254383615ef",
+  "runs/train/room2-stall-B-seed32/progress.csv": "4f91bf118d84b5a5411af2c7c6c3fd77f777d9ad3a6c0702009ec4796781216a",
+  "runs/train/room2-stall-B-seed33/episodes.jsonl": "392e4be5074e5b849863e9ec39154da0f041d90d6fb35be3667c6385c2499c9b",
+  "runs/train/room2-stall-B-seed33/progress.csv": "745ced428e3fb5bf00c6c8a3f0bb7ce236c2e8b73ff55e623b972ec486f11044"
+ }
+}
