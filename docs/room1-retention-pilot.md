@@ -88,11 +88,14 @@ outcome would be read.
 | Room 1 demonstrations only | | 10% to 15% | | | | | |
 
 **Mixing the demonstrations back in did not keep the Room 1 skill.** After mixed imitation, Room 1 success was
-between 14% and 22%, and between 11% and 14% after fine-tuning on Room 2. The reason shows in the reference: clones
-fitted on the Room 1 demonstrations alone scored only 10% to 15% on the Room 1 test, no better than policies that
-never saw Room 1. So the demonstrations teach almost nothing that carries over to the Room 1 test states. The
-starting policies' 66% to 77% came from their own reinforcement learning, and re-imitating the demonstrations cannot
-bring that back. By the rule fixed in advance, the next recipe should instead use the starting policy's own play as
+between 14% and 22%, and between 11% and 14% after fine-tuning on Room 2. The reference suggests why: clones fitted
+on the Room 1 demonstrations alone scored only 10% to 15% on the Room 1 test, no better than policies that never saw
+Room 1. On their own, as a policy, the demonstrations carry almost nothing that the Room 1 test measures; their value
+in Phase 3B was as a starting point for reinforcement learning. The starting policies' 66% to 77% came from that
+reinforcement learning, and re-imitating the demonstrations did not bring it back. A hint, from four runs: all four
+mixed policies ended fine-tuning below the policies that never saw Room 1 (11% to 14%, against a floor of 12% to 30%
+with a mean of 21%), as if re-imitating the demonstrations pulled toward weaker Room 1 play. By the rule fixed in
+advance, the next recipe should instead use the starting policy's own play as
 the imitation target.
 
 Fitting the demonstrations was not the problem. The mixed clones matched the held-back Room 2 routes as well as
