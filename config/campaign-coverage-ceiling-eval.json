@@ -1,0 +1,218 @@
+{
+  "name": "coverage-ceiling-eval-v1",
+  "written": "2026-09-26T18:13:30+01:00",
+  "pilot_plan": "config/coverage-ceiling-pilot.json",
+  "pilot_plan_sha256": "1449ac6b1d5976b28906f6e001c6ec7da0951ab89460a764270438c1ddca280c",
+  "recordings": {
+    "3": "runs/policy-play/chapter-1-room-1/20260926-164255",
+    "4": "runs/policy-play/chapter-1-room-1/20260926-170822",
+    "5": "runs/policy-play/chapter-1-room-1/20260926-165351",
+    "6": "runs/policy-play/chapter-1-room-1/20260926-170623"
+  },
+  "recording_note": "donor 4's first recording attempt (16:43:55) failed at game launch before any episode (empty folder runs/policy-play/chapter-1-room-1/20260926-164355); rerun with the same settings at 17:08",
+  "students": {
+    "room1-S-demo-k0": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-162250",
+      "donor_seed": 3,
+      "seed": 0
+    },
+    "room1-S-play-k0": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-172049",
+      "donor_seed": 3,
+      "seed": 0
+    },
+    "room1-S-demo-k1": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-162859",
+      "donor_seed": 4,
+      "seed": 1
+    },
+    "room1-S-play-k1": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-174230",
+      "donor_seed": 4,
+      "seed": 1
+    },
+    "room1-S-demo-k2": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-163446",
+      "donor_seed": 5,
+      "seed": 2
+    },
+    "room1-S-play-k2": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-175717",
+      "donor_seed": 5,
+      "seed": 2
+    },
+    "room1-S-demo-k3": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-164038",
+      "donor_seed": 6,
+      "seed": 3
+    },
+    "room1-S-play-k3": {
+      "dir": "runs/distill/chapter-1-room-1/20260926-181134",
+      "donor_seed": 6,
+      "seed": 3
+    }
+  },
+  "label": "descriptive coverage-ceiling evaluations; Room 1 aggregates only; the Room 2 v2 set is never read",
+  "runs": [
+    {
+      "id": "room1-S-demo-k0",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-162250/cloned.zip",
+      "checkpoint_sha256": "5ffb2a95c0b2ceaef387b5e7414ce6c34cf14a0cc7e829ba85c55f8f42d428c0",
+      "run_dir": "runs/evaluation/_planned-room1-S-demo-k0",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-162250/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-play-k0",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-172049/cloned.zip",
+      "checkpoint_sha256": "5935bfae245c5efdd3cb1a077335ccc660533939c6975b4edb04fc0d0b79f40b",
+      "run_dir": "runs/evaluation/_planned-room1-S-play-k0",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-172049/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-demo-k1",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-162859/cloned.zip",
+      "checkpoint_sha256": "3e0a1dd30778986829a0405665967d12ca81f029c0c6b26f04da08669f5de1fb",
+      "run_dir": "runs/evaluation/_planned-room1-S-demo-k1",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-162859/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-play-k1",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-174230/cloned.zip",
+      "checkpoint_sha256": "782ca93c80d45aa053a65a66bf5a487aca42c433e2f5174c067a375a63ad85a5",
+      "run_dir": "runs/evaluation/_planned-room1-S-play-k1",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-174230/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-demo-k2",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-163446/cloned.zip",
+      "checkpoint_sha256": "cb2db8cef81cad01aad7d2ca55891c8677cc80cb2fc0e2227d266f079d4b1514",
+      "run_dir": "runs/evaluation/_planned-room1-S-demo-k2",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-163446/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-play-k2",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-175717/cloned.zip",
+      "checkpoint_sha256": "82ffef475259718e434dfa4f6fea7a7d5f3579bafaa015f23b851ea3f8174a39",
+      "run_dir": "runs/evaluation/_planned-room1-S-play-k2",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-175717/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-demo-k3",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-164038/cloned.zip",
+      "checkpoint_sha256": "a7868829d071bdb54dfd2887cf0d726080e0b0a052760dd682146d281f8f5992",
+      "run_dir": "runs/evaluation/_planned-room1-S-demo-k3",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-164038/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-S-play-k3",
+      "stage": "coverage-ceiling-room1",
+      "checkpoint": "runs/distill/chapter-1-room-1/20260926-181134/cloned.zip",
+      "checkpoint_sha256": "e8ccf83120ea9d5e28dfdd35fb8a74c79b393eccad17ee104f301daaa606f99d",
+      "run_dir": "runs/evaluation/_planned-room1-S-play-k3",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/distill/chapter-1-room-1/20260926-181134/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    }
+  ]
+}
