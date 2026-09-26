@@ -15,7 +15,7 @@ from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.schema import ACTION_INPUTS  # noqa: E402
 from celeste_rl.starts import Start  # noqa: E402
 from celeste_rl.training.policy import CelestePolicy, policy_kwargs  # noqa: E402
-from distill_policy import agreement, fit_student  # noqa: E402
+from distill_policy import agreement, fit_student, play_problems  # noqa: E402
 from record_policy_play import record_episodes  # noqa: E402
 from tests.test_cloning import _spaces_env, demonstrations  # noqa: E402
 from tests.test_env import Room3Bridge  # noqa: E402
@@ -50,6 +50,17 @@ class DistillTests(unittest.TestCase):
         before, after = record["before"]["fitted"], record["after"]["fitted"]
         self.assertLess(after["mean_abs_probability_difference"], before["mean_abs_probability_difference"])
         self.assertEqual(record["after"]["held_out"]["trajectories"], 1)
+
+    def test_a_recording_must_be_this_donors_clean_attributable_play(self):
+        identity = {"name": "chapter-1-room-1"}
+        good = {"checkpoint_sha256": "d" * 64, "dataset_sha256": "a" * 64, "task": identity,
+                "uncommitted_changes": False, "attributable": True, "runtime_problems": []}
+        self.assertEqual(play_problems(good, "a" * 64, "d" * 64, identity), [])
+        for change in ({"checkpoint_sha256": "e" * 64}, {"dataset_sha256": "b" * 64}, {"uncommitted_changes": True},
+                       {"task": {"name": "chapter-1-room-2"}}, {"attributable": False},
+                       {"runtime_problems": ["python.numpy differs"]}):
+            with self.subTest(change=change):
+                self.assertTrue(play_problems({**good, **change}, "a" * 64, "d" * 64, identity))
 
     def test_a_policy_agrees_with_itself(self):
         donor = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=5).policy

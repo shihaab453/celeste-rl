@@ -61,6 +61,20 @@ def agreement(student, donor, data: Demonstrations) -> dict:
             "mean_abs_probability_difference": round(float(np.abs(ps - pd).mean()), 4)}
 
 
+def play_problems(record: dict, dataset_sha256: str, donor_sha256: str, identity: dict) -> list[str]:
+    """Reasons a record_policy_play.py recording cannot be used as this donor's states (empty when it can)."""
+    problems = []
+    if record.get("checkpoint_sha256") != donor_sha256:
+        problems.append("the play was recorded from a different policy")
+    if record.get("dataset_sha256") != dataset_sha256:
+        problems.append("dataset.npz changed since it was recorded")
+    if record.get("task") != identity or record.get("uncommitted_changes") is not False:
+        problems.append("the play is for another task or was recorded from a dirty tree")
+    if record.get("attributable") is not True or record.get("runtime_problems"):
+        problems.append("the play is not attributable (recorded with runtime problems or an override)")
+    return problems
+
+
 def fit_student(donor_policy, data: Demonstrations, holdout: float, seed: int, epochs: int, batch_size: int,
                 learning_rate: float):
     """Split by trajectory, take the donor's probabilities as targets, fit a fresh network. Returns (model, record)."""
@@ -113,13 +127,7 @@ def main() -> int:
         if args.play is not None:
             record = json.loads((args.play / "play.json").read_text(encoding="utf-8"))
             dataset = args.play / "dataset.npz"
-            problems = []
-            if record["checkpoint_sha256"] != donor_sha256:
-                problems.append("the play was recorded from a different policy")
-            if record["dataset_sha256"] != hashlib.sha256(dataset.read_bytes()).hexdigest():
-                problems.append("dataset.npz changed since it was recorded")
-            if record["task"] != identity or record.get("uncommitted_changes") is not False:
-                problems.append("the play is for another task or was recorded from a dirty tree")
+            problems = play_problems(record, hashlib.sha256(dataset.read_bytes()).hexdigest(), donor_sha256, identity)
             if problems:
                 raise ValueError("; ".join(problems))
             data = load(dataset)
