@@ -1,0 +1,48 @@
+{
+  "name": "coverage-ceiling-pilot-v1",
+  "written": "2026-09-26",
+  "status": "Proposal, on branch proposal/self-distillation; needs the orchestrator's review and the owner's go before any recording. No data exists.",
+  "label": "descriptive pilot; Room 1 only; no confirmatory claim; the Room 2 v2 held-out set is never read",
+  "question": "Can a fresh network copied from a Room 1 policy's own action probabilities play Room 1 like that policy (Room 1 held-out success), and does it matter whether the copy is made on the demonstration routes' states or on the policy's own play?",
+  "why": "The mixed-imitation pilot (branch B) showed that re-imitating the demonstrations does not keep the donors' Room 1 skill, and the orchestrator's review found that every imitation recipe so far fitted frames well but played near the floor. Before any mixed self-distillation pilot, this tests the ceiling directly: if even a copy made on the donor's own play cannot play Room 1, no imitation-based mixing will keep the skill.",
+  "decisions_it_may_inform": [
+    "whether to run a mixed self-distillation pilot (cloning stage first), and on which states",
+    "whether the next lever is instead keeping the network close to the donor during Room 2 learning (fewer epochs, frozen layers, a drift penalty) or mixed PPO"
+  ],
+  "decisions_it_may_not_inform": "anything else, including which donors, seeds, episode counts or settings a later experiment uses; one striking run does not set the next design",
+  "donors": "config/retention-pilot.json donors: Room 1 varied-start seeds 3 to 6, same checkpoints and sha256, same before values",
+  "recording": {
+    "command": "scripts/record_policy_play.py --checkpoint <donor> --checkpoint-sha256 <donor sha256> --episodes 25 --seed 20260926 (Room 1 default task)",
+    "declared_before_recording": "25 stochastic episodes per donor from the Room 1 canonical start only, sampling seed 20260926, every frame of every episode kept (successes and failures), one recording per donor, in order donor 3 to 6; the frame count is recorded by the script",
+    "held_out_rule": "No Room 1 held-out state is ever used as a start. The donor's own play from the canonical start may pass near positions that held-out states also have; the targets are the donor's own outputs, never held-out outcomes. Declared, not a refusal.",
+    "readiness": "launch-only readiness check and runtime pins before recording"
+  },
+  "students": {
+    "design": "for each donor seed 3 + k (k = 0 to 3), two fresh students with seed k: S-demo-k distilled on the verified Room 1 demonstration dataset's states (runs/clone/20260925-221134/dataset.npz, sha256 6b9bd94d..., with config/demonstrations.json and config/heldout_starts.json, --routes-only), and S-play-k distilled on donor 3 + k's own recording",
+    "command": "scripts/distill_policy.py --donor <donor> --donor-sha256 <donor sha256> (--demonstration-dataset ... | --play <recording>) --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --seed <k>",
+    "fixed": "the cloning settings of every earlier pilot (300 epochs, batch 64, learning rate 0.001, holdout 0.25 by whole trajectory); fresh weights (no --init-from); targets = the donor's probabilities with disabled inputs 0",
+    "throwaway": "runs/distill/chapter-1-room-1/20260926-102534 is a 1-epoch smoke test and is never selected"
+  },
+  "measurements": {
+    "primary": "Room 1 held-out route-macro and state-weighted success of the 8 students with the primary command (scripts/evaluate_heldout.py --checkpoint <zip> --starts config/heldout_starts.json --repeats 1 --seed 20260920), aggregates only",
+    "retained_share": "(student - clone floor) / (donor before - clone floor), with the clone floor 0.142 (never-saw-Room-1 Room 2 clones, docs/results/retention-pilot.json); the evaluation-code check as in the mixed pilot (evaluate_heldout.py and its imports unchanged since f26914d, else re-measure the floor)",
+    "comparisons": "the donors' before values, the imitation-only reference (Room 1-only clones on the demonstrations, mean 0.122), and S-demo against S-play per donor",
+    "open_loop": "each student's agreement with its donor on fitted and held-out trajectories (inputs, whole frames, mean probability difference), from distill_policy.py, reported beside the play result"
+  },
+  "decision_branches": {
+    "measure": "median retained share of the four S-play students, described across the four runs, with S-demo beside it",
+    "rules_in_order": [
+      "P (the ceiling is high): median S-play retained share at least 0.5. Next: a mixed self-distillation pilot on donor-play states, cloning stage first, PPO only if the clone keeps the skill.",
+      "Q (partial): median S-play retained share at least 0.2 and below 0.5. Next: more state coverage (more episodes or training-side starts) or less aggressive imitation; the owner and the orchestrator choose.",
+      "R (the ceiling is low): median S-play retained share below 0.2. Imitation cannot reproduce the donor's skill with this network and recipe. Next: keep the network close to the donor during Room 2 learning (fewer epochs, frozen shared layers, a drift penalty) or mixed PPO; the owner and the orchestrator choose."
+    ],
+    "descriptive": "whether S-play beats S-demo by more than 10 points in at least 3 of 4 donors (state coverage matters) is reported, not a branch"
+  },
+  "aggregates_only": "The Room 1 held-out set already carries the published Phase 3B result and two pilots; only aggregate success per student is reported. A fresh Room 1 set (config/heldout-room1-v2-procedure.json) comes before any confirmatory experiment, and every comparison value is re-measured on it then.",
+  "declared_confounds": [
+    "The donors are stochastic policies; a copy of their probabilities is judged by stochastic play, as the donors were.",
+    "Donor-play states come from canonical-start play only; the held-out set spans states along other routes.",
+    "About 3 points of sampling noise per Room 1 value at 20% success; describe patterns across the four donors."
+  ],
+  "cost": "recording about 4 x 5 minutes live; 8 CPU distillation fits (demonstration states about 4 minutes each, donor play about 15 minutes each); 8 Room 1 held-out evaluations about 2 minutes each. About 2 hours in total."
+}
