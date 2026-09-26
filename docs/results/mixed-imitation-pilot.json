@@ -1,0 +1,1014 @@
+{
+ "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "9e87f6317e25e8027835050e4dfbc5108442dc4a17140388515ba1ef43ab24a7",
+ "pilot_plan_sha256": "4754b546d9ced2eac12ca1b4fe30dabc523e672fe6592c37bced58ae5f170ea1",
+ "evaluation_plan_sha256": "c569f8d3f5903cf817301803f04af73219b40e1edbd09d89cbe8c1dde21575ad",
+ "evaluation_commit": "b794e8febce34953286f48bfc4105865af010435",
+ "floor_reused_from": "docs/results/retention-pilot.json",
+ "floor": {
+  "clone": {
+   "route_macro": 0.142,
+   "state_weighted": 0.1425
+  },
+  "final": {
+   "route_macro": 0.2046,
+   "state_weighted": 0.2062
+  }
+ },
+ "imitation_only_reference": {
+  "per_seed": [
+   {
+    "route_macro": 0.1496,
+    "state_weighted": 0.145,
+    "successes": 29
+   },
+   {
+    "route_macro": 0.1369,
+    "state_weighted": 0.13,
+    "successes": 26
+   },
+   {
+    "route_macro": 0.1042,
+    "state_weighted": 0.105,
+    "successes": 21
+   },
+   {
+    "route_macro": 0.0957,
+    "state_weighted": 0.1,
+    "successes": 20
+   }
+  ],
+  "route_macro": 0.1216,
+  "state_weighted": 0.12
+ },
+ "decision": {
+  "branch": "B",
+  "next": "a recipe that targets the donor's own play (for example self-distillation)",
+  "median_retained_share_after_cloning": 0.0775,
+  "median_retained_share_at_500k": -0.1544,
+  "runs_more_than_10_points_above_reference": 0,
+  "runs_within_10_points_of_reference": 4
+ },
+ "runs": {
+  "M-k0": {
+   "donor_seed": 3,
+   "room1_before": {
+    "route_macro": 0.7643,
+    "state_weighted": 0.76
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1667,
+     "state_weighted": 0.17,
+     "successes": 34,
+     "route_macro_retained_share": 0.0397,
+     "state_weighted_retained_share": 0.0445
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.235,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "route_macro_retained_share": 0.0543,
+     "state_weighted_retained_share": 0.052
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.1067,
+     "state_weighted": 0.105,
+     "successes": 21,
+     "route_macro_retained_share": -0.1749,
+     "state_weighted_retained_share": -0.1827
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1207,
+     "state_weighted": 0.125,
+     "successes": 25,
+     "route_macro_retained_share": -0.1499,
+     "state_weighted_retained_share": -0.1466
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.2106,
+     "state_weighted": 0.215,
+     "successes": 43,
+     "route_macro_retained_share": 0.0107,
+     "state_weighted_retained_share": 0.0159
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.1088,
+     "state_weighted": 0.095,
+     "successes": 19,
+     "route_macro_retained_share": -0.1712,
+     "state_weighted_retained_share": -0.2008
+    }
+   ],
+   "retention_R_k_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.2137,
+     "state_weighted": 0.22,
+     "successes": 44,
+     "episodes": 200,
+     "route_macro_drop": 0.5506,
+     "route_macro_retained_share": 0.1152,
+     "state_weighted_drop": 0.54,
+     "state_weighted_retained_share": 0.1255
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2341,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "episodes": 200,
+     "route_macro_drop": 0.5302,
+     "route_macro_retained_share": 0.0527,
+     "state_weighted_drop": 0.525,
+     "state_weighted_retained_share": 0.052
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.2848,
+     "state_weighted": 0.29,
+     "successes": 58,
+     "episodes": 200,
+     "route_macro_drop": 0.4795,
+     "route_macro_retained_share": 0.1433,
+     "state_weighted_drop": 0.47,
+     "state_weighted_retained_share": 0.1513
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.3227,
+     "state_weighted": 0.32,
+     "successes": 64,
+     "episodes": 200,
+     "route_macro_drop": 0.4416,
+     "route_macro_retained_share": 0.211,
+     "state_weighted_drop": 0.44,
+     "state_weighted_retained_share": 0.2055
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.3139,
+     "state_weighted": 0.31,
+     "successes": 62,
+     "episodes": 200,
+     "route_macro_drop": 0.4504,
+     "route_macro_retained_share": 0.1953,
+     "state_weighted_drop": 0.45,
+     "state_weighted_retained_share": 0.1874
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.294,
+     "state_weighted": 0.295,
+     "successes": 59,
+     "episodes": 200,
+     "route_macro_drop": 0.4703,
+     "route_macro_retained_share": 0.1597,
+     "state_weighted_drop": 0.465,
+     "state_weighted_retained_share": 0.1603
+    }
+   ],
+   "per_room_imitation_holdout": {
+    "mixed_clone_after": {
+     "chapter-1-room-2": {
+      "frames": 2275,
+      "trajectories": 5,
+      "input_accuracy": 0.9603,
+      "frame_accuracy": 0.5705,
+      "always_zero_input_accuracy": 0.8962,
+      "always_zero_frame_accuracy": 0.0523,
+      "persistence_input_accuracy": 0.9811,
+      "persistence_frame_accuracy": 0.8659,
+      "inputs_per_frame": 2.18
+     },
+     "chapter-1-room-1": {
+      "frames": 740,
+      "trajectories": 2,
+      "input_accuracy": 0.9512,
+      "frame_accuracy": 0.5054,
+      "always_zero_input_accuracy": 0.8968,
+      "always_zero_frame_accuracy": 0.0324,
+      "persistence_input_accuracy": 0.9786,
+      "persistence_frame_accuracy": 0.8554,
+      "inputs_per_frame": 2.17
+     }
+    },
+    "donor_before": {
+     "chapter-1-room-2": {
+      "frames": 2275,
+      "trajectories": 5,
+      "input_accuracy": 0.8405,
+      "frame_accuracy": 0.1587,
+      "always_zero_input_accuracy": 0.8962,
+      "always_zero_frame_accuracy": 0.0523,
+      "persistence_input_accuracy": 0.9811,
+      "persistence_frame_accuracy": 0.8659,
+      "inputs_per_frame": 2.18
+     },
+     "chapter-1-room-1": {
+      "frames": 740,
+      "trajectories": 2,
+      "input_accuracy": 0.8104,
+      "frame_accuracy": 0.0986,
+      "always_zero_input_accuracy": 0.8968,
+      "always_zero_frame_accuracy": 0.0324,
+      "persistence_input_accuracy": 0.9786,
+      "persistence_frame_accuracy": 0.8554,
+      "inputs_per_frame": 2.17
+     }
+    },
+    "retention_clone_room2_after": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9624,
+     "frame_accuracy": 0.6031,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    },
+    "train_frames": {
+     "chapter-1-room-2": 7520,
+     "chapter-1-room-1": 1948
+    }
+   },
+   "room2": {
+    "clone_clears_of_50": 11,
+    "final_clears_of_50": 49,
+    "training": {
+     "clear_per_100k": [
+      0.308,
+      0.773,
+      0.924,
+      0.913,
+      0.916
+     ],
+     "first_50k_window_at_half": 150000
+    },
+    "retention_R_k_training": {
+     "clear_per_100k": [
+      0.099,
+      0.355,
+      0.568,
+      0.866,
+      0.898
+     ],
+     "first_50k_window_at_half": 250000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "M-k": [
+     -0.664,
+     -0.099,
+     0.148,
+     -0.423,
+     0.416,
+     0.333,
+     0.097,
+     0.3,
+     0.278,
+     0.194
+    ],
+    "R-k": [
+     -0.767,
+     0.096,
+     0.298,
+     0.29,
+     0.499,
+     0.545,
+     0.441,
+     0.581,
+     0.61,
+     0.778
+    ]
+   }
+  },
+  "M-k1": {
+   "donor_seed": 4,
+   "room1_before": {
+    "route_macro": 0.7691,
+    "state_weighted": 0.765
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1407,
+     "state_weighted": 0.14,
+     "successes": 28,
+     "route_macro_retained_share": -0.0021,
+     "state_weighted_retained_share": -0.004
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2171,
+     "state_weighted": 0.205,
+     "successes": 41,
+     "route_macro_retained_share": 0.0221,
+     "state_weighted_retained_share": -0.0021
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.295,
+     "state_weighted": 0.295,
+     "successes": 59,
+     "route_macro_retained_share": 0.1601,
+     "state_weighted_retained_share": 0.1589
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.247,
+     "state_weighted": 0.24,
+     "successes": 48,
+     "route_macro_retained_share": 0.0751,
+     "state_weighted_retained_share": 0.0605
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.2161,
+     "state_weighted": 0.21,
+     "successes": 42,
+     "route_macro_retained_share": 0.0204,
+     "state_weighted_retained_share": 0.0068
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.1269,
+     "state_weighted": 0.125,
+     "successes": 25,
+     "route_macro_retained_share": -0.1376,
+     "state_weighted_retained_share": -0.1453
+    }
+   ],
+   "retention_R_k_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1543,
+     "state_weighted": 0.15,
+     "successes": 30,
+     "episodes": 200,
+     "route_macro_drop": 0.6148,
+     "route_macro_retained_share": 0.0196,
+     "state_weighted_drop": 0.615,
+     "state_weighted_retained_share": 0.012
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2071,
+     "state_weighted": 0.2,
+     "successes": 40,
+     "episodes": 200,
+     "route_macro_drop": 0.562,
+     "route_macro_retained_share": 0.0044,
+     "state_weighted_drop": 0.565,
+     "state_weighted_retained_share": -0.0111
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.1924,
+     "state_weighted": 0.185,
+     "successes": 37,
+     "episodes": 200,
+     "route_macro_drop": 0.5767,
+     "route_macro_retained_share": -0.0216,
+     "state_weighted_drop": 0.58,
+     "state_weighted_retained_share": -0.0379
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1357,
+     "state_weighted": 0.14,
+     "successes": 28,
+     "episodes": 200,
+     "route_macro_drop": 0.6334,
+     "route_macro_retained_share": -0.1221,
+     "state_weighted_drop": 0.625,
+     "state_weighted_retained_share": -0.1185
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.115,
+     "state_weighted": 0.11,
+     "successes": 22,
+     "episodes": 200,
+     "route_macro_drop": 0.6541,
+     "route_macro_retained_share": -0.1587,
+     "state_weighted_drop": 0.655,
+     "state_weighted_retained_share": -0.1722
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.0878,
+     "state_weighted": 0.09,
+     "successes": 18,
+     "episodes": 200,
+     "route_macro_drop": 0.6813,
+     "route_macro_retained_share": -0.2069,
+     "state_weighted_drop": 0.675,
+     "state_weighted_retained_share": -0.2079
+    }
+   ],
+   "per_room_imitation_holdout": {
+    "mixed_clone_after": {
+     "chapter-1-room-2": {
+      "frames": 2411,
+      "trajectories": 5,
+      "input_accuracy": 0.9565,
+      "frame_accuracy": 0.5409,
+      "always_zero_input_accuracy": 0.8919,
+      "always_zero_frame_accuracy": 0.0365,
+      "persistence_input_accuracy": 0.9796,
+      "persistence_frame_accuracy": 0.8611,
+      "inputs_per_frame": 2.27
+     },
+     "chapter-1-room-1": {
+      "frames": 632,
+      "trajectories": 2,
+      "input_accuracy": 0.9705,
+      "frame_accuracy": 0.6883,
+      "always_zero_input_accuracy": 0.8938,
+      "always_zero_frame_accuracy": 0.0396,
+      "persistence_input_accuracy": 0.9782,
+      "persistence_frame_accuracy": 0.8528,
+      "inputs_per_frame": 2.23
+     }
+    },
+    "donor_before": {
+     "chapter-1-room-2": {
+      "frames": 2411,
+      "trajectories": 5,
+      "input_accuracy": 0.9107,
+      "frame_accuracy": 0.1688,
+      "always_zero_input_accuracy": 0.8919,
+      "always_zero_frame_accuracy": 0.0365,
+      "persistence_input_accuracy": 0.9796,
+      "persistence_frame_accuracy": 0.8611,
+      "inputs_per_frame": 2.27
+     },
+     "chapter-1-room-1": {
+      "frames": 632,
+      "trajectories": 2,
+      "input_accuracy": 0.9518,
+      "frame_accuracy": 0.4003,
+      "always_zero_input_accuracy": 0.8938,
+      "always_zero_frame_accuracy": 0.0396,
+      "persistence_input_accuracy": 0.9782,
+      "persistence_frame_accuracy": 0.8528,
+      "inputs_per_frame": 2.23
+     }
+    },
+    "retention_clone_room2_after": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9556,
+     "frame_accuracy": 0.5284,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    },
+    "train_frames": {
+     "chapter-1-room-2": 7384,
+     "chapter-1-room-1": 2056
+    }
+   },
+   "room2": {
+    "clone_clears_of_50": 13,
+    "final_clears_of_50": 50,
+    "training": {
+     "clear_per_100k": [
+      0.039,
+      0.094,
+      0.489,
+      0.762,
+      0.937
+     ],
+     "first_50k_window_at_half": 300000
+    },
+    "retention_R_k_training": {
+     "clear_per_100k": [
+      0.169,
+      0.452,
+      0.848,
+      0.889,
+      0.943
+     ],
+     "first_50k_window_at_half": 200000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "M-k": [
+     0.649,
+     0.496,
+     0.629,
+     0.474,
+     0.567,
+     0.833,
+     0.552,
+     0.624,
+     0.536,
+     0.827
+    ],
+    "R-k": [
+     0.858,
+     0.501,
+     0.743,
+     0.698,
+     0.629,
+     0.768,
+     0.796,
+     0.732,
+     0.638,
+     0.819
+    ]
+   }
+  },
+  "M-k2": {
+   "donor_seed": 5,
+   "room1_before": {
+    "route_macro": 0.7735,
+    "state_weighted": 0.775
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.2148,
+     "state_weighted": 0.21,
+     "successes": 42,
+     "route_macro_retained_share": 0.1153,
+     "state_weighted_retained_share": 0.1067
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2495,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "route_macro_retained_share": 0.0789,
+     "state_weighted_retained_share": 0.0506
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.202,
+     "state_weighted": 0.195,
+     "successes": 39,
+     "route_macro_retained_share": -0.0046,
+     "state_weighted_retained_share": -0.0197
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1572,
+     "state_weighted": 0.155,
+     "successes": 31,
+     "route_macro_retained_share": -0.0833,
+     "state_weighted_retained_share": -0.09
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.1823,
+     "state_weighted": 0.18,
+     "successes": 36,
+     "route_macro_retained_share": -0.0392,
+     "state_weighted_retained_share": -0.0461
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.1423,
+     "state_weighted": 0.135,
+     "successes": 27,
+     "route_macro_retained_share": -0.1095,
+     "state_weighted_retained_share": -0.1252
+    }
+   ],
+   "retention_R_k_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.1674,
+     "state_weighted": 0.175,
+     "successes": 35,
+     "episodes": 200,
+     "route_macro_drop": 0.6061,
+     "route_macro_retained_share": 0.0402,
+     "state_weighted_drop": 0.6,
+     "state_weighted_retained_share": 0.0514
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2353,
+     "state_weighted": 0.235,
+     "successes": 47,
+     "episodes": 200,
+     "route_macro_drop": 0.5382,
+     "route_macro_retained_share": 0.054,
+     "state_weighted_drop": 0.54,
+     "state_weighted_retained_share": 0.0506
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.3162,
+     "state_weighted": 0.32,
+     "successes": 64,
+     "episodes": 200,
+     "route_macro_drop": 0.4573,
+     "route_macro_retained_share": 0.1962,
+     "state_weighted_drop": 0.455,
+     "state_weighted_retained_share": 0.2001
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.2754,
+     "state_weighted": 0.27,
+     "successes": 54,
+     "episodes": 200,
+     "route_macro_drop": 0.4981,
+     "route_macro_retained_share": 0.1245,
+     "state_weighted_drop": 0.505,
+     "state_weighted_retained_share": 0.1122
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.2758,
+     "state_weighted": 0.27,
+     "successes": 54,
+     "episodes": 200,
+     "route_macro_drop": 0.4977,
+     "route_macro_retained_share": 0.1252,
+     "state_weighted_drop": 0.505,
+     "state_weighted_retained_share": 0.1122
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.3012,
+     "state_weighted": 0.305,
+     "successes": 61,
+     "episodes": 200,
+     "route_macro_drop": 0.4723,
+     "route_macro_retained_share": 0.1698,
+     "state_weighted_drop": 0.47,
+     "state_weighted_retained_share": 0.1737
+    }
+   ],
+   "per_room_imitation_holdout": {
+    "mixed_clone_after": {
+     "chapter-1-room-2": {
+      "frames": 2486,
+      "trajectories": 5,
+      "input_accuracy": 0.9566,
+      "frame_accuracy": 0.5495,
+      "always_zero_input_accuracy": 0.8931,
+      "always_zero_frame_accuracy": 0.0479,
+      "persistence_input_accuracy": 0.9806,
+      "persistence_frame_accuracy": 0.8648,
+      "inputs_per_frame": 2.25
+     },
+     "chapter-1-room-1": {
+      "frames": 699,
+      "trajectories": 2,
+      "input_accuracy": 0.967,
+      "frame_accuracy": 0.6295,
+      "always_zero_input_accuracy": 0.8984,
+      "always_zero_frame_accuracy": 0.0372,
+      "persistence_input_accuracy": 0.9804,
+      "persistence_frame_accuracy": 0.8655,
+      "inputs_per_frame": 2.13
+     }
+    },
+    "donor_before": {
+     "chapter-1-room-2": {
+      "frames": 2486,
+      "trajectories": 5,
+      "input_accuracy": 0.8986,
+      "frame_accuracy": 0.1521,
+      "always_zero_input_accuracy": 0.8931,
+      "always_zero_frame_accuracy": 0.0479,
+      "persistence_input_accuracy": 0.9806,
+      "persistence_frame_accuracy": 0.8648,
+      "inputs_per_frame": 2.25
+     },
+     "chapter-1-room-1": {
+      "frames": 699,
+      "trajectories": 2,
+      "input_accuracy": 0.9239,
+      "frame_accuracy": 0.3119,
+      "always_zero_input_accuracy": 0.8984,
+      "always_zero_frame_accuracy": 0.0372,
+      "persistence_input_accuracy": 0.9804,
+      "persistence_frame_accuracy": 0.8655,
+      "inputs_per_frame": 2.13
+     }
+    },
+    "retention_clone_room2_after": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9577,
+     "frame_accuracy": 0.5471,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    },
+    "train_frames": {
+     "chapter-1-room-2": 7309,
+     "chapter-1-room-1": 1989
+    }
+   },
+   "room2": {
+    "clone_clears_of_50": 10,
+    "final_clears_of_50": 50,
+    "training": {
+     "clear_per_100k": [
+      0.142,
+      0.408,
+      0.888,
+      0.906,
+      0.946
+     ],
+     "first_50k_window_at_half": 200000
+    },
+    "retention_R_k_training": {
+     "clear_per_100k": [
+      0.188,
+      0.57,
+      0.865,
+      0.92,
+      0.935
+     ],
+     "first_50k_window_at_half": 200000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "M-k": [
+     0.729,
+     0.737,
+     0.537,
+     0.753,
+     0.557,
+     0.554,
+     0.531,
+     0.703,
+     0.575,
+     0.753
+    ],
+    "R-k": [
+     0.302,
+     0.507,
+     0.681,
+     0.804,
+     0.49,
+     0.443,
+     0.656,
+     0.508,
+     0.516,
+     0.519
+    ]
+   }
+  },
+  "M-k3": {
+   "donor_seed": 6,
+   "room1_before": {
+    "route_macro": 0.6593,
+    "state_weighted": 0.66
+   },
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.2183,
+     "state_weighted": 0.215,
+     "successes": 43,
+     "route_macro_retained_share": 0.1475,
+     "state_weighted_retained_share": 0.1401
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2197,
+     "state_weighted": 0.22,
+     "successes": 44,
+     "route_macro_retained_share": 0.0332,
+     "state_weighted_retained_share": 0.0304
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.1723,
+     "state_weighted": 0.175,
+     "successes": 35,
+     "route_macro_retained_share": -0.071,
+     "state_weighted_retained_share": -0.0688
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1314,
+     "state_weighted": 0.125,
+     "successes": 25,
+     "route_macro_retained_share": -0.161,
+     "state_weighted_retained_share": -0.1789
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.1243,
+     "state_weighted": 0.12,
+     "successes": 24,
+     "route_macro_retained_share": -0.1766,
+     "state_weighted_retained_share": -0.19
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.1202,
+     "state_weighted": 0.115,
+     "successes": 23,
+     "route_macro_retained_share": -0.1856,
+     "state_weighted_retained_share": -0.201
+    }
+   ],
+   "retention_R_k_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.166,
+     "state_weighted": 0.165,
+     "successes": 33,
+     "episodes": 200,
+     "route_macro_drop": 0.4933,
+     "route_macro_retained_share": 0.0464,
+     "state_weighted_drop": 0.495,
+     "state_weighted_retained_share": 0.0435
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.2466,
+     "state_weighted": 0.255,
+     "successes": 51,
+     "episodes": 200,
+     "route_macro_drop": 0.4127,
+     "route_macro_retained_share": 0.0924,
+     "state_weighted_drop": 0.405,
+     "state_weighted_retained_share": 0.1075
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.3071,
+     "state_weighted": 0.305,
+     "successes": 61,
+     "episodes": 200,
+     "route_macro_drop": 0.3522,
+     "route_macro_retained_share": 0.2254,
+     "state_weighted_drop": 0.355,
+     "state_weighted_retained_share": 0.2177
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.2826,
+     "state_weighted": 0.275,
+     "successes": 55,
+     "episodes": 200,
+     "route_macro_drop": 0.3767,
+     "route_macro_retained_share": 0.1715,
+     "state_weighted_drop": 0.385,
+     "state_weighted_retained_share": 0.1516
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.3309,
+     "state_weighted": 0.325,
+     "successes": 65,
+     "episodes": 200,
+     "route_macro_drop": 0.3284,
+     "route_macro_retained_share": 0.2778,
+     "state_weighted_drop": 0.335,
+     "state_weighted_retained_share": 0.2618
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.3105,
+     "state_weighted": 0.315,
+     "successes": 63,
+     "episodes": 200,
+     "route_macro_drop": 0.3488,
+     "route_macro_retained_share": 0.2329,
+     "state_weighted_drop": 0.345,
+     "state_weighted_retained_share": 0.2398
+    }
+   ],
+   "per_room_imitation_holdout": {
+    "mixed_clone_after": {
+     "chapter-1-room-2": {
+      "frames": 2351,
+      "trajectories": 5,
+      "input_accuracy": 0.9614,
+      "frame_accuracy": 0.5721,
+      "always_zero_input_accuracy": 0.8956,
+      "always_zero_frame_accuracy": 0.0659,
+      "persistence_input_accuracy": 0.981,
+      "persistence_frame_accuracy": 0.8626,
+      "inputs_per_frame": 2.19
+     },
+     "chapter-1-room-1": {
+      "frames": 699,
+      "trajectories": 2,
+      "input_accuracy": 0.9702,
+      "frame_accuracy": 0.671,
+      "always_zero_input_accuracy": 0.8984,
+      "always_zero_frame_accuracy": 0.0372,
+      "persistence_input_accuracy": 0.9804,
+      "persistence_frame_accuracy": 0.8655,
+      "inputs_per_frame": 2.13
+     }
+    },
+    "donor_before": {
+     "chapter-1-room-2": {
+      "frames": 2351,
+      "trajectories": 5,
+      "input_accuracy": 0.9103,
+      "frame_accuracy": 0.2339,
+      "always_zero_input_accuracy": 0.8956,
+      "always_zero_frame_accuracy": 0.0659,
+      "persistence_input_accuracy": 0.981,
+      "persistence_frame_accuracy": 0.8626,
+      "inputs_per_frame": 2.19
+     },
+     "chapter-1-room-1": {
+      "frames": 699,
+      "trajectories": 2,
+      "input_accuracy": 0.9286,
+      "frame_accuracy": 0.3047,
+      "always_zero_input_accuracy": 0.8984,
+      "always_zero_frame_accuracy": 0.0372,
+      "persistence_input_accuracy": 0.9804,
+      "persistence_frame_accuracy": 0.8655,
+      "inputs_per_frame": 2.13
+     }
+    },
+    "retention_clone_room2_after": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9592,
+     "frame_accuracy": 0.5593,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    },
+    "train_frames": {
+     "chapter-1-room-2": 7444,
+     "chapter-1-room-1": 1989
+    }
+   },
+   "room2": {
+    "clone_clears_of_50": 14,
+    "final_clears_of_50": 48,
+    "training": {
+     "clear_per_100k": [
+      0.177,
+      0.658,
+      0.932,
+      0.952,
+      0.914
+     ],
+     "first_50k_window_at_half": 150000
+    },
+    "retention_R_k_training": {
+     "clear_per_100k": [
+      0.282,
+      0.75,
+      0.886,
+      0.922,
+      0.939
+     ],
+     "first_50k_window_at_half": 150000
+    }
+   },
+   "explained_variance_first_10_updates": {
+    "M-k": [
+     0.083,
+     0.55,
+     0.417,
+     0.47,
+     0.426,
+     0.509,
+     0.533,
+     0.765,
+     0.61,
+     0.773
+    ],
+    "R-k": [
+     0.092,
+     0.558,
+     0.593,
+     0.648,
+     0.597,
+     0.598,
+     0.681,
+     0.678,
+     0.681,
+     0.629
+    ]
+   }
+  }
+ }
+}
