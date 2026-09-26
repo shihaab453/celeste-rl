@@ -68,3 +68,43 @@ cleared 46 to 50 of 50 episodes from the Room 2 start, against 39 to 48 for the 
 The per-checkpoint numbers, the floor for every run and the input hashes are in
 [`docs/results/retention-pilot.json`](results/retention-pilot.json), written by
 `scripts/analyze_retention_pilot.py`.
+
+## Second pilot: mixing the Room 1 demonstrations back in
+
+Also descriptive, four runs, one recipe, declared before any data (`config/mixed-imitation-pilot.json`).
+
+The same four starting policies, seeds and settings, with one change: the imitation step used the Room 1 and Room 2
+demonstrations together, each room counting equally in the loss. The plan also added a reference: clones fitted on
+the Room 1 demonstrations alone, from fresh weights, scored on the same Room 1 test. It fixed in advance how each
+outcome would be read.
+
+| Starting policy | Before | After mixed imitation | 100k | 200k | 300k | 400k | 500k |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Seed 3 | 76% | 17% | 24% | 11% | 12% | 21% | 11% |
+| Seed 4 | 77% | 14% | 22% | 30% | 25% | 22% | 13% |
+| Seed 5 | 77% | 21% | 25% | 20% | 16% | 18% | 14% |
+| Seed 6 | 66% | 22% | 22% | 17% | 13% | 12% | 12% |
+| Floor: never saw Room 1 | | 10% to 17% | | | | | 12% to 30% |
+| Room 1 demonstrations only | | 10% to 15% | | | | | |
+
+**Mixing the demonstrations back in did not keep the Room 1 skill.** After mixed imitation, Room 1 success was
+between 14% and 22%, and between 11% and 14% after fine-tuning on Room 2. The reason shows in the reference: clones
+fitted on the Room 1 demonstrations alone scored only 10% to 15% on the Room 1 test, no better than policies that
+never saw Room 1. So the demonstrations teach almost nothing that carries over to the Room 1 test states. The
+starting policies' 66% to 77% came from their own reinforcement learning, and re-imitating the demonstrations cannot
+bring that back. By the rule fixed in advance, the next recipe should instead use the starting policy's own play as
+the imitation target.
+
+Fitting the demonstrations was not the problem. The mixed clones matched the held-back Room 2 routes as well as
+Room 2-only clones did, and matched the held-back Room 1 routes better than the Room 1-only reference clones did (51%
+to 69% of whole frames against 33% to 40%), yet they still scored near the floor on the Room 1 test. They also still
+learned Room 2: their final checkpoints cleared 48 to 50 of 50 episodes from the Room 2 start (training side).
+
+Limits: as for the first pilot. In addition, the floor was reused from the first pilot (the same checkpoints and
+command, with the evaluation code unchanged), and balanced mixing also changed the Room 2 side of the imitation step
+(half the loss weight, about 26% more frames per epoch), so Room 2 differences between the pilots cannot be put down
+to Room 1 being present.
+
+The numbers, the reference clones and the input hashes are in
+[`docs/results/mixed-imitation-pilot.json`](results/mixed-imitation-pilot.json), written by
+`scripts/analyze_mixed_imitation_pilot.py`.
