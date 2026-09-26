@@ -1,0 +1,831 @@
+{
+  "name": "mixed-imitation-pilot-eval-v1",
+  "written": "2026-09-26T02:14:35+01:00",
+  "pilot_plan": "config/mixed-imitation-pilot.json",
+  "pilot_plan_sha256": "4754b546d9ced2eac12ca1b4fe30dabc523e672fe6592c37bced58ae5f170ea1",
+  "training_plan": "config/campaign-mixed-imitation-pilot-train.json",
+  "training_plan_sha256": "450c4140952be5420e3940bb63de17f39cf4c432f4a86c7c62cba8f07ad6cdee",
+  "training_campaign": "runs/campaign/20260925-235957-mixed-imitation-pilot-train-v1/summary.json",
+  "training_campaign_sha256": "d3c62c84d56ba9e431fd85d0412ff92f9709e928b6240cbf2f94c9ec86b036a0",
+  "training_commit": "3b78848bbb5ac703b22564f424718be23dd1b079",
+  "clones": {
+    "0": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-222804",
+      "sha256": "0ba2f09dedb6f5c947facf3929a7701d6fa90c7d997befd0072f8f59bcdfcd06",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7520,
+        "chapter-1-room-1": 1948
+      }
+    },
+    "1": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-224921",
+      "sha256": "2fdac4783dc5cab7b78566da9939f76459a6ff0810541fea4943c034be034bb8",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7384,
+        "chapter-1-room-1": 2056
+      }
+    },
+    "2": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-230604",
+      "sha256": "7e20aa98935f1cbe45765702d66635bd8c5cdbb0fd284b750f2cf45417a367d3",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7309,
+        "chapter-1-room-1": 1989
+      }
+    },
+    "3": {
+      "dir": "runs/clone/chapter-1-room-2/20260925-232320",
+      "sha256": "13bc4fef36b5af67a5e9d3a5dd788a00ff39604ad313dff48846dc25406ac0a8",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "train_frames": {
+        "chapter-1-room-2": 7444,
+        "chapter-1-room-1": 1989
+      }
+    }
+  },
+  "imitation_only_references": {
+    "0": {
+      "dir": "runs/clone/20260918-183508",
+      "sha256": "541e58f6492196183475cd0a48ed7315c5be2754825640f08a21a5f7b2ae76d5",
+      "note": "the original Room 1 clone"
+    },
+    "1": {
+      "dir": "runs/clone/20260925-234049",
+      "sha256": "d5902a82b8de85b77b9ce5efadd3536d0eb51404c810f4351c6f7a5f5877fb9d",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d"
+    },
+    "2": {
+      "dir": "runs/clone/20260925-234455",
+      "sha256": "2b15bc647b927afbf1bb4ffcb1a6bf80c28d7456f76e5ab2bcd3606054e14ad8",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d"
+    },
+    "3": {
+      "dir": "runs/clone/20260925-234844",
+      "sha256": "c5227636faab3427a1c0681cc3afcc5cb6716edff640a451af95d46aa7c82d54",
+      "commit": "fab033139acdfc84b542adf1dd0779d6de2cc15d"
+    }
+  },
+  "floor": "reused from the retention pilot (docs/results/retention-pilot.json), as declared",
+  "label": "descriptive mixed-imitation pilot evaluations; Room 1 aggregates only; the Room 2 v2 set is never read",
+  "runs": [
+    {
+      "id": "room1-M-k0-clone",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip",
+      "checkpoint_sha256": "0ba2f09dedb6f5c947facf3929a7701d6fa90c7d997befd0072f8f59bcdfcd06",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k0-step_000100352",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "2fe1ad93c5cf147089cee0318c9dc9f45e4afdb50a5cc85aeb1ebc0b80007bd9",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k0-step_000200704",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "3fc511cd899010d1e00b5beaf57053b947722706cada4f68bb8568b6c20161d0",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k0-step_000301056",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "8c026abd161c47a448829a2f2f5e5402302954fc973725e37d4ebb94b219066a",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k0-step_000401408",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "b85cc029f5d220340bd8daf95cbc677bc7f3200b5c3ac2ca36dbdf953d8dfef1",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k0-step_000501760",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "599bbd26f1a7a091c8ea7ee69609809ac301e14ef50bb6579443e7d33d5668d8",
+      "run_dir": "runs/evaluation/_planned-room1-M-k0-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-M-k0-clone",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip",
+      "checkpoint_sha256": "0ba2f09dedb6f5c947facf3929a7701d6fa90c7d997befd0072f8f59bcdfcd06",
+      "run_dir": "runs/evaluation/_planned-room2-M-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-222804/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-M-k0-final",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k0/checkpoints/latest.zip",
+      "checkpoint_sha256": "599bbd26f1a7a091c8ea7ee69609809ac301e14ef50bb6579443e7d33d5668d8",
+      "run_dir": "runs/evaluation/_planned-room2-M-k0-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-M-k1-clone",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip",
+      "checkpoint_sha256": "2fdac4783dc5cab7b78566da9939f76459a6ff0810541fea4943c034be034bb8",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k1-step_000100352",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "dd7c7c5e4d7763f61f4d10f75207b4619f072df36a995fee4796304e8d48ebe8",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k1-step_000200704",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "2f294d5eed06f8c2e3caf90b3caacc2eabc9b11d84f9644cd08492b41a6b61dc",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k1-step_000301056",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "30758016b41e5128768650080dd9ce78086360b7e31d32a5790cbebead45891f",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k1-step_000401408",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "6d04d89e8df556977723031237e1f5f9367213ab5fc63113f08df68f5986ca82",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k1-step_000501760",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "c91129e8132009c27cd01ecca3063b46e833aafdfef385248cf942a6ddfb1f3c",
+      "run_dir": "runs/evaluation/_planned-room1-M-k1-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-M-k1-clone",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip",
+      "checkpoint_sha256": "2fdac4783dc5cab7b78566da9939f76459a6ff0810541fea4943c034be034bb8",
+      "run_dir": "runs/evaluation/_planned-room2-M-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-224921/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-M-k1-final",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k1/checkpoints/latest.zip",
+      "checkpoint_sha256": "c91129e8132009c27cd01ecca3063b46e833aafdfef385248cf942a6ddfb1f3c",
+      "run_dir": "runs/evaluation/_planned-room2-M-k1-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-M-k2-clone",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip",
+      "checkpoint_sha256": "7e20aa98935f1cbe45765702d66635bd8c5cdbb0fd284b750f2cf45417a367d3",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k2-step_000100352",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "345bd39a57c59d09319147a901afc6e3f5ced822da620a4879af259b6af198a4",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k2-step_000200704",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "6352804b61571f51cc87b8b15c3445291aa49cd2e2feaa3a0600833b55e7c934",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k2-step_000301056",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "753ef6c9a488f15a8acc5ab287b48b2c5ac1874d2f9529ab78671d207bf22ad6",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k2-step_000401408",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "a7aeeb607e9dace502e738266747ba7016734c9b1017646c171c31be73531963",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k2-step_000501760",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "38a8f7edd282dccd4316c9f48c65344ee86e6edaee30da5e44aa3d5d05cfc964",
+      "run_dir": "runs/evaluation/_planned-room1-M-k2-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-M-k2-clone",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip",
+      "checkpoint_sha256": "7e20aa98935f1cbe45765702d66635bd8c5cdbb0fd284b750f2cf45417a367d3",
+      "run_dir": "runs/evaluation/_planned-room2-M-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-230604/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-M-k2-final",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k2/checkpoints/latest.zip",
+      "checkpoint_sha256": "38a8f7edd282dccd4316c9f48c65344ee86e6edaee30da5e44aa3d5d05cfc964",
+      "run_dir": "runs/evaluation/_planned-room2-M-k2-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "room1-M-k3-clone",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip",
+      "checkpoint_sha256": "13bc4fef36b5af67a5e9d3a5dd788a00ff39604ad313dff48846dc25406ac0a8",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k3-step_000100352",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000100352.zip",
+      "checkpoint_sha256": "e28410d96a2a58e317c7dd6d34637b91c1d267246e1e9dcdf7e5a89b1d084684",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-step_000100352",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000100352.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k3-step_000200704",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000200704.zip",
+      "checkpoint_sha256": "96c7f0dc576e70886161937bc2c882a2a000c47db6435260055c837431b50ced",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-step_000200704",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000200704.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k3-step_000301056",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000301056.zip",
+      "checkpoint_sha256": "65259349bda172b9ac03e11c77cb1fd30d60b767bfbf3d7548145b4924de3647",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-step_000301056",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000301056.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k3-step_000401408",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000401408.zip",
+      "checkpoint_sha256": "487f59f4969ffeaa2d93177ece7b9f2a9d240ac363d11f53594ab2cb878f3b11",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-step_000401408",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000401408.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room1-M-k3-step_000501760",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000501760.zip",
+      "checkpoint_sha256": "5c883b68a86bab5b49b41eb4699ea336adb6b798be8b6ac5a81dec9b3aae1c27",
+      "run_dir": "runs/evaluation/_planned-room1-M-k3-step_000501760",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000501760.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-M-k3-clone",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip",
+      "checkpoint_sha256": "13bc4fef36b5af67a5e9d3a5dd788a00ff39604ad313dff48846dc25406ac0a8",
+      "run_dir": "runs/evaluation/_planned-room2-M-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260925-232320/cloned.zip"
+      ]
+    },
+    {
+      "id": "room2-M-k3-final",
+      "stage": "mixed-imitation-pilot-room2",
+      "checkpoint": "runs/train/mixed-imitation-pilot-M-k3/checkpoints/latest.zip",
+      "checkpoint_sha256": "5c883b68a86bab5b49b41eb4699ea336adb6b798be8b6ac5a81dec9b3aae1c27",
+      "run_dir": "runs/evaluation/_planned-room2-M-k3-final",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/latest.zip"
+      ]
+    },
+    {
+      "id": "reference-room1-only-seed0",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/20260918-183508/cloned.zip",
+      "checkpoint_sha256": "541e58f6492196183475cd0a48ed7315c5be2754825640f08a21a5f7b2ae76d5",
+      "run_dir": "runs/evaluation/_planned-reference-room1-only-seed0",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/20260918-183508/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "reference-room1-only-seed1",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/20260925-234049/cloned.zip",
+      "checkpoint_sha256": "d5902a82b8de85b77b9ce5efadd3536d0eb51404c810f4351c6f7a5f5877fb9d",
+      "run_dir": "runs/evaluation/_planned-reference-room1-only-seed1",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/20260925-234049/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "reference-room1-only-seed2",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/20260925-234455/cloned.zip",
+      "checkpoint_sha256": "2b15bc647b927afbf1bb4ffcb1a6bf80c28d7456f76e5ab2bcd3606054e14ad8",
+      "run_dir": "runs/evaluation/_planned-reference-room1-only-seed2",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/20260925-234455/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "reference-room1-only-seed3",
+      "stage": "mixed-imitation-pilot-room1",
+      "checkpoint": "runs/clone/20260925-234844/cloned.zip",
+      "checkpoint_sha256": "c5227636faab3427a1c0681cc3afcc5cb6716edff640a451af95d46aa7c82d54",
+      "run_dir": "runs/evaluation/_planned-reference-room1-only-seed3",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/20260925-234844/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    }
+  ]
+}
