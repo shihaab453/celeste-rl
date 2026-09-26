@@ -1,0 +1,36 @@
+{
+  "name": "heldout-room1-v2-procedure",
+  "written": "2026-09-26",
+  "status": "Procedure only; nothing generated. Reviewed by the orchestrator 2026-09-26 (sound, with the edits applied here). Generation needs the owner's approval.",
+  "why": "The Room 1 held-out set (config/heldout_starts.json, sha256 54d62e86...) carries the published Phase 3B result and has now been used for two descriptive retention pilots (aggregates only). The orchestrator asked for a fresh Room 1 set before any confirmatory retention experiment, so nothing the pilots saw can shape the confirmatory measure. The procedure is fixed before any such experiment is designed.",
+  "task": "chapter-1-room-1, the original Room 1 task (no --task-definition)",
+  "original_set_as_found": {
+    "output": "config/heldout_starts.json, generated 2026-09-20T00:32:09 at 235df9b, 200 states, 11 routes (runs/heldout-routes/20260920-001246 to -002044), task frames 20 to 404",
+    "seeds": "route.json seeds 100 to 110 in runs/heldout-routes; the folder runs/heldout-routes/20260920-002108 holds only episode.tas (a search that started and left no route, probably seed 111), so 111 counts as tried",
+    "other_room1_namespaces": "runs/routes holds the 7 demonstration routes (seeds 0 to 6) and seeds 100 to 104 from 2026-09-19 01:25 to 01:31: the routes of the retired first held-out set, which its generator wrote into the demonstration folder (caught before any training used them; the set was replaced on 2026-09-20). Checked 2026-09-26: each is action-for-action identical to the same seed's route in runs/heldout-routes, so --exclude-heldout config/heldout_starts.json already excludes them."
+  },
+  "procedure": {
+    "route_namespace": "runs/heldout-routes-v2 (new, empty; never runs/heldout-routes or runs/routes; the name contains 'heldout', so evaluate_checkpoint.py's input guard refuses it)",
+    "output": "config/heldout_starts-room1-v2.json (must not exist beforehand)",
+    "command": "scripts/make_heldout_starts.py --demonstrations config/demonstrations.json --exclude-heldout config/heldout_starts.json --routes-dir runs/heldout-routes-v2 --output config/heldout_starts-room1-v2.json --first-seed 128 --searches 11 --min-routes 11 --states 200 --earliest 20 --spacing 12 --search-minutes 10",
+    "seed_rule": "--first-seed 128, above every seed used in any namespace of either room (Room 1: 0 to 6, 100 to 111; Room 2: up to 127), so no seed can be ambiguous; a seed counts as tried once its search process starts (the attempt records under runs/heldout-routes-v2/_attempts make this automatic), and a tried seed is never retried",
+    "stuck_route_rule": "as in the Room 2 v2 procedure: if a guard rejects a route, search the missing routes with new seeds, then build with --routes <accepted directories> --searches 0, and record the excluded route and the reason; never delete a route folder"
+  },
+  "validation": [
+    "every selected state replays exactly (make_heldout_starts.validate)",
+    "11 unique full-route hashes",
+    "zero overlap with the 7 Room 1 demonstration routes (existing guard)",
+    "zero overlap with the 11 routes of config/heldout_starts.json (--exclude-heldout, G1)",
+    "the manifest validates with celeste_rl.heldout.validate_manifest and carries the Room 1 task identity"
+  ],
+  "descriptive_after_generation": "Optional, descriptive only, never a refusal: one aggregate count of new states that share (task frame, position, dashes) with any state of config/heldout_starts.json or any demonstration state. Early states near the room entrance are expected to coincide. Also, descriptively, that no new route's action trace matches any route.json in runs/routes or runs/heldout-routes (expected by construction: the demonstration guard, --exclude-heldout and fresh seeds).",
+  "protections": [
+    "No policy is evaluated on the new set until a new experiment's plan pins its path and sha256.",
+    "The new file is committed on its own immediately after generation, with every seed tried and its outcome in the commit message.",
+    "A launch-only readiness check (Steam fully started) runs before generation, as after the Room 2 v2 attempt 1."
+  ],
+  "estimated_run_time": "About 20 to 40 minutes if every seed finds a route quickly (the original: 11 routes in about 20 minutes); up to about 2 hours if searches run their full 10-minute budget.",
+  "remeasure_rule": "Every value a later experiment compares against (donor 'before' values, the floor, the imitation-only reference) must be re-measured on the new set before a confirmatory experiment; the pilot numbers measured on config/heldout_starts.json cannot be carried over.",
+  "route_count_decision": "11 routes and 200 states, matching the original set (orchestrator review 2026-09-26).",
+  "room2_routes": "Not excluded: a different task identity, so no Room 2 route can repeat a Room 1 route."
+}
