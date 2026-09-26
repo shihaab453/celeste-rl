@@ -1,0 +1,210 @@
+{
+ "label": "descriptive pilot; Room 1 only; no confirmatory claim; the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "4c65852ca5ba76f37cc579fc019ba2fd7c40c446e5dc675a3cc7c59395c4c45c",
+ "evaluation_plan_sha256": "fbdde17a909d2dc1336f103905380e82ae14f27d2939d9cd1adc2d61f6ac24cf",
+ "evaluation_commit": "0b21face0a57bc639d7778e8cdefbdeca02925d0",
+ "clone_floor": 0.142,
+ "imitation_only_reference": 0.1216,
+ "students": {
+  "room1-S-demo-k0": {
+   "donor_seed": 3,
+   "route_macro": 0.6408,
+   "state_weighted": 0.63,
+   "retained_share": 0.8015,
+   "donor_before": 0.7643,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 1948,
+     "trajectories": 5,
+     "input_agreement": 0.9917,
+     "frame_agreement": 0.8511,
+     "mean_abs_probability_difference": 0.0085
+    },
+    "held_out": {
+     "frames": 740,
+     "trajectories": 2,
+     "input_agreement": 0.9118,
+     "frame_agreement": 0.3054,
+     "mean_abs_probability_difference": 0.0911
+    }
+   }
+  },
+  "room1-S-play-k0": {
+   "donor_seed": 3,
+   "route_macro": 0.6922,
+   "state_weighted": 0.685,
+   "retained_share": 0.8841,
+   "donor_before": 0.7643,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 4472,
+     "trajectories": 19,
+     "input_agreement": 0.994,
+     "frame_agreement": 0.8915,
+     "mean_abs_probability_difference": 0.0064
+    },
+    "held_out": {
+     "frames": 804,
+     "trajectories": 6,
+     "input_agreement": 0.9425,
+     "frame_agreement": 0.5224,
+     "mean_abs_probability_difference": 0.055
+    }
+   }
+  },
+  "room1-S-demo-k1": {
+   "donor_seed": 4,
+   "route_macro": 0.5956,
+   "state_weighted": 0.61,
+   "retained_share": 0.7233,
+   "donor_before": 0.7691,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 2056,
+     "trajectories": 5,
+     "input_agreement": 0.9976,
+     "frame_agreement": 0.9514,
+     "mean_abs_probability_difference": 0.0035
+    },
+    "held_out": {
+     "frames": 632,
+     "trajectories": 2,
+     "input_agreement": 0.9558,
+     "frame_agreement": 0.4415,
+     "mean_abs_probability_difference": 0.0487
+    }
+   }
+  },
+  "room1-S-play-k1": {
+   "donor_seed": 4,
+   "route_macro": 0.7353,
+   "state_weighted": 0.73,
+   "retained_share": 0.9461,
+   "donor_before": 0.7691,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 8619,
+     "trajectories": 19,
+     "input_agreement": 0.9989,
+     "frame_agreement": 0.9783,
+     "mean_abs_probability_difference": 0.0016
+    },
+    "held_out": {
+     "frames": 2047,
+     "trajectories": 6,
+     "input_agreement": 0.9934,
+     "frame_agreement": 0.8818,
+     "mean_abs_probability_difference": 0.0075
+    }
+   }
+  },
+  "room1-S-demo-k2": {
+   "donor_seed": 5,
+   "route_macro": 0.6956,
+   "state_weighted": 0.675,
+   "retained_share": 0.8766,
+   "donor_before": 0.7735,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 1989,
+     "trajectories": 5,
+     "input_agreement": 0.9966,
+     "frame_agreement": 0.9397,
+     "mean_abs_probability_difference": 0.0042
+    },
+    "held_out": {
+     "frames": 699,
+     "trajectories": 2,
+     "input_agreement": 0.941,
+     "frame_agreement": 0.3805,
+     "mean_abs_probability_difference": 0.0671
+    }
+   }
+  },
+  "room1-S-play-k2": {
+   "donor_seed": 5,
+   "route_macro": 0.832,
+   "state_weighted": 0.825,
+   "retained_share": 1.0926,
+   "donor_before": 0.7735,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 4307,
+     "trajectories": 19,
+     "input_agreement": 0.997,
+     "frame_agreement": 0.9468,
+     "mean_abs_probability_difference": 0.0041
+    },
+    "held_out": {
+     "frames": 1413,
+     "trajectories": 6,
+     "input_agreement": 0.973,
+     "frame_agreement": 0.7212,
+     "mean_abs_probability_difference": 0.0271
+    }
+   }
+  },
+  "room1-S-demo-k3": {
+   "donor_seed": 6,
+   "route_macro": 0.5004,
+   "state_weighted": 0.5,
+   "retained_share": 0.6928,
+   "donor_before": 0.6593,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 1989,
+     "trajectories": 5,
+     "input_agreement": 0.9962,
+     "frame_agreement": 0.9261,
+     "mean_abs_probability_difference": 0.0054
+    },
+    "held_out": {
+     "frames": 699,
+     "trajectories": 2,
+     "input_agreement": 0.9423,
+     "frame_agreement": 0.3634,
+     "mean_abs_probability_difference": 0.0715
+    }
+   }
+  },
+  "room1-S-play-k3": {
+   "donor_seed": 6,
+   "route_macro": 0.5629,
+   "state_weighted": 0.57,
+   "retained_share": 0.8136,
+   "donor_before": 0.6593,
+   "open_loop_agreement": {
+    "fitted": {
+     "frames": 5863,
+     "trajectories": 19,
+     "input_agreement": 0.9985,
+     "frame_agreement": 0.9707,
+     "mean_abs_probability_difference": 0.0022
+    },
+    "held_out": {
+     "frames": 2008,
+     "trajectories": 6,
+     "input_agreement": 0.9678,
+     "frame_agreement": 0.6559,
+     "mean_abs_probability_difference": 0.0367
+    }
+   }
+  }
+ },
+ "decision": {
+  "branch": "P",
+  "median_s_play_retained_share": 0.9151,
+  "next": "a mixed self-distillation pilot on donor-play states, cloning stage first"
+ },
+ "descriptive": {
+  "s_play_beats_s_demo_by_more_than_10_points": "2 of 4",
+  "median_s_demo_retained_share": 0.7624,
+  "heldout_states_coinciding_with_a_recorded_state": {
+   "3": 0,
+   "4": 1,
+   "5": 0,
+   "6": 1
+  },
+  "heldout_states": 200
+ }
+}
