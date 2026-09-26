@@ -22,6 +22,7 @@ from celeste_rl.cloning import (
     accuracy,
     clone,
     combine,
+    distilled,
     equal_room_weights,
     split_by_trajectory,
 )
@@ -166,6 +167,40 @@ class MixedRoomTests(unittest.TestCase):
                   weights=weights)
             fits[name] = accuracy(model.policy, a)["input_accuracy"]
         self.assertGreater(fits["favour a"], fits["favour b"])
+
+
+class DistillationTests(unittest.TestCase):
+    """clone_room1.py --mix-targets donor: fit the starting policy's own outputs instead of the demonstrations."""
+
+    def setUp(self):
+        self.donor = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=7).policy
+        self.disabled = [ACTION_INPUTS.index(name) for name in MENU_INPUTS]
+
+    def test_targets_are_the_donor_probabilities_with_disabled_inputs_off(self):
+        data = demonstrations(2, 15)
+        soft = distilled(self.donor, data, self.disabled)
+        with th.no_grad():
+            expected = self.donor.get_distribution({k: th.as_tensor(v) for k, v in data.obs.items()}).distribution.probs
+        expected = expected.numpy()
+        expected[:, self.disabled] = 0
+        self.assertTrue(np.allclose(soft.targets, expected, atol=1e-6))
+        self.assertTrue(np.array_equal(soft.actions, (soft.targets >= 0.5).astype(soft.actions.dtype)))
+        self.assertTrue(np.array_equal(soft.obs["grid"], data.obs["grid"]))
+
+    def test_soft_targets_survive_split_and_combine(self):
+        soft = distilled(self.donor, demonstrations(4, 10), self.disabled)
+        train, holdout = split_by_trajectory(soft, holdout=0.25, seed=0)
+        self.assertEqual(len(train.targets), len(train))
+        combined, rooms = combine([demonstrations(2, 5, seed=9), train])
+        self.assertTrue(np.array_equal(combined.targets[:10], combined.actions[:10].astype(np.float32)))
+        self.assertTrue(np.allclose(combined.targets[10:], train.targets))
+
+    def test_cloning_on_soft_targets_moves_a_fresh_policy_toward_the_donor(self):
+        soft = distilled(self.donor, demonstrations(3, 40), self.disabled)
+        student = PPO(CelestePolicy, _spaces_env(), policy_kwargs=policy_kwargs(), device="cpu", seed=1).policy
+        before = accuracy(student, soft)["input_accuracy"]
+        clone(student, soft, None, epochs=30, batch_size=32, learning_rate=1e-3, seed=0)
+        self.assertGreater(accuracy(student, soft)["input_accuracy"], before)
 
 
 def _spaces_env():

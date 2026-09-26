@@ -43,6 +43,9 @@ class Demonstrations:
     actions: np.ndarray
     trajectory: np.ndarray
     provenance: list[dict] = field(default_factory=list)
+    # Optional soft targets (probabilities, one per input) that cloning fits instead of `actions`, for distilling
+    # another policy's own outputs; `actions` then holds that policy's most likely choice, for accuracy.
+    targets: np.ndarray | None = None
 
     def __len__(self) -> int:
         return len(self.actions)
@@ -54,7 +57,8 @@ class Demonstrations:
     def subset(self, wanted) -> "Demonstrations":
         mask = np.isin(self.trajectory, list(wanted))
         return Demonstrations({key: value[mask] for key, value in self.obs.items()}, self.actions[mask],
-                              self.trajectory[mask], self.provenance)
+                              self.trajectory[mask], self.provenance,
+                              None if self.targets is None else self.targets[mask])
 
     def inputs_per_frame(self) -> float:
         return float(self.actions.sum(axis=1).mean())
@@ -134,11 +138,34 @@ def combine(parts: list[Demonstrations]) -> tuple[Demonstrations, np.ndarray]:
     if any(part.trajectory.max() >= 100_000 for part in parts):
         raise ValueError("trajectory ids must stay below 100,000 to be offset per room")
     obs = {key: np.concatenate([part.obs[key] for part in parts]) for key in OBS_KEYS}
+    targets = None
+    if any(part.targets is not None for part in parts):  # hard actions are the targets of parts without soft ones
+        targets = np.concatenate([part.targets if part.targets is not None else part.actions.astype(np.float32)
+                                  for part in parts])
     combined = Demonstrations(obs, np.concatenate([part.actions for part in parts]),
                               np.concatenate([part.trajectory + offset for part, offset in zip(parts, offsets)]),
-                              [item for part in parts for item in part.provenance])
+                              [item for part in parts for item in part.provenance], targets)
     rooms = np.concatenate([np.full(len(part), index) for index, part in enumerate(parts)])
     return combined, rooms
+
+
+def distilled(policy, data: Demonstrations, disabled_columns: list[int], batch_size: int = 512) -> Demonstrations:
+    """The same observations with `policy`'s own action probabilities as soft targets (self-distillation).
+
+    Disabled inputs get probability 0, because the environment never applies them and demonstrations record them
+    as 0. `actions` becomes the policy's most likely choice (probability at least 0.5), so accuracy measures
+    agreement with it.
+    """
+    probabilities = []
+    policy.set_training_mode(False)
+    with th.no_grad():
+        for start in range(0, len(data), batch_size):
+            batch = {key: th.as_tensor(value[start:start + batch_size]) for key, value in data.obs.items()}
+            probabilities.append(policy.get_distribution(batch).distribution.probs.cpu().numpy())
+    targets = np.concatenate(probabilities).astype(np.float32)
+    targets[:, disabled_columns] = 0.0
+    return Demonstrations(data.obs, (targets >= 0.5).astype(data.actions.dtype), data.trajectory,
+                          data.provenance, targets)
 
 
 def equal_room_weights(rooms: np.ndarray) -> np.ndarray:
@@ -158,7 +185,7 @@ def clone(policy, train: Demonstrations, holdout: Demonstrations | None, epochs:
     th.manual_seed(seed)
     optimizer = th.optim.Adam(policy.parameters(), lr=learning_rate)
     observations = {key: th.as_tensor(value) for key, value in train.obs.items()}
-    targets = th.as_tensor(train.actions).float()
+    targets = th.as_tensor(train.targets if train.targets is not None else train.actions).float()
     if weights is not None and len(weights) != len(train):
         raise ValueError(f"{len(weights)} weights for {len(train)} training frames")
     frame_weights = None if weights is None else th.as_tensor(weights, dtype=th.float32)

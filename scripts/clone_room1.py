@@ -61,6 +61,7 @@ from celeste_rl.cloning import (  # noqa: E402
     accuracy,
     clone,
     combine,
+    distilled,
     equal_room_weights,
     split_by_trajectory,
 )
@@ -253,6 +254,9 @@ def main() -> int:
     parser.add_argument("--room-weighting", choices=("frames", "equal"), default="frames",
                         help="with --mix-room: 'frames' weights every frame alike; 'equal' gives each room the same "
                              "total weight in the loss")
+    parser.add_argument("--mix-targets", choices=("demonstrations", "donor"), default="demonstrations",
+                        help="with --mix-room: fit the mix room's demonstrated actions, or (donor, needs --init-from) "
+                             "the starting policy's own action probabilities on those observations (self-distillation)")
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--allow-runtime-mismatch", action="store_true")
     args = parser.parse_args()
@@ -276,6 +280,8 @@ def main() -> int:
         parser.error("--mix-room works only with --dataset (a refit), so both rooms' pairs are verified records")
     if args.room_weighting != "frames" and args.mix_room is None:
         parser.error("--room-weighting needs --mix-room")
+    if args.mix_targets == "donor" and (args.mix_room is None or args.init_from is None):
+        parser.error("--mix-targets donor needs --mix-room and --init-from (the donor whose outputs are distilled)")
 
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
@@ -374,6 +380,9 @@ def main() -> int:
         train, holdout = split_by_trajectory(data, args.holdout, args.seed)
         print(f"\n{len(data)} frames over {len(data.trajectories)} demonstrations: "
               f"{len(train.trajectories)} to train on, {len(holdout.trajectories)} held out")
+        # Built before mixing so --mix-targets donor can read the starting weights' own outputs; the splits use their
+        # own generators, so this order changes nothing else.
+        model = initial_model(args.seed, args.init_from)
         weights = rooms = None
         if mix is not None:
             # Each room is split on its own with the same seed, so the primary room holds back exactly the routes
@@ -382,15 +391,22 @@ def main() -> int:
             print(f"{len(mix_data)} {mix['identity']['name']} frames over {len(mix_data.trajectories)} "
                   f"demonstrations: {len(mix_train.trajectories)} to train on, "
                   f"{len(mix_holdout.trajectories)} held out")
+            if args.mix_targets == "donor":
+                # Self-distillation: the mix room's targets become the starting policy's own action probabilities
+                # on those observations, so cloning keeps what that policy does there rather than what the
+                # demonstrations did.
+                disabled = [ACTION_INPUTS.index(name) for name in MENU_INPUTS]
+                mix_train = distilled(model.policy, mix_train, disabled)
+                mix_holdout = distilled(model.policy, mix_holdout, disabled)
+                print(f"{mix['identity']['name']} targets: the starting policy's own action probabilities")
             rooms = {identity["name"]: (train, holdout), mix["identity"]["name"]: (mix_train, mix_holdout)}
             train, train_rooms = combine([train, mix_train])
             holdout, _ = combine([holdout, mix_holdout])
             if args.room_weighting == "equal":
                 weights = equal_room_weights(train_rooms)
-            results["mix"] = {"room_weighting": args.room_weighting, "rooms": list(rooms),
+            results["mix"] = {"room_weighting": args.room_weighting, "targets": args.mix_targets, "rooms": list(rooms),
                               "task": mix["identity"], "manifests": mix["record"],
                               "train_frames": {name: len(parts[0]) for name, parts in rooms.items()}}
-        model = initial_model(args.seed, args.init_from)
         if args.init_from is not None:
             results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256,
                                     "provenance": init_provenance}
