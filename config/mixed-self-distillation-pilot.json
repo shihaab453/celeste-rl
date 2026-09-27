@@ -1,7 +1,7 @@
 {
   "name": "mixed-self-distillation-pilot-v1",
   "written": "2026-09-27T19:30:00+01:00",
-  "status": "proposal, before any data; code and plan go to the orchestrator before any fit",
+  "status": "proposal; orchestrator GO for the 8 clones after the 2026-09-27 amendments below, before any fit",
   "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
   "question": "Does cloning a Room 1 policy on Room 2 demonstrations together with its own recorded Room 1 play, fitted to its own action probabilities (mixed self-distillation), keep its Room 1 held-out skill, where mixing in the Room 1 demonstrations did not (mixed-imitation pilot, branch B)? And does PPO on Room 2 afterwards wear that skill down?",
   "why": "The coverage-ceiling pilot (branch P, docs/results/coverage-ceiling-pilot.json) showed that a fresh network fitted to a donor's own probabilities on its recorded play plays Room 1 at a median 0.92 of the donor's margin over the floor, against 0.12 for copying the demonstrations on the same kind of states. The orchestrator's result review (2026-09-27) approved this as the next step: the same targets, now mixed with Room 2 learning from the donor's own weights.",
@@ -66,13 +66,14 @@
     "per_room_imitation": "held-back input and frame accuracy per room for each SD-k and D-k clone (recorded by clone_room1.py); Room 2 against M-k and R-k; Room 1 as agreement with the donor on its own held-back episodes",
     "weights": "the per-frame weight of each room under equal weighting, recorded per clone (results.json mix.per_frame_weight)",
     "secondary_room2": "Room 2 canonical clears of 50 for each SD-k and D-k clone and each SD-k final; training clear rate per 100k window and first 50k window at 50%, beside M-k and R-k",
-    "critic_record": "explained variance over the first 10 PPO updates for SD-k beside M-k"
+    "critic_record": "explained variance over the first 10 PPO updates for SD-k beside M-k",
+    "room2_headroom": "descriptive, added on the orchestrator's review: Room 2 v1 held-out success (config/heldout_starts-room2.json, 200 states, already published in the Room 2 matched fine-tuning result, so a development set, aggregates only) for each SD-k final, with the M-k and R-k finals as comparison, with the published Room 2 matched fine-tuning command: scripts/evaluate_heldout.py --task-definition config/room2.json --checkpoint <zip> --starts config/heldout_starts-room2.json --repeats 1 --seed 20260922 --reward-version rew-v2 --shaping-scale 2.0; about 12 evaluations. Canonical clears (46 to 50 of 50) are at their ceiling and cannot show a Room 2 loss. The Room 2 v2 set stays unread."
   },
   "aggregates_only": "The Room 1 held-out set already carries Phase 3B and the retention, mixed-imitation and coverage-ceiling pilots; it is treated as a development set and only aggregate success per checkpoint is reported, never per-route or per-state results. The fresh Room 1 v2 set comes before any claim beyond descriptive.",
   "decision_branches": {
-    "measure": "median Room 1 route-macro retained share of the four SD-k clones against the clone floor 0.142; later points against the final floor 0.205",
+    "measure": "median Room 1 route-macro retained share of the four SD-k clones against the clone floor 0.142; after PPO, each run's drop (clone - 500k) / (donor before - 0.142), in the clone-floor unit; final-floor (0.205) shares at the step checkpoints are reported descriptively only",
     "rules_in_order": [
-      "K (keeps): the median SD-k clone share is at least 0.5. Run the PPO stage. Then K-hold: the median share at 500k is within 0.25 of its after-cloning value, and the Room 2 finals clear at least 45 of 50 in at least 3 of 4 runs (M-k finals: 48 to 50); read as 'mixed self-distillation keeps the skill through Room 2 learning, for now', and the next step is the fresh Room 1 v2 set before any claim. K-decay: the median share at 500k is more than 0.25 below its after-cloning value; cloning-time anchoring is not enough, and the next step is an anchor inside PPO. K-cost: neither (Room 1 holds but fewer than 3 of 4 Room 2 finals clear 45 of 50); reported as a Room 2 cost, and the owner and the orchestrator choose.",
+      "K (keeps): the median SD-k clone share is at least 0.5. Run the PPO stage. Then, with each run's drop defined in one unit as (clone route-macro - 500k route-macro) / (donor before - 0.142): K-hold: the median of the four drops is at most 0.25, and the Room 2 finals clear at least 45 of 50 in at least 3 of 4 runs (M-k finals: 48 to 50); read as 'mixed self-distillation keeps the skill through Room 2 learning, for now', and the next step is the fresh Room 1 v2 set before any claim. K-decay: the median drop is more than 0.25; cloning-time anchoring is not enough, and the next step is an anchor inside PPO. K-cost: neither (the median drop is at most 0.25 but fewer than 3 of 4 Room 2 finals clear 45 of 50); reported as a Room 2 cost, and the owner and the orchestrator choose.",
       "Partial: the median SD-k clone share is from 0.2 to below 0.5. Room 2 imitation pulls the shared network away even with donor targets. Next: more Room 1 weight or fewer epochs; the owner and the orchestrator choose. No PPO stage.",
       "Lost: the median SD-k clone share is below 0.2. Next: a weight anchor or frozen layers; the owner and the orchestrator choose. No PPO stage."
     ],
@@ -87,7 +88,22 @@
     "Single checkpoints swing by a few points (about 3 points of sampling noise); describe patterns across the four runs."
   ],
   "evaluation_code_check": "before any evaluation, confirm that scripts/evaluate_heldout.py, scripts/evaluate_checkpoint.py and every celeste_rl module they import are unchanged since f26914d (the floor's evaluation commit); if anything changed, re-evaluate the floor in the same plan",
-  "generator_checks": "the training-plan generator selects exactly one SD-k clone per k by: donor sha256; seed k; a clean commit; 300 epochs; mix.room_weighting equal; mix.targets donor; mix.states donor play; mix.play.dataset_sha256 equal to that donor's recording above. Any smoke-test clone (fewer epochs) can never match. D-k clones are selected the same way with mix.states demonstrations and mix.targets donor, for the evaluation plan only.",
+  "generator_checks": "the training-plan generator selects exactly one SD-k clone per k by: donor sha256; seed k; a clean commit; 300 epochs; mix.room_weighting equal; mix.targets donor; mix.states donor play; mix.play.dataset_sha256 equal to that donor's recording above. Any smoke-test clone (fewer epochs) can never match. D-k clones are selected the same way with mix.states demonstrations and mix.targets donor, for the evaluation plan only. Never selectable, named explicitly: the smoke-test clone runs/clone/chapter-1-room-2/20260925-221717 and the two earlier proxy clones runs/clone/chapter-1-room-2/20260926-035006 (donor 3, seed 0, donor targets, a proxy D-k0) and runs/clone/chapter-1-room-2/20260926-033107 (its demonstration-target twin); both proxies predate mix.states, and the generator refuses them by path as well as by the missing field.",
   "later": "An anchor inside PPO (an extra loss keeping the policy's probabilities near the frozen donor's on recorded Room 1 frames) is designed in parallel, per the orchestrator's review, and reviewed on its own before any use.",
-  "cost": "No live recording. 4 SD-k and 4 D-k clones on CPU, about 15 to 25 minutes each (about 2.5 hours). If branch K: 4 fine-tuning runs, about 35 minutes each. Evaluations: 8 clones on Room 1 and Room 2 (about 25 minutes), plus 20 Room 1 checkpoint and 4 Room 2 final evaluations if K (about 50 minutes). About 3 hours without PPO, about 6 hours with it."
+  "cost": "No live recording. Clones on CPU: SD-k fit 12,000 to 16,100 frames per epoch, about 25 to 40 minutes each; D-k about 20 minutes each (M-k took 17 to 21 minutes at about 9,500 frames); about 3 to 4 hours for the 8. If branch K: 4 fine-tuning runs, about 35 minutes each. Evaluations: 8 clones on Room 1 and Room 2 (about 25 minutes), plus 20 Room 1 checkpoint and 4 Room 2 final evaluations and about 12 Room 2 v1 held-out evaluations if K (about 1.3 hours). About 4 to 5 hours without PPO, about 8 with it.",
+  "amendments": [
+    {
+      "date": "2026-09-27",
+      "before_any_pilot_data": true,
+      "reason": "orchestrator review of bfd5e79 (GO for the 8 clones after these amendments, no re-review needed): one unit for the PPO-stage drop, proxy clones named as never selectable, realistic clone cost; plus the suggested descriptive Room 2 measure with headroom",
+      "changed": [
+        "decision_branches.rules_in_order[0]",
+        "decision_branches.measure",
+        "generator_checks",
+        "measurements.room2_headroom",
+        "cost",
+        "status"
+      ]
+    }
+  ]
 }
