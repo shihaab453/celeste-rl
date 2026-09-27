@@ -6,6 +6,8 @@ Run from the repo root with the RL interpreter (Steam running, mod installed):
         --demonstrations config/demonstrations-room2.json --heldout config/heldout_starts-room2.json
     .venv-rl/Scripts/python.exe scripts/clone_room1.py --dataset runs/clone/<run>/dataset.npz   # refit, no game
     ... --init-from runs/train/<run>/checkpoints/latest.zip --init-from-sha256 <sha256>   # start from those weights
+    ... --dataset <room 2 dataset> --init-from <donor> --init-from-sha256 <sha256> \
+        --mix-play default runs/policy-play/chapter-1-room-1/<timestamp> --mix-targets donor   # donor's own play
 
 Both modes require the explicit demonstration and held-out manifests. A dataset refit also requires the
 `dataset.manifest.json` written beside it, and verifies all three hashes before fitting.
@@ -77,6 +79,7 @@ from celeste_rl.env import CelesteRoomEnv  # noqa: E402
 from celeste_rl.heldout import HeldoutManifestError, validate_manifest as validate_heldout_manifest  # noqa: E402
 from celeste_rl.lockstep import LockstepBridge  # noqa: E402
 from celeste_rl.observation import observation_space  # noqa: E402
+from celeste_rl.policy_play import verified_play  # noqa: E402
 from celeste_rl.schema import ACTION_INPUTS, MENU_INPUTS  # noqa: E402
 from celeste_rl.schema import FINGERPRINT as SCHEMA_FINGERPRINT  # noqa: E402
 from celeste_rl.tasks import (  # noqa: E402
@@ -251,9 +254,13 @@ def main() -> int:
                         metavar=("TASK_DEFINITION", "DEMONSTRATIONS", "HELDOUT", "DATASET"),
                         help="refit only: also fit this room's recorded pairs, verified against its own manifests "
                              "(use 'default' as TASK_DEFINITION for the original Room 1 task)")
+    parser.add_argument("--mix-play", nargs=2, type=Path, metavar=("TASK_DEFINITION", "RECORDING"),
+                        help="refit only, instead of --mix-room: the mix room's states come from the --init-from "
+                             "policy's own recorded play (record_policy_play.py), fitted to its own action "
+                             "probabilities; needs --mix-targets donor ('default' as TASK_DEFINITION for Room 1)")
     parser.add_argument("--room-weighting", choices=("frames", "equal"), default="frames",
-                        help="with --mix-room: 'frames' weights every frame alike; 'equal' gives each room the same "
-                             "total weight in the loss")
+                        help="with --mix-room or --mix-play: 'frames' weights every frame alike; 'equal' gives each "
+                             "room the same total weight in the loss")
     parser.add_argument("--mix-targets", choices=("demonstrations", "donor"), default="demonstrations",
                         help="with --mix-room: fit the mix room's demonstrated actions, or (donor, needs --init-from) "
                              "the starting policy's own action probabilities on those observations (self-distillation)")
@@ -276,12 +283,21 @@ def main() -> int:
         args.heldout = DEFAULT_HELDOUT
     if (args.init_from is None) != (args.init_from_sha256 is None):
         parser.error("--init-from and --init-from-sha256 go together")
-    if args.mix_room is not None and args.dataset is None:
-        parser.error("--mix-room works only with --dataset (a refit), so both rooms' pairs are verified records")
-    if args.room_weighting != "frames" and args.mix_room is None:
-        parser.error("--room-weighting needs --mix-room")
-    if args.mix_targets == "donor" and (args.mix_room is None or args.init_from is None):
-        parser.error("--mix-targets donor needs --mix-room and --init-from (the donor whose outputs are distilled)")
+    if args.mix_room is not None and args.mix_play is not None:
+        parser.error("--mix-room and --mix-play are alternatives: one mix room, from demonstrations or from play")
+    mixing = args.mix_room is not None or args.mix_play is not None
+    if mixing and args.dataset is None:
+        parser.error("--mix-room and --mix-play work only with --dataset (a refit), so both rooms' pairs are verified "
+                     "records")
+    if args.room_weighting != "frames" and not mixing:
+        parser.error("--room-weighting needs --mix-room or --mix-play")
+    if args.mix_targets == "donor" and (not mixing or args.init_from is None):
+        parser.error("--mix-targets donor needs --mix-room or --mix-play, and --init-from (the donor whose outputs "
+                     "are distilled)")
+    if args.mix_play is not None and args.mix_targets != "donor":
+        # The recorded actions are samples from stochastic play, never labels to fit as 0/1.
+        parser.error("--mix-play needs --mix-targets donor: recorded play is fitted to the donor's own probabilities, "
+                     "never to its sampled actions")
 
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
@@ -308,6 +324,13 @@ def main() -> int:
                               "demonstrations_file_sha256": hashlib.sha256(mix_demonstrations.read_bytes()).hexdigest(),
                               "heldout": str(mix_heldout), "heldout_sha256": mix_heldout_manifest["sha256"],
                               "heldout_file_sha256": hashlib.sha256(mix_heldout.read_bytes()).hexdigest()}}
+        elif args.mix_play is not None:
+            mix_task, recording = args.mix_play
+            mix_identity = task_identity(resolve_task_definition(None if str(mix_task) == "default" else mix_task))
+            if mix_identity == identity:
+                raise TaskDefinitionError("--mix-play names the same task as the main room")
+            # The recording is verified once the --init-from sha256 is confirmed, because it must name that donor.
+            mix = {"identity": mix_identity, "recording": recording}
     except (OSError, json.JSONDecodeError, DemonstrationManifestError, HeldoutManifestError,
             TaskDefinitionError) as error:
         print(f"Cannot establish demonstration/held-out separation: {error}")
@@ -325,6 +348,12 @@ def main() -> int:
             init_provenance = donor_provenance(args.init_from)
         except (OSError, KeyError, json.JSONDecodeError, ValueError) as error:
             print(f"Cannot use --init-from: {error}")
+            return 2
+    if args.mix_play is not None:
+        try:
+            mix["data"], mix["record"] = verified_play(mix["recording"], init_sha256, mix["identity"])
+        except (OSError, KeyError, json.JSONDecodeError, ValueError) as error:
+            print(f"Cannot use --mix-play: {error}")
             return 2
     output_root = REPO / "runs" / "clone"
     if args.task_definition:
@@ -352,7 +381,12 @@ def main() -> int:
                                            heldout_manifest, identity)
             results["provenance"] = [{"dataset": str(args.dataset), **audit}]
             print(f"Refitting {len(data)} frames from {args.dataset}")
-            if mix is not None:
+            if mix is not None and args.mix_play is not None:
+                mix_data = mix["data"]
+                results["provenance"].append(mix["record"])
+                print(f"Mixing in {len(mix_data)} frames of donor play from {mix['recording']} "
+                      f"({mix['identity']['name']})")
+            elif mix is not None:
                 mix_data, mix_audit = verified_dataset(mix["dataset"], mix["demonstrations_manifest"],
                                                        mix["demonstration_entries"], mix["heldout_manifest"],
                                                        mix["identity"])
@@ -389,7 +423,7 @@ def main() -> int:
             # it would hold back alone; then the parts are stacked with room-distinct trajectory ids.
             mix_train, mix_holdout = split_by_trajectory(mix_data, args.holdout, args.seed)
             print(f"{len(mix_data)} {mix['identity']['name']} frames over {len(mix_data.trajectories)} "
-                  f"demonstrations: {len(mix_train.trajectories)} to train on, "
+                  f"{'episodes' if args.mix_play else 'demonstrations'}: {len(mix_train.trajectories)} to train on, "
                   f"{len(mix_holdout.trajectories)} held out")
             if args.mix_targets == "donor":
                 # Self-distillation: the mix room's targets become the starting policy's own action probabilities
@@ -405,8 +439,13 @@ def main() -> int:
             if args.room_weighting == "equal":
                 weights = equal_room_weights(train_rooms)
             results["mix"] = {"room_weighting": args.room_weighting, "targets": args.mix_targets, "rooms": list(rooms),
-                              "task": mix["identity"], "manifests": mix["record"],
+                              "task": mix["identity"],
+                              "states": "donor play" if args.mix_play else "demonstrations",
+                              ("play" if args.mix_play else "manifests"): mix["record"],
                               "train_frames": {name: len(parts[0]) for name, parts in rooms.items()}}
+            if weights is not None:
+                results["mix"]["per_frame_weight"] = {name: round(float(weights[train_rooms == index][0]), 6)
+                                                      for index, name in enumerate(rooms)}
         if args.init_from is not None:
             results["init_from"] = {"path": args.init_from.as_posix(), "sha256": args.init_from_sha256,
                                     "provenance": init_provenance}

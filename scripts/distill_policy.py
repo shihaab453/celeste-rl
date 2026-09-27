@@ -37,10 +37,11 @@ from celeste_rl import runtime  # noqa: E402
 from celeste_rl.cloning import Demonstrations, clone, distilled, split_by_trajectory  # noqa: E402
 from celeste_rl.demonstrations import DemonstrationManifestError  # noqa: E402
 from celeste_rl.heldout import HeldoutManifestError  # noqa: E402
+from celeste_rl.policy_play import play_problems, verified_play  # noqa: F401,E402
 from celeste_rl.schema import ACTION_INPUTS, MENU_INPUTS  # noqa: E402
 from celeste_rl.tasks import TaskDefinitionError, resolve_task_definition, task_identity  # noqa: E402
 from celeste_rl.training.supervisor import SupervisedPPO  # noqa: E402
-from clone_room1 import initial_model, load, load_manifests, verified_dataset  # noqa: E402
+from clone_room1 import initial_model, load_manifests, verified_dataset  # noqa: E402
 
 DISABLED = [ACTION_INPUTS.index(name) for name in MENU_INPUTS]
 
@@ -59,20 +60,6 @@ def agreement(student, donor, data: Demonstrations) -> dict:
     return {"frames": len(data), "trajectories": int(len(data.trajectories)),
             "input_agreement": round(float(same.mean()), 4), "frame_agreement": round(float(same.all(1).mean()), 4),
             "mean_abs_probability_difference": round(float(np.abs(ps - pd).mean()), 4)}
-
-
-def play_problems(record: dict, dataset_sha256: str, donor_sha256: str, identity: dict) -> list[str]:
-    """Reasons a record_policy_play.py recording cannot be used as this donor's states (empty when it can)."""
-    problems = []
-    if record.get("checkpoint_sha256") != donor_sha256:
-        problems.append("the play was recorded from a different policy")
-    if record.get("dataset_sha256") != dataset_sha256:
-        problems.append("dataset.npz changed since it was recorded")
-    if record.get("task") != identity or record.get("uncommitted_changes") is not False:
-        problems.append("the play is for another task or was recorded from a dirty tree")
-    if record.get("attributable") is not True or record.get("runtime_problems"):
-        problems.append("the play is not attributable (recorded with runtime problems or an override)")
-    return problems
 
 
 def fit_student(donor_policy, data: Demonstrations, holdout: float, seed: int, epochs: int, batch_size: int,
@@ -125,14 +112,7 @@ def main() -> int:
         return 2
     try:
         if args.play is not None:
-            record = json.loads((args.play / "play.json").read_text(encoding="utf-8"))
-            dataset = args.play / "dataset.npz"
-            problems = play_problems(record, hashlib.sha256(dataset.read_bytes()).hexdigest(), donor_sha256, identity)
-            if problems:
-                raise ValueError("; ".join(problems))
-            data = load(dataset)
-            states = {"kind": "donor play", "play": args.play.as_posix(), "dataset_sha256": record["dataset_sha256"],
-                      "episodes": record["episodes"], "seed": record["seed"], "recorded_at": record["commit"]}
+            data, states = verified_play(args.play, donor_sha256, identity)
         else:
             demonstrations_manifest, entries, heldout_manifest = load_manifests(
                 args.demonstrations, args.heldout, args.routes_only, identity)
