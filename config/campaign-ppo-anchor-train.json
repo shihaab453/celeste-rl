@@ -5,6 +5,7 @@
   "pilot_plan_sha256": "fe0f9c53cf0025a32d969424791e1445b8ad21b7ff14e0b2c30dc919adf446a3",
   "control": "the SD-k PPO runs of config/campaign-mixed-self-distillation-train.json (not rerun)",
   "label": "training for the descriptive PPO anchor pilot; nothing reads a held-out set",
+  "amendment": "Amended 2026-09-28 (after the campaign was stopped on purpose at 21:16, campaign folder runs/campaign/20260928-194021-ppo-anchor-pilot-train-v1, when the laptop had to be switched off): the three runs that had started (A1-k0, A1-k1, A1-k2, each stopped right after saving step_000401408.zip) are marked \"resume\": true, so run_overnight.py continues them with --resume from their latest checkpoint and their anchor settings; the other nine runs had not started. Nothing else changed: same commands, seeds, limits and order. The plan sha256 before this amendment was 05ca1e8cb457c90391082a5003e5393632c0f7b173ec47ceda03be83e4175001. A resumed run is valid but not bit-identical to an uninterrupted one, and the analyzer reports it by name.",
   "runs": [
     {
       "id": "ppo-anchor-pilot-A1-k0",
@@ -17,6 +18,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k0",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k0/checkpoints/latest.zip",
       "resumable": true,
+      "resume": true,
       "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k0, seed 40",
       "command": [
@@ -66,6 +68,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k1",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k1/checkpoints/latest.zip",
       "resumable": true,
+      "resume": true,
       "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k1, seed 41",
       "command": [
@@ -115,6 +118,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k2",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k2/checkpoints/latest.zip",
       "resumable": true,
+      "resume": true,
       "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k2, seed 42",
       "command": [

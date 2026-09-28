@@ -157,6 +157,23 @@ class RunEntryTests(unittest.TestCase):
         self.assertEqual((record["threads_per_job"], record["available_memory_gb_at_start"]), (10, 8.0))
         self.assertEqual(record["game_copy"], "copy-2")
 
+    def test_a_resume_entry_starts_with_a_resume_and_is_recorded_as_one(self):
+        run, calls = self.fake([{"status": "ok", "seconds": 60}])
+        with mock.patch.object(run_overnight, "clear_game"):
+            record = run_overnight.run_entry({**self.entry, "resume": True}, self.copy, self.logfile, 10, run=run,
+                                             free_memory=lambda: 8.0)
+        self.assertEqual([call["resume"] for call in calls], [True])
+        self.assertEqual((record["status"], record["resume"], "attempts" in record), ("ok", True, False))
+
+    def test_a_resume_entry_that_fails_at_launch_is_resumed_again_never_started_new(self):
+        run, calls = self.fake([{"status": "exit_1", "seconds": 1, "launch_failure": True},
+                                {"status": "ok", "seconds": 60}])
+        with mock.patch.object(run_overnight, "clear_game"):
+            record = run_overnight.run_entry({**self.entry, "resume": True}, self.copy, self.logfile, 10, run=run,
+                                             free_memory=lambda: 8.0)
+        self.assertEqual(([call["resume"] for call in calls], record["status"], len(record["attempts"])),
+                         ([True, True], "ok", 2))
+
     def test_an_ordinary_failure_is_not_retried(self):
         run, calls = self.fake([{"status": "exit_2", "seconds": 1}])
         with mock.patch.object(run_overnight, "clear_game"):

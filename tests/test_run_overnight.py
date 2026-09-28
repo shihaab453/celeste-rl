@@ -77,6 +77,46 @@ class BuildCommandTests(unittest.TestCase):
             run_overnight.build_command(self.entry, Path("C:/games/celeste"), resume=True)
 
 
+class EntryProblemsTests(unittest.TestCase):
+    """A plan entry marked "resume" continues a stopped run; any other entry needs a folder that holds no run."""
+
+    def setUp(self) -> None:
+        self.repo = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.repo, ignore_errors=True))
+        self.entry = {"id": "A1-k0", "run_dir": "runs/train/A1-k0",
+                      "command": ["scripts/train_anchored.py", "--anchor-coef", "1.0", "--run-dir", "runs/train/A1-k0"]}
+        self.run_dir = self.repo / "runs" / "train" / "A1-k0"
+
+    def stopped_run(self, manifest: bool = True, latest: bool = True) -> None:
+        (self.run_dir / "checkpoints").mkdir(parents=True)
+        if manifest:
+            (self.run_dir / "manifest.json").write_text("{}", encoding="utf-8")
+        if latest:
+            (self.run_dir / "checkpoints" / "latest.zip").write_bytes(b"x")
+
+    def test_a_new_run_is_refused_only_when_its_folder_already_holds_a_run(self) -> None:
+        self.assertEqual(run_overnight.entry_problems(self.entry, self.repo), [])
+        self.stopped_run()
+        self.assertEqual(run_overnight.entry_problems(self.entry, self.repo),
+                         ["runs/train/A1-k0 already holds a run"])
+
+    def test_a_resume_entry_needs_the_run_it_continues(self) -> None:
+        entry = {**self.entry, "resume": True}
+        self.assertEqual(len(run_overnight.entry_problems(entry, self.repo)), 2)  # no manifest, no latest.zip
+        self.stopped_run(latest=False)
+        self.assertEqual(run_overnight.entry_problems(entry, self.repo),
+                         ["A1-k0 is marked resume but runs/train/A1-k0/checkpoints/latest.zip does not exist"])
+        (self.run_dir / "checkpoints" / "latest.zip").write_bytes(b"x")
+        self.assertEqual(run_overnight.entry_problems(entry, self.repo), [])
+
+    def test_a_resume_entry_must_be_a_command_that_can_resume(self) -> None:
+        self.stopped_run()
+        entry = {**self.entry, "resume": True, "command": ["scripts/evaluate_heldout.py"]}
+        problems = run_overnight.entry_problems(entry, self.repo)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("does not support --resume", problems[0])
+
+
 class ResultArtifactTests(unittest.TestCase):
     def test_captures_result_episode_hashes_and_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

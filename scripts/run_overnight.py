@@ -19,6 +19,9 @@ What this does that a shell loop does not:
   killed and any game still holding the ports is stopped before the next run starts.
 - **Retries an abort once** (`--resume`), then records it and moves on. Never retries forever, and never drops
   a declared run from the summary: every entry appears with its status, including the ones that failed.
+- **Continues a run that was stopped on purpose** when its plan entry says `"resume": true`: the first attempt is
+  then a `--resume` of the run's own folder (which must hold its manifest and checkpoints/latest.zip), instead of
+  a refusal. The entry stays in the plan and in the summary like any other, so one campaign records every run.
 - **Writes after every run.** `summary.json` and a timestamped `campaign.log`, so a crash at hour five still
   leaves the first four answers.
 - **Stops rather than starts** a run that cannot finish before the declared stop time.
@@ -256,6 +259,21 @@ def build_command(entry: dict, game_dir: Path, resume: bool = False) -> list[str
     return [str(REPO / ".venv-rl" / "Scripts" / "python.exe"), *child_arguments]
 
 
+def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
+    """Why a plan entry cannot start. A new run needs a folder that holds no run; an entry marked `"resume": true`
+    continues a run that was stopped on purpose, so it needs that run's manifest and latest checkpoint instead."""
+    run_dir = repo / entry["run_dir"]
+    if not entry.get("resume"):
+        return [f"{entry['run_dir']} already holds a run"] if (run_dir / "manifest.json").exists() else []
+    problems = [f"{entry['id']} is marked resume but {entry['run_dir']}/{name} does not exist"
+                for name in ("manifest.json", "checkpoints/latest.zip") if not (run_dir / name).exists()]
+    try:
+        build_command(entry, Path("."), resume=True)
+    except ValueError as error:
+        problems.append(str(error))
+    return problems
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -419,7 +437,7 @@ def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at:
                 "available_memory_gb_at_start": free}
     env = copy.env(threads)
     clear_game(copy.game_dir, logfile)
-    result = run(entry, logfile, copy.game_dir, env=env)
+    result = run(entry, logfile, copy.game_dir, resume=bool(entry.get("resume")), env=env)
     has_manifest = (REPO / entry["run_dir"] / "manifest.json").exists()
     if (result.get("folder_collision") or result.get("launch_failure")) and not has_manifest:
         # Crashed before doing anything: another child took the same per-second folder name, or the game did not
@@ -427,7 +445,7 @@ def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at:
         reason = "collided on its output folder name" if result.get("folder_collision") else "could not launch the game"
         log(logfile, f"  {entry['id']} {reason}; retrying once")
         clear_game(copy.game_dir, logfile)
-        result = merge_attempts(result, run(entry, logfile, copy.game_dir, env=env))
+        result = merge_attempts(result, run(entry, logfile, copy.game_dir, resume=bool(entry.get("resume")), env=env))
     elif result["status"] != "ok" and has_manifest and entry.get("resumable", True):
         # An aborted run exhausted its fault budget; give it exactly one resume, then move on.
         log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
@@ -505,8 +523,7 @@ def main() -> int:
     if args.copy:
         problems.extend(copy_problems(copies))
     for entry in plan["runs"]:
-        if (REPO / entry["run_dir"] / "manifest.json").exists():
-            problems.append(f"{entry['run_dir']} already holds a run")
+        problems.extend(entry_problems(entry))
     if problems:
         print("Not starting:\n  " + "\n  ".join(problems))
         return 2
@@ -518,8 +535,8 @@ def main() -> int:
         log(logfile, f"declared stop time {stop_at:%Y-%m-%d %H:%M}, "
                      f"{(stop_at - datetime.now()).total_seconds() / 3600:.1f} hours from now")
     for entry in plan["runs"]:
-        log(logfile, f"  planned {entry['id']}: {entry.get('condition', '')} "
-                     f"limit {entry.get('limit_minutes', 75)} min")
+        log(logfile, f"  planned {entry['id']}{' (resume)' if entry.get('resume') else ''}: "
+                     f"{entry.get('condition', '')} limit {entry.get('limit_minutes', 75)} min")
     log(logfile, f"threads per job {args.threads_per_job} (OMP_NUM_THREADS, MKL_NUM_THREADS)")
     if parallel:
         log(logfile, f"side by side: {len(copies)} game copies {parallel['copies']}, "
