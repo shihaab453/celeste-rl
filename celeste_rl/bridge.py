@@ -26,7 +26,9 @@ import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_PORT = 32279
+# Everest's DebugRC port. A second game copy runs on its own port (its DebugRCPort setting); the environment variable
+# lets run_overnight.py point one child process at it. Unset, this is the port every run so far used.
+DEFAULT_PORT = int(os.environ.get("CELESTE_RL_DEBUGRC_PORT", "32279"))
 
 # One letter per TAS button, with the game bindings CelesteTAS presses for it (BindingHelper in
 # CelesteTAS 3.47.1). Together with dash-only and move-only directions, these cover the bindings in

@@ -22,15 +22,27 @@ What this does that a shell loop does not:
 - **Writes after every run.** `summary.json` and a timestamped `campaign.log`, so a crash at hour five still
   leaves the first four answers.
 - **Stops rather than starts** a run that cannot finish before the declared stop time.
+- **Optionally runs 2 or 3 at once** (`--copy DIR:DEBUGRC_PORT:LOCKSTEP_PORT`, once per game copy): each job gets
+  its own game copy and ports through CELESTE_RL_DEBUGRC_PORT and CELESTE_RL_LOCKSTEP_PORT, and
+  `--threads-per-job N` sets OMP_NUM_THREADS for each child. Each copy's Everest settings must name its DebugRC
+  port. The 2026-09-28 feasibility test found episodes identical in 1, 2 and 3 copies and 1.8x / 2.4x throughput
+  with one torch thread per job. Without --copy, everything runs as before: one copy, default ports, the child
+  environment unchanged.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
+import os
+import queue
+import re
 import subprocess
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -60,11 +72,70 @@ RESULT_SUMMARY_FIELDS = (
 )
 
 
+_LOG_LOCK = threading.Lock()
+
+
 def log(path: Path, message: str) -> None:
     line = f"{datetime.now():%Y-%m-%d %H:%M:%S}  {message}"
-    print(line, flush=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+    with _LOG_LOCK:  # parallel jobs log from several threads
+        print(line, flush=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+
+
+@dataclass(frozen=True)
+class GameCopy:
+    """A game copy and the ports its child process uses. No ports: the defaults, exactly as a single copy always ran."""
+
+    game_dir: Path
+    debug_port: int | None = None
+    lockstep_port: int | None = None
+
+    def env(self, threads: int | None) -> dict | None:
+        """The child's environment; None (inherit unchanged) for a default copy without a thread setting."""
+        if self.debug_port is None and threads is None:
+            return None
+        env = dict(os.environ)
+        if self.debug_port is not None:
+            env.update(CELESTE_RL_DEBUGRC_PORT=str(self.debug_port), CELESTE_RL_LOCKSTEP_PORT=str(self.lockstep_port))
+        if threads is not None:
+            env.update(OMP_NUM_THREADS=str(threads), MKL_NUM_THREADS=str(threads))
+        return env
+
+
+def parse_copy(text: str) -> GameCopy:
+    """DIR:DEBUGRC_PORT:LOCKSTEP_PORT; the directory may itself contain colons (C:/...)."""
+    try:
+        directory, debug, lockstep = text.rsplit(":", 2)
+        return GameCopy(Path(directory), int(debug), int(lockstep))
+    except ValueError as error:
+        raise ValueError(f"--copy {text!r} is not DIR:DEBUGRC_PORT:LOCKSTEP_PORT") from error
+
+
+def settings_debugrc_port(game_dir: Path) -> int | None:
+    settings = Path(game_dir) / "probe-profile" / "Saves" / "modsettings-Everest.celeste"
+    if not settings.exists():
+        return None
+    match = re.search(r"^DebugRCPort:\s*(\d+)\s*$", settings.read_text(encoding="utf-8-sig"), re.MULTILINE)
+    return int(match.group(1)) if match else None
+
+
+def copy_problems(copies: list[GameCopy], port_open=game_process._port_accepts_connections) -> list[str]:
+    """Reasons these copies cannot run side by side (empty when they can)."""
+    problems = []
+    ports = [port for copy in copies for port in (copy.debug_port, copy.lockstep_port)]
+    if len(set(ports)) != len(ports):
+        problems.append(f"the copies' ports are not all different: {ports}")
+    if len({Path(copy.game_dir).resolve() for copy in copies}) != len(copies):
+        problems.append("two copies name the same game directory")
+    for copy in copies:
+        configured = settings_debugrc_port(copy.game_dir)
+        if configured != copy.debug_port:
+            problems.append(f"{copy.game_dir}: its Everest settings name DebugRC port {configured}, not {copy.debug_port}")
+        for port in (copy.debug_port, copy.lockstep_port):
+            if port_open(port):
+                problems.append(f"port {port} is already in use")
+    return problems
 
 
 def clear_game(game_dir: Path, logfile: Path) -> None:
@@ -176,14 +247,14 @@ def result_artifact(stdout: str, repo: Path = REPO) -> dict | None:
     return artifact
 
 
-def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False) -> dict:
-    """One run, bounded in time. Returns its outcome."""
+def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, env: dict | None = None) -> dict:
+    """One run, bounded in time. Returns its outcome. `env` is the child's environment (None: inherit)."""
     command = build_command(entry, game_dir, resume=resume)
     limit = entry.get("limit_minutes", 75) * 60
     started = time.time()
     log(logfile, f"start {entry['id']}{' (resume)' if resume else ''}: {' '.join(command[1:])}")
     try:
-        finished = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=limit)
+        finished = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=limit, env=env)
         code = finished.returncode
         stdout = finished.stdout or ""
         tail = stdout.strip().splitlines()[-3:]
@@ -217,10 +288,12 @@ def reported_success_rate(record: dict):
     return record.get("artifact", {}).get("summary", {}).get("success_rate")
 
 
-def write_summary(path: Path, plan: dict, plan_hash: str, commit: str, results: list[dict]) -> None:
+def write_summary(path: Path, plan: dict, plan_hash: str, commit: str, results: list[dict],
+                  parallel: dict | None = None) -> None:
     path.write_text(json.dumps(
         {"plan": plan["name"], "plan_sha256": plan_hash, "commit": commit,
-         "definitions": plan.get("definitions"), "results": results}, indent=2, default=str), encoding="utf-8")
+         "definitions": plan.get("definitions"), "results": results,
+         **({"parallel": parallel} if parallel else {})}, indent=2, default=str), encoding="utf-8")
 
 
 def outcome_of(run_dir: Path) -> dict:
@@ -241,13 +314,46 @@ def outcome_of(run_dir: Path) -> dict:
             "final_deterministic": final and final["deterministic"]["ending"]}
 
 
+def side_by_side(entries: list[dict], copies: list[GameCopy], run_one, publish) -> list[dict]:
+    """Run every entry, at most one per copy at a time: each job takes a free copy and returns it when done.
+    `publish` gets the finished records in plan order after every job; the result is all records in plan order."""
+    free: queue.Queue[GameCopy] = queue.Queue()
+    for copy in copies:
+        free.put(copy)
+    slots: list[dict | None] = [None] * len(entries)
+    lock = threading.Lock()
+
+    def job(index: int, entry: dict) -> None:
+        copy = free.get()
+        try:
+            record = run_one(entry, copy)
+        finally:
+            free.put(copy)
+        with lock:
+            slots[index] = record
+            publish([r for r in slots if r is not None])
+
+    with ThreadPoolExecutor(max_workers=len(copies)) as pool:
+        list(pool.map(job, range(len(entries)), entries))
+    return [r for r in slots if r is not None]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--game-dir", type=Path, default=Path("C:/Projects/celeste-research-scratch/game-probe"))
     parser.add_argument("--dry-run", action="store_true", help="check everything and print the plan, run nothing")
     parser.add_argument("--allow-dirty", action="store_true")
+    parser.add_argument("--copy", action="append", default=[], metavar="DIR:DEBUGRC_PORT:LOCKSTEP_PORT",
+                        help="run jobs side by side, one per game copy (repeat for each copy; replaces --game-dir)")
+    parser.add_argument("--threads-per-job", type=int, help="OMP_NUM_THREADS for each child (1 is best side by side)")
     args = parser.parse_args()
+    try:
+        copies = [parse_copy(text) for text in args.copy] or [GameCopy(args.game_dir)]
+    except ValueError as error:
+        parser.error(str(error))
+    parallel = ({"copies": [{"game_dir": str(c.game_dir), "ports": [c.debug_port, c.lockstep_port]} for c in copies],
+                 "threads_per_job": args.threads_per_job} if args.copy or args.threads_per_job else None)
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
     plan_hash = hashlib.sha256(args.plan.read_bytes()).hexdigest()
@@ -258,8 +364,11 @@ def main() -> int:
     git = runtime.git_state()
     refusal = runtime.refusal(git, args.allow_dirty)
     problems = [refusal] if refusal else []
-    for pid in game_process.running_game_pids(args.game_dir):
-        problems.append(f"a game process is already running (pid {pid}); it would hold the ports")
+    for copy in copies:
+        for pid in game_process.running_game_pids(copy.game_dir):
+            problems.append(f"a game process is already running in {copy.game_dir} (pid {pid}); it would hold the ports")
+    if args.copy:
+        problems.extend(copy_problems(copies))
     for entry in plan["runs"]:
         if (REPO / entry["run_dir"] / "manifest.json").exists():
             problems.append(f"{entry['run_dir']} already holds a run")
@@ -276,30 +385,41 @@ def main() -> int:
     for entry in plan["runs"]:
         log(logfile, f"  planned {entry['id']}: {entry.get('condition', '')} "
                      f"limit {entry.get('limit_minutes', 75)} min")
+    if parallel:
+        log(logfile, f"side by side: {len(copies)} game copies {parallel['copies']}, "
+                     f"threads per job {args.threads_per_job}")
     if args.dry_run:
         log(logfile, "dry run: nothing executed")
         return 0
 
-    results = []
-    for entry in plan["runs"]:
+    def run_entry(entry: dict, copy: GameCopy) -> dict:
         if stop_at and datetime.now() + timedelta(minutes=entry.get("limit_minutes", 75)) > stop_at:
             log(logfile, f"skip {entry['id']}: cannot finish before the declared stop time")
-            results.append({**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None})
-            write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results)
-            continue
-        clear_game(args.game_dir, logfile)
-        result = execute(entry, logfile, args.game_dir)
+            return {**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None}
+        env = copy.env(args.threads_per_job)
+        clear_game(copy.game_dir, logfile)
+        result = execute(entry, logfile, copy.game_dir, env=env)
         # An aborted run exhausted its fault budget; give it exactly one resume, then move on.
         if result["status"] != "ok" and (REPO / entry["run_dir"] / "manifest.json").exists() and entry.get("resumable", True):
             log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
-            clear_game(args.game_dir, logfile)
-            retry = execute(entry, logfile, args.game_dir, resume=True)
+            clear_game(copy.game_dir, logfile)
+            retry = execute(entry, logfile, copy.game_dir, resume=True, env=env)
             result = merge_attempts(result, retry)
         record = {**entry, **result, **outcome_of(REPO / entry["run_dir"])}
-        results.append(record)
+        if parallel:
+            record["game_copy"] = str(copy.game_dir)
         log(logfile, f"done {entry['id']}: {record['status']} in {record['seconds'] // 60} min, "
                      f"final success {reported_success_rate(record)}")
-        write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results)
+        return record
+
+    if len(copies) == 1:
+        results = []
+        for entry in plan["runs"]:
+            results.append(run_entry(entry, copies[0]))
+            write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results, parallel)
+    else:
+        results = side_by_side(plan["runs"], copies, run_entry, lambda done: write_summary(
+            output_dir / "summary.json", plan, plan_hash, git["commit"], done, parallel))
 
     finished = [r for r in results if r.get("status") == "ok"]
     log(logfile, f"campaign finished: {len(finished)} of {len(plan['runs'])} runs completed")
