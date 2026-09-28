@@ -14,7 +14,7 @@
   },
   "held_fixed": {
     "clones": "the four SD-k clones pinned in config/campaign-mixed-self-distillation-train.json (sha256 there)",
-    "command": "the SD-k PPO command of config/campaign-mixed-self-distillation-train.json: scripts/train_room1.py --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from runs/clone/chapter-1-room-2/20260927-205018/cloned.zip --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed 40 --run-dir <new>; only the arm's change is added",
+    "command": "the SD-k PPO command of config/campaign-mixed-self-distillation-train.json, shown for k = 0 (run k uses clone SD-k and seed 40 + k): scripts/train_room1.py --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from runs/clone/chapter-1-room-2/20260927-205018/cloned.zip --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed 40 --run-dir <new>; only the arm's change is added",
     "seeds": "run k uses clone SD-k, seed 40 + k, anchor split seed k, anchor batch seed k",
     "evaluation": "Room 1 held-out (scripts/evaluate_heldout.py --starts config/heldout_starts.json --repeats 1 --seed 20260920) at every 100k checkpoint; Room 2 canonical (scripts/evaluate_checkpoint.py --task-definition config/room2.json --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0) on the finals; Room 2 v1 held-out (--task-definition config/room2.json --starts config/heldout_starts-room2.json --repeats 1 --seed 20260922 --reward-version rew-v2 --shaping-scale 2.0) on the finals",
     "floors": "clone floor 0.142 and final floor 0.2046 (docs/results/retention-pilot.json); the one-unit drop",
