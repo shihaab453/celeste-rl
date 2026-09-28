@@ -19,7 +19,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from celeste_rl.bridge import DebugRcClient
+from celeste_rl.bridge import DEFAULT_PORT, DebugRcClient
+from celeste_rl.lockstep import DEFAULT_LOCKSTEP_PORT
 
 _user32 = ctypes.windll.user32 if os.name == "nt" else None
 if _user32 is not None:
@@ -255,7 +256,7 @@ def _port_accepts_connections(port: int, host: str = "127.0.0.1", timeout: float
         s.close()
 
 
-def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: bool = True,
+def launch(game_dir: Path, port: int = DEFAULT_PORT, timeout: float = 120.0, focus: bool = True,
            extra_args: list[str] | None = None) -> subprocess.Popen:
     """Start the game and wait until DebugRC answers.
 
@@ -296,7 +297,7 @@ def launch(game_dir: Path, port: int = 32279, timeout: float = 120.0, focus: boo
 
 
 def stop(process: subprocess.Popen, timeout: float = 10.0,
-         ports: tuple[int, ...] = (32279, 32280),
+         ports: tuple[int, ...] = (DEFAULT_PORT, DEFAULT_LOCKSTEP_PORT),
          _port_checker: Callable[[int], bool] = _port_accepts_connections) -> bool:
     """Close the game and wait until its ports stop accepting connections.
 

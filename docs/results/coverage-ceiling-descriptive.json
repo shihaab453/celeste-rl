@@ -1,0 +1,90 @@
+{
+  "label": "descriptive; companion to docs/results/coverage-ceiling-pilot.json; aggregates only",
+  "analysis_code_sha256": "81edce8e722ecdef9161e1afc901478aebc25bf52ce1fb84b9e96b4b153aa37f",
+  "inputs": {
+    "config/campaign-coverage-ceiling-eval.json": "fbdde17a909d2dc1336f103905380e82ae14f27d2939d9cd1adc2d61f6ac24cf",
+    "config/retention-pilot.json": "6f07add90fab22fc6c03487d27c0065fe2a1f05f0fc608c5da3921e253214ae5",
+    "config/heldout_starts.json": "9abc35b97460ff15e1d49bf669fd7840c01a5cb3b0e98c51195ed6f01eb1e650",
+    "runs/clone/20260925-221134/dataset.npz": "6b9bd94dffbb0afe45d1ba59bc19bbe5e85c45da2424adee424a2d7199d8aa2b"
+  },
+  "donor_vs_demonstrations": {
+    "3": {
+      "frames": 2688,
+      "button_match": 0.832,
+      "whole_frame_match": 0.203
+    },
+    "4": {
+      "frames": 2688,
+      "button_match": 0.932,
+      "whole_frame_match": 0.3
+    },
+    "5": {
+      "frames": 2688,
+      "button_match": 0.91,
+      "whole_frame_match": 0.255
+    },
+    "6": {
+      "frames": 2688,
+      "button_match": 0.92,
+      "whole_frame_match": 0.279
+    }
+  },
+  "coverage": {
+    "room1-S-demo-k0": {
+      "fitted_frames": 1948,
+      "median_px": 2.0,
+      "within_4px": 0.705,
+      "within_8px": 0.875,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-play-k0": {
+      "fitted_frames": 4472,
+      "median_px": 2.24,
+      "within_4px": 0.59,
+      "within_8px": 0.695,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-demo-k1": {
+      "fitted_frames": 2056,
+      "median_px": 1.41,
+      "within_4px": 0.735,
+      "within_8px": 0.9,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-play-k1": {
+      "fitted_frames": 8619,
+      "median_px": 1.0,
+      "within_4px": 0.76,
+      "within_8px": 0.875,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-demo-k2": {
+      "fitted_frames": 1989,
+      "median_px": 1.71,
+      "within_4px": 0.73,
+      "within_8px": 0.905,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-play-k2": {
+      "fitted_frames": 4307,
+      "median_px": 2.24,
+      "within_4px": 0.605,
+      "within_8px": 0.75,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-demo-k3": {
+      "fitted_frames": 1989,
+      "median_px": 1.71,
+      "within_4px": 0.73,
+      "within_8px": 0.905,
+      "starts_without_same_dash_frame": 0
+    },
+    "room1-S-play-k3": {
+      "fitted_frames": 5863,
+      "median_px": 1.41,
+      "within_4px": 0.73,
+      "within_8px": 0.855,
+      "starts_without_same_dash_frame": 0
+    }
+  }
+}

@@ -31,6 +31,8 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 PAIRED_FIELDS = ("accepted_steps", "ending", "length", "return", "max_x", "end_x", "end_y", "max_potential")
 WINDOW = 100_000
 
@@ -117,8 +119,8 @@ def training_record(run_dir: Path, final_window_steps: int, total_steps: int) ->
         "late_episodes": len(late)}
 
 
-def verify_training(plan: dict, summary: dict, plan_hash: str) -> None:
-    if summary.get("plan") != plan["name"] or summary.get("plan_sha256") != plan_hash:
+def verify_training(plan: dict, summary: dict, plan_path: Path) -> None:
+    if summary.get("plan") != plan["name"] or not matches_text_hash(plan_path, summary.get("plan_sha256")):
         raise AnalysisError("the training campaign summary does not identify the committed plan")
     results = {entry["id"]: entry for entry in summary["results"]}
     for run in plan["runs"]:
@@ -168,7 +170,7 @@ def main() -> int:
         if own_blob != plan["analysis"]["analysis_code_git_blob"]:
             raise AnalysisError(f"this script's git blob {own_blob} is not the plan's pinned "
                                 f"{plan['analysis']['analysis_code_git_blob']}")
-        verify_training(plan, json.loads(args.training.read_text(encoding="utf-8")), file_sha256(args.plan))
+        verify_training(plan, json.loads(args.training.read_text(encoding="utf-8")), args.plan)
         play_summary = json.loads(args.play.read_text(encoding="utf-8"))
         play_results = {entry["id"]: entry for entry in play_summary["results"]}
         protocol = plan["primary"]["protocol"]

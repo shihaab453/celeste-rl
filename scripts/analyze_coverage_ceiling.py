@@ -27,6 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 from celeste_rl.schema import PLAYER_FEATURE_NAMES  # noqa: E402
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 
 FEATURE = {name: index for index, name in enumerate(PLAYER_FEATURE_NAMES)}
 ROOM1_BOUNDS = (0.0, 0.0, 320.0, 180.0)
@@ -88,7 +89,7 @@ def main() -> int:
         raise SystemExit(f"{args.output} already exists")
     plan_path = REPO / "config/campaign-coverage-ceiling-eval.json"
     plan, summary = load(plan_path), load(REPO / args.summary)
-    if summary["plan_sha256"] != sha(plan_path):
+    if not matches_text_hash(plan_path, summary["plan_sha256"]):
         raise SystemExit("the evaluation summary does not match the committed evaluation plan")
     planned = {run["id"]: run for run in plan["runs"]}
     results = {}

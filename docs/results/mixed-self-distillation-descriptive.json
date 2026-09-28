@@ -1,0 +1,394 @@
+{
+  "label": "descriptive; companion to docs/results/mixed-self-distillation-ppo.json; aggregates only",
+  "analysis_code_sha256": "4b6c0a89f0122d57ba3ed01c350197d6ea67ce972c1d738ffc41e3ddaf35bde9",
+  "inputs": {
+    "config/campaign-mixed-self-distillation-train.json": "d234679791695cb582ca3a2178960f52e8fed8c0d2bb1b5b722c83c93cf45d0d",
+    "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz": "ea17c59c0dddb999b7362b39c5030fb5eccc4c874d4094a64e2e1f4b7356373f",
+    "runs/campaign/20260928-035401-mixed-self-distillation-ppo-eval-v1/summary.json": "01f163a50107de6f5d7476babd1eaccc1c558f94b81935f5b3165b0229dc3c76"
+  },
+  "entropy_per_frame": {
+    "k0": {
+      "donor": {
+        "room1": {
+          "nats": 3.688,
+          "bits": 5.321
+        },
+        "room2": {
+          "nats": 4.865,
+          "bits": 7.018
+        }
+      },
+      "SD clone": {
+        "room1": {
+          "nats": 3.655,
+          "bits": 5.273
+        },
+        "room2": {
+          "nats": 0.243,
+          "bits": 0.35
+        }
+      },
+      "SD 100k": {
+        "room1": {
+          "nats": 4.534,
+          "bits": 6.541
+        },
+        "room2": {
+          "nats": 0.544,
+          "bits": 0.784
+        }
+      },
+      "SD 200k": {
+        "room1": {
+          "nats": 5.131,
+          "bits": 7.403
+        },
+        "room2": {
+          "nats": 0.896,
+          "bits": 1.293
+        }
+      },
+      "SD 500k": {
+        "room1": {
+          "nats": 6.606,
+          "bits": 9.531
+        },
+        "room2": {
+          "nats": 4.022,
+          "bits": 5.803
+        }
+      },
+      "M clone": {
+        "room1": {
+          "nats": 0.317,
+          "bits": 0.457
+        },
+        "room2": {
+          "nats": 0.208,
+          "bits": 0.3
+        }
+      },
+      "M 500k": {
+        "room1": {
+          "nats": 0.437,
+          "bits": 0.63
+        },
+        "room2": {
+          "nats": 0.711,
+          "bits": 1.025
+        }
+      },
+      "R 500k": {
+        "room1": {
+          "nats": 0.514,
+          "bits": 0.742
+        },
+        "room2": {
+          "nats": 0.652,
+          "bits": 0.94
+        }
+      }
+    },
+    "k1": {
+      "donor": {
+        "room1": {
+          "nats": 0.734,
+          "bits": 1.059
+        },
+        "room2": {
+          "nats": 1.05,
+          "bits": 1.515
+        }
+      },
+      "SD clone": {
+        "room1": {
+          "nats": 0.744,
+          "bits": 1.073
+        },
+        "room2": {
+          "nats": 0.237,
+          "bits": 0.342
+        }
+      },
+      "SD 100k": {
+        "room1": {
+          "nats": 1.068,
+          "bits": 1.54
+        },
+        "room2": {
+          "nats": 0.438,
+          "bits": 0.632
+        }
+      },
+      "SD 200k": {
+        "room1": {
+          "nats": 1.485,
+          "bits": 2.142
+        },
+        "room2": {
+          "nats": 0.694,
+          "bits": 1.001
+        }
+      },
+      "SD 500k": {
+        "room1": {
+          "nats": 2.683,
+          "bits": 3.871
+        },
+        "room2": {
+          "nats": 1.737,
+          "bits": 2.506
+        }
+      },
+      "M clone": {
+        "room1": {
+          "nats": 0.384,
+          "bits": 0.554
+        },
+        "room2": {
+          "nats": 0.231,
+          "bits": 0.333
+        }
+      },
+      "M 500k": {
+        "room1": {
+          "nats": 0.656,
+          "bits": 0.946
+        },
+        "room2": {
+          "nats": 0.72,
+          "bits": 1.038
+        }
+      },
+      "R 500k": {
+        "room1": {
+          "nats": 0.985,
+          "bits": 1.42
+        },
+        "room2": {
+          "nats": 0.747,
+          "bits": 1.077
+        }
+      }
+    },
+    "k2": {
+      "donor": {
+        "room1": {
+          "nats": 1.826,
+          "bits": 2.634
+        },
+        "room2": {
+          "nats": 2.45,
+          "bits": 3.534
+        }
+      },
+      "SD clone": {
+        "room1": {
+          "nats": 1.802,
+          "bits": 2.6
+        },
+        "room2": {
+          "nats": 0.259,
+          "bits": 0.373
+        }
+      },
+      "SD 100k": {
+        "room1": {
+          "nats": 2.229,
+          "bits": 3.216
+        },
+        "room2": {
+          "nats": 0.459,
+          "bits": 0.662
+        }
+      },
+      "SD 200k": {
+        "room1": {
+          "nats": 2.994,
+          "bits": 4.319
+        },
+        "room2": {
+          "nats": 0.649,
+          "bits": 0.937
+        }
+      },
+      "SD 500k": {
+        "room1": {
+          "nats": 5.687,
+          "bits": 8.205
+        },
+        "room2": {
+          "nats": 3.75,
+          "bits": 5.41
+        }
+      },
+      "M clone": {
+        "room1": {
+          "nats": 0.291,
+          "bits": 0.42
+        },
+        "room2": {
+          "nats": 0.225,
+          "bits": 0.324
+        }
+      },
+      "M 500k": {
+        "room1": {
+          "nats": 0.549,
+          "bits": 0.793
+        },
+        "room2": {
+          "nats": 0.857,
+          "bits": 1.236
+        }
+      },
+      "R 500k": {
+        "room1": {
+          "nats": 0.65,
+          "bits": 0.938
+        },
+        "room2": {
+          "nats": 0.705,
+          "bits": 1.016
+        }
+      }
+    },
+    "k3": {
+      "donor": {
+        "room1": {
+          "nats": 1.49,
+          "bits": 2.15
+        },
+        "room2": {
+          "nats": 1.873,
+          "bits": 2.703
+        }
+      },
+      "SD clone": {
+        "room1": {
+          "nats": 1.377,
+          "bits": 1.987
+        },
+        "room2": {
+          "nats": 0.233,
+          "bits": 0.336
+        }
+      },
+      "SD 100k": {
+        "room1": {
+          "nats": 1.812,
+          "bits": 2.614
+        },
+        "room2": {
+          "nats": 0.448,
+          "bits": 0.646
+        }
+      },
+      "SD 200k": {
+        "room1": {
+          "nats": 2.601,
+          "bits": 3.752
+        },
+        "room2": {
+          "nats": 0.687,
+          "bits": 0.991
+        }
+      },
+      "SD 500k": {
+        "room1": {
+          "nats": 4.717,
+          "bits": 6.805
+        },
+        "room2": {
+          "nats": 3.365,
+          "bits": 4.855
+        }
+      },
+      "M clone": {
+        "room1": {
+          "nats": 0.276,
+          "bits": 0.398
+        },
+        "room2": {
+          "nats": 0.205,
+          "bits": 0.295
+        }
+      },
+      "M 500k": {
+        "room1": {
+          "nats": 0.588,
+          "bits": 0.848
+        },
+        "room2": {
+          "nats": 0.871,
+          "bits": 1.257
+        }
+      },
+      "R 500k": {
+        "room1": {
+          "nats": 0.586,
+          "bits": 0.846
+        },
+        "room2": {
+          "nats": 0.641,
+          "bits": 0.925
+        }
+      }
+    }
+  },
+  "confident_room1_choices_at_500k": {
+    "SD-k0": {
+      "donor_confident_choices": 84279,
+      "still_confident_same": 0.574,
+      "now_uncertain": 0.405,
+      "flipped_confident_opposite": 0.021
+    },
+    "SD-k1": {
+      "donor_confident_choices": 215497,
+      "still_confident_same": 0.825,
+      "now_uncertain": 0.154,
+      "flipped_confident_opposite": 0.021
+    },
+    "SD-k2": {
+      "donor_confident_choices": 107194,
+      "still_confident_same": 0.551,
+      "now_uncertain": 0.398,
+      "flipped_confident_opposite": 0.051
+    },
+    "SD-k3": {
+      "donor_confident_choices": 150970,
+      "still_confident_same": 0.672,
+      "now_uncertain": 0.308,
+      "flipped_confident_opposite": 0.019
+    }
+  },
+  "median_abs_logit_room2": {
+    "SD-k0": 11.51,
+    "M-k0": 25.59,
+    "SD-k1": 12.39,
+    "M-k1": 26.07,
+    "SD-k2": 12.19,
+    "M-k2": 25.73,
+    "SD-k3": 11.74,
+    "M-k3": 26.2
+  },
+  "room1_endings_at_500k": {
+    "SD-k0": {
+      "death": 182,
+      "success": 17,
+      "timeout": 1
+    },
+    "SD-k1": {
+      "death": 149,
+      "success": 51
+    },
+    "SD-k2": {
+      "death": 185,
+      "success": 15
+    },
+    "SD-k3": {
+      "death": 184,
+      "success": 16
+    }
+  }
+}

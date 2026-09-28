@@ -22,6 +22,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 from analyze_retention_pilot import explained_variance, retained_share, room2_training  # noqa: E402
 
 
@@ -66,7 +67,7 @@ def main() -> int:
     pilot_path = REPO / "config/mixed-imitation-pilot.json"
     plan_path = REPO / "config/campaign-mixed-imitation-pilot-eval.json"
     plan, summary = load(plan_path), load(REPO / args.summary)
-    if summary["plan_sha256"] != sha(plan_path):
+    if not matches_text_hash(plan_path, summary["plan_sha256"]):
         raise SystemExit("the evaluation summary does not match the committed evaluation plan")
     planned = {run["id"]: run for run in plan["runs"]}
     results = {}

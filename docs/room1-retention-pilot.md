@@ -111,3 +111,126 @@ to Room 1 being present.
 The numbers, the reference clones and the input hashes are in
 [`docs/results/mixed-imitation-pilot.json`](results/mixed-imitation-pilot.json), written by
 `scripts/analyze_mixed_imitation_pilot.py`.
+
+## Third pilot: can a copy of the policy play like it?
+
+Also descriptive, four runs, one recipe, declared before any data (`config/coverage-ceiling-pilot.json`).
+
+The second pilot suggested that the demonstrations were the wrong thing to imitate. Before mixing anything else in,
+this pilot asked a narrower question: if a network is trained only to copy what a starting policy itself does, can
+it play Room 1 like that policy? If even that failed, imitation could not rebuild the skill from scratch.
+
+- **Copying target:** the starting policy's own probability for each button, on each frame, rather than a single
+  "right answer" per frame.
+- **Copies:** fresh networks, sharing no weights with the policy they copy, trained with the same settings as the
+  earlier imitation steps.
+- **Two sets of frames to copy on:**
+  - **Demonstration frames:** the Room 1 demonstration routes (5 of the 7 routes fitted, about 2,000 frames).
+  - **The policy's own play:** 25 episodes of each starting policy playing Room 1 from its normal start (19 fitted,
+    4,300 to 8,600 frames). No test state was used as a start.
+- **Measure:** the same Room 1 test, floor and reference as before; nothing was fine-tuned afterwards.
+
+| Starting policy | Before | Copy on demonstration frames | Copy on its own play |
+|---|---:|---:|---:|
+| Seed 3 | 76% | 64% | 69% |
+| Seed 4 | 77% | 60% | 74% |
+| Seed 5 | 77% | 70% | 83% |
+| Seed 6 | 66% | 50% | 56% |
+| Floor: never saw Room 1 | | 10% to 17% | 10% to 17% |
+| Room 1 demonstrations only | | 10% to 15% | |
+
+**A copy of the policy plays Room 1 almost as well as the policy.** Measured against the floor, copies trained on
+the policy's own play reached 81% to 109% of the policy's skill (median 92%), and copies trained on the demonstration
+frames reached 69% to 88% (median 76%). Seed 5's copy scoring above its policy (83% against 77%) is within sampling
+noise; read it as about equal.
+
+The clearest comparison is on the demonstration frames. There, copying the policy's own probabilities gave 50% to
+70%, while copying the demonstrated buttons on exactly the same frames, split and settings gave 10% to 15%. So what
+the copy is trained to reproduce matters a great deal: copying the policy you want to keep works, and copying the
+demonstrations does not. This pilot cannot say *why*. Two things changed together: whose choices are copied (on the
+demonstration frames, all of the policy's most likely buttons match the demonstrated ones on only 20% to 30% of
+frames), and probabilities instead of one right answer per frame. It also does not show that the choice of frames is
+unimportant. Copies trained on the policy's own play did better in all four pairs, by 5 to 14 points, but they also
+had two to four times as many frames.
+
+**This is not yet a retention result.** Nothing learned Room 2 here; the copies only show that the policy's own
+probabilities can carry its Room 1 skill. Whether they keep it while Room 2 is learned is the next pilot's question.
+
+Sampling noise and the reused test set, as for the first pilot, and in addition:
+
+- **This shows copying along known paths, not far from them.** Most Room 1 test starts (59% to 76%, depending on the
+  copy) lie within 4 pixels of a frame the copy was trained on; the median distance is 1 to 2 pixels. This compares
+  position only, not speed or timers. A copy that plays well only near familiar paths would score the same.
+- Four starting policies from one training recipe (Phase 3B, varied starts).
+- The Room 1 test set has now been used by Phase 3B and three pilots, so it serves as a development set. A fresh Room
+  1 set will be generated before any claim beyond "descriptive".
+- The policy's own play was recorded only from the normal Room 1 start.
+
+The next pilot tests this: while a policy learns Room 2, keep copying its own Room 1 probabilities on its recorded
+Room 1 play.
+
+The numbers, the copies' agreement with their policies and the input hashes are in
+[`docs/results/coverage-ceiling-pilot.json`](results/coverage-ceiling-pilot.json), written by
+`scripts/analyze_coverage_ceiling.py`. The button-match and distance figures are in
+[`docs/results/coverage-ceiling-descriptive.json`](results/coverage-ceiling-descriptive.json), written by
+`scripts/describe_coverage_ceiling.py`.
+
+## Fourth pilot: copying the policy's own play while learning Room 2
+
+Also descriptive, four runs, one recipe, declared before any data (`config/mixed-self-distillation-pilot.json`).
+
+The third pilot showed that a copy trained on a policy's own probabilities can carry its Room 1 skill. This pilot
+used that in the retention setting: the same four starting policies were taught Room 2 exactly as in the second
+pilot, with one change. The Room 1 part of the imitation step was the policy's own recorded play, fitted to its own
+probabilities, instead of the Room 1 demonstrations. Fine-tuning on Room 2 then ran unchanged.
+
+| Starting policy | Before | After mixed copying | 100k | 200k | 300k | 400k | 500k | Room 2 final |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Seed 3 | 76% | 64% | 36% | 14% | 11% | 8% | 8% | 44 of 50 |
+| Seed 4 | 77% | 63% | 47% | 48% | 43% | 40% | 26% | 46 of 50 |
+| Seed 5 | 77% | 64% | 53% | 55% | 29% | 26% | 7% | 41 of 50 |
+| Seed 6 | 66% | 52% | 41% | 39% | 19% | 15% | 7% | 35 of 50 |
+| Floor: never saw Room 1 | | 10% to 17% | | | | | 12% to 30% | |
+
+**Copying the policy's own play kept the Room 1 skill through the imitation step.** After mixed copying, Room 1
+success was 52% to 64%, a median 78% of each policy's margin over the floor, where mixing in the demonstrations had
+kept almost none (14% to 22%). Room 2 imitation was as good as before. Copying on the demonstration frames instead
+of the recorded play kept a median 69%.
+
+**Fine-tuning on Room 2 then wore it away.** Over 500,000 steps, Room 1 success fell to 7% to 26%. Measured in the
+same unit (each policy's original margin over the floor), the median run dropped 0.87, more than the 0.78 it had kept
+after copying, so three of the four ended below every policy that never saw Room 1. Room 2 also paid: only one of four
+final policies cleared the Room 2 start 45 or more times out of 50, against 48 to 50 in the second pilot. On a
+held-out set of Room 2 starts they did about as well as the earlier recipes: 76% to 85% (median 81%), against 80% to
+86% (median 82%) for the second pilot and 79% to 86% (median 81%) for the first.
+
+**What went wrong looks like growing randomness rather than overwritten choices.** During fine-tuning these policies
+became much less decisive, in both rooms. Randomness here is measured as how many fair coin tosses a policy's button
+choices amount to per frame (0 means it always presses the same buttons in a given situation). For the seed 3 run it
+rose from 5.3 to 9.5 in Room 1 and from 0.4 to 5.8 in Room 2, while the second and first pilots' fine-tuned policies
+stayed at 1.4 or below. Of the choices the starting policy made confidently in Room 1, the fine-tuned policies still
+made 55% to 83% the same way. Only 2% to 5% flipped to the opposite choice; the rest became uncertain, and 149 to 185
+of the 200 Room 1 test episodes ended in a death. The run whose starting policy was least random (seed 4) stayed the
+least random and did best in both rooms.
+
+A possible cause, not yet tested: copying soft probabilities left the network less decisive than imitating single
+answers does (its raw outputs on Room 2 frames were about half as large), and fine-tuning's small bonus for staying
+random may then have pushed it further. The next pilot tests this directly, beside a term that keeps the policy close
+to its starting self in Room 1.
+
+Sampling noise, the reused Room 1 test set and the copied value estimate, as for the first pilot, and in addition:
+
+- The randomness explanation is a hypothesis drawn from these four runs, not a measured cause.
+- The two Room 2 measures disagree (the canonical start says worse, the held-out starts say about the same), so the
+  Room 2 cost is reported, not settled.
+- The Room 2 held-out set was used by the Room 2 matched fine-tuning result before, so it serves as a development
+  set; only aggregates are reported.
+- The starting policies differ a lot in how random they are to begin with (Room 1: 1.1 to 5.3 coin tosses per
+  frame), and the least random one did best; four runs cannot separate that from chance.
+
+The numbers are in [`docs/results/mixed-self-distillation-clone.json`](results/mixed-self-distillation-clone.json)
+and [`docs/results/mixed-self-distillation-ppo.json`](results/mixed-self-distillation-ppo.json), written by
+`scripts/analyze_mixed_self_distillation.py` and `scripts/analyze_mixed_self_distillation_ppo.py`; the randomness,
+confident-choice, output-size and ending figures are in
+[`docs/results/mixed-self-distillation-descriptive.json`](results/mixed-self-distillation-descriptive.json), written
+by `scripts/describe_mixed_self_distillation.py`.

@@ -19,6 +19,7 @@ number of engine updates spent loading is in diagnostics["loading_updates"].
 from __future__ import annotations
 
 import json
+import os
 import socket
 import time
 
@@ -31,7 +32,9 @@ from celeste_rl.bridge import (
     format_input_line,
 )
 
-DEFAULT_LOCKSTEP_PORT = 32280
+# The mod reads the same environment variable (LockstepDriver.Load), and a game launched by this process inherits
+# it, so both ends agree. Unset, this is the port every run so far used.
+DEFAULT_LOCKSTEP_PORT = int(os.environ.get("CELESTE_RL_LOCKSTEP_PORT", "32280"))
 
 
 class LockstepBridge:

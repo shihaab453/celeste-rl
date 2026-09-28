@@ -38,6 +38,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 
 CANONICAL_ID = "canonical"
 MODES = ("stochastic", "deterministic")
@@ -215,7 +216,7 @@ def load_campaign(plan_path: Path, summary_path: Path, *, script_blob: str | Non
     if own_blob != pinned_blob:
         raise AnalysisError(f"this analysis script is blob {own_blob}, but the plan pins {pinned_blob}")
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    if summary.get("plan") != plan["name"] or summary.get("plan_sha256") != file_sha256(plan_path):
+    if summary.get("plan") != plan["name"] or not matches_text_hash(plan_path, summary.get("plan_sha256")):
         raise AnalysisError("the campaign summary was not produced from this plan file")
     tool = plan["tool"]
     if git_blob(summary["commit"], tool["script"]) != git_blob(tool["commit"], tool["script"]):
