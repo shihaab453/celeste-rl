@@ -1,7 +1,14 @@
-"""Has the evaluation code changed since a baseline, beyond reviewed and approved changes? (read-only)
+"""Has the evaluation (or training) code changed since a baseline, beyond reviewed and approved changes? (read-only)
 
 Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5
+    .venv-rl/Scripts/python.exe scripts/check_evaluation_code.py --entry scripts/train_room1.py --baseline 331e6c9 \
+        --approved 44ffab5          # the training code a new arm shares with an earlier control
+
+With --entry, the checked code is those scripts and their import closure instead of the evaluators'.
+
+Limit: several --approved commits can only be combined when they change different files; a second approved change
+to the same file needs a new baseline (their concatenated diffs would not equal the single diff over both).
 
 The evaluation code is every project file that scripts/evaluate_heldout.py and scripts/evaluate_checkpoint.py load
 (their import closure, found by importing them), plus the two scripts. The check passes when the diff of those files
@@ -26,14 +33,15 @@ REPO = Path(__file__).resolve().parents[1]
 EVALUATORS = ["scripts/evaluate_heldout.py", "scripts/evaluate_checkpoint.py"]
 
 
-def closure() -> list[str]:
-    """Repo-relative paths of every celeste_rl module the evaluators import, plus the evaluators."""
-    code = ("import os, sys; sys.path.insert(0, 'scripts'); import evaluate_heldout, evaluate_checkpoint; "
+def closure(entries: list[str] = EVALUATORS) -> list[str]:
+    """Repo-relative paths of the entry scripts and every celeste_rl module they import (found by importing them)."""
+    modules = ", ".join(Path(entry).stem for entry in entries)
+    code = (f"import os, sys; sys.path.insert(0, 'scripts'); import {modules}; "
             "print('\\n'.join(sorted({os.path.relpath(m.__file__).replace(os.sep, '/') for n, m in sys.modules.items() "
             "if n.startswith('celeste_rl') and getattr(m, '__file__', None)})))")
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     out = subprocess.run([sys.executable, "-c", code], cwd=REPO, capture_output=True, text=True, check=True, env=env)
-    return sorted(set(out.stdout.split()) | set(EVALUATORS))
+    return sorted(set(out.stdout.split()) | set(entries))
 
 
 def git(*args: str) -> bytes:
@@ -48,8 +56,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--baseline", required=True, help="the commit the compared evaluations ran at")
     parser.add_argument("--approved", nargs="*", default=[], help="reviewed commits whose changes are allowed")
+    parser.add_argument("--entry", nargs="+", default=EVALUATORS,
+                        help="entry scripts whose code is checked (default: the two evaluators)")
     args = parser.parse_args()
-    files = closure()
+    files = closure(args.entry)
     dirty = git("status", "--porcelain", "--", *files).decode().strip()
     if dirty:
         print(f"REFUSED: uncommitted changes in the evaluation code:\n{dirty}")
@@ -57,12 +67,12 @@ def main() -> int:
     actual = diff_sha256(files, args.baseline, "HEAD")
     allowed = hashlib.sha256(b"".join(git("diff", f"{c}^", c, "--", *files) for c in args.approved)).hexdigest()
     changed = git("diff", "--name-only", args.baseline, "HEAD", "--", *files).decode().split()
-    print(f"evaluation code: {len(files)} files; changed since {args.baseline}: {changed or 'none'}")
+    print(f"code of {', '.join(args.entry)}: {len(files)} files; changed since {args.baseline}: {changed or 'none'}")
     print(f"diff since baseline {actual[:16]}; approved changes {allowed[:16]} ({', '.join(args.approved) or 'none'})")
     if actual == allowed:
-        print("PASS: the evaluation code equals the baseline plus exactly the approved changes")
+        print("PASS: the code equals the baseline plus exactly the approved changes")
         return 0
-    print("FAIL: the evaluation code differs from the baseline beyond the approved changes")
+    print("FAIL: the code differs from the baseline beyond the approved changes")
     return 1
 
 
