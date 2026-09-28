@@ -111,3 +111,66 @@ to Room 1 being present.
 The numbers, the reference clones and the input hashes are in
 [`docs/results/mixed-imitation-pilot.json`](results/mixed-imitation-pilot.json), written by
 `scripts/analyze_mixed_imitation_pilot.py`.
+
+## Third pilot: can a copy of the policy play like it?
+
+Also descriptive, four runs, one recipe, declared before any data (`config/coverage-ceiling-pilot.json`).
+
+The second pilot suggested that the demonstrations were the wrong thing to imitate. Before mixing anything else in,
+this pilot asked a narrower question: if a network is trained only to copy what a starting policy itself does, can
+it play Room 1 like that policy? If even that failed, imitation could not rebuild the skill from scratch.
+
+- **Copying target:** the starting policy's own probability for each button, on each frame, rather than a single
+  "right answer" per frame.
+- **Copies:** fresh networks, sharing no weights with the policy they copy, trained with the same settings as the
+  earlier imitation steps.
+- **Two sets of frames to copy on:**
+  - **Demonstration frames:** the Room 1 demonstration routes (5 of the 7 routes fitted, about 2,000 frames).
+  - **The policy's own play:** 25 episodes of each starting policy playing Room 1 from its normal start (19 fitted,
+    4,300 to 8,600 frames). No test state was used as a start.
+- **Measure:** the same Room 1 test, floor and reference as before; nothing was fine-tuned afterwards.
+
+| Starting policy | Before | Copy on demonstration frames | Copy on its own play |
+|---|---:|---:|---:|
+| Seed 3 | 76% | 64% | 69% |
+| Seed 4 | 77% | 60% | 74% |
+| Seed 5 | 77% | 70% | 83% |
+| Seed 6 | 66% | 50% | 56% |
+| Floor: never saw Room 1 | | 10% to 17% | 10% to 17% |
+| Room 1 demonstrations only | | 10% to 15% | |
+
+**A copy of the policy plays Room 1 almost as well as the policy.** Measured against the floor, copies trained on
+the policy's own play reached 81% to 109% of the policy's skill (median 92%), and copies trained on the demonstration
+frames reached 69% to 88% (median 76%). Seed 5's copy scoring above its policy (83% against 77%) is within sampling
+noise; read it as about equal.
+
+The clearest comparison is on the demonstration frames. There, copying the policy's own probabilities gave 50% to
+70%, while copying the demonstrated buttons on exactly the same frames, split and settings gave 10% to 15%. So what
+the copy is trained to reproduce matters a great deal: copying the policy you want to keep works, and copying the
+demonstrations does not. This pilot cannot say *why*. Two things changed together: whose choices are copied (on the
+demonstration frames, all of the policy's most likely buttons match the demonstrated ones on only 20% to 30% of
+frames), and probabilities instead of one right answer per frame. It also does not show that the choice of frames is
+unimportant. Copies trained on the policy's own play did better in all four pairs, by 5 to 14 points, but they also
+had two to four times as many frames.
+
+**This is not yet a retention result.** Nothing learned Room 2 here; the copies only show that the policy's own
+probabilities can carry its Room 1 skill. Whether they keep it while Room 2 is learned is the next pilot's question.
+
+Sampling noise and the reused test set, as for the first pilot, and in addition:
+
+- **This shows copying along known paths, not far from them.** Most Room 1 test starts (59% to 76%, depending on the
+  copy) lie within 4 pixels of a frame the copy was trained on; the median distance is 1 to 2 pixels. This compares
+  position only, not speed or timers. A copy that plays well only near familiar paths would score the same.
+- Four starting policies from one training recipe (Phase 3B, varied starts).
+- The Room 1 test set has now been used by Phase 3B and three pilots, so it serves as a development set. A fresh Room
+  1 set will be generated before any claim beyond "descriptive".
+- The policy's own play was recorded only from the normal Room 1 start.
+
+The next pilot tests this: while a policy learns Room 2, keep copying its own Room 1 probabilities on its recorded
+Room 1 play.
+
+The numbers, the copies' agreement with their policies and the input hashes are in
+[`docs/results/coverage-ceiling-pilot.json`](results/coverage-ceiling-pilot.json), written by
+`scripts/analyze_coverage_ceiling.py`. The button-match and distance figures are in
+[`docs/results/coverage-ceiling-descriptive.json`](results/coverage-ceiling-descriptive.json), written by
+`scripts/describe_coverage_ceiling.py`.
