@@ -198,8 +198,9 @@ kept almost none (14% to 22%). Room 2 imitation was as good as before. Copying o
 of the recorded play kept a median 69%.
 
 **Fine-tuning on Room 2 then wore it away.** Over 500,000 steps, Room 1 success fell to 7% to 26%. Measured in the
-same unit (each policy's original margin over the floor), the median run dropped 0.87, more than the 0.78 it had kept
-after copying, so three of the four ended below every policy that never saw Room 1. Room 2 also paid: only one of four
+same unit (each policy's original margin over the floor), the median run dropped 0.87 of that margin against the
+0.78 it had kept; three of the four dropped more than they had kept and ended below every policy that never saw
+Room 1. Room 2 also paid: only one of four
 final policies cleared the Room 2 start 45 or more times out of 50, against 48 to 50 in the second pilot. On a
 held-out set of Room 2 starts they did about as well as the earlier recipes: 76% to 85% (median 81%), against 80% to
 86% (median 82%) for the second pilot and 79% to 86% (median 81%) for the first.
