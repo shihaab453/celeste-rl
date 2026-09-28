@@ -1,0 +1,229 @@
+{
+  "name": "mixed-self-distillation-train-v1",
+  "written": "2026-09-28T01:50:18+01:00",
+  "pilot_plan": "config/mixed-self-distillation-pilot.json",
+  "pilot_plan_sha256": "2e1c3f1f37e52ce1c96dd955f5f310eae887b281667b633a43d268ced29d6d5b",
+  "clone_analysis": "docs/results/mixed-self-distillation-clone.json",
+  "clone_analysis_sha256": "5ed82271f9f115f55bc39efd20303a684044f751ab14f6a6a5a768af0c6d122c",
+  "clones": {
+    "SD-k0": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-205018",
+      "sha256": "56dc7fd85a2cee79697a137ef741347dc91968fac2e2ddd21a69ffdb0b9e43b4",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "donor_seed": 3,
+      "seed": 0,
+      "train_frames": {
+        "chapter-1-room-2": 7520,
+        "chapter-1-room-1": 4472
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.79734,
+        "chapter-1-room-1": 1.340787
+      }
+    },
+    "SD-k1": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-224504",
+      "sha256": "128055ee8503fa64c5e23cb9c9012845fbcdd736840185961ceb45fe2d4978f8",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "donor_seed": 4,
+      "seed": 1,
+      "train_frames": {
+        "chapter-1-room-2": 7384,
+        "chapter-1-room-1": 8619
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 1.083627,
+        "chapter-1-room-1": 0.928356
+      }
+    },
+    "SD-k2": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-233034",
+      "sha256": "babfa470a541f7733be7794bc8ece3f796950f8c56edfa1fa19fce5a0c4f1c44",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "donor_seed": 5,
+      "seed": 2,
+      "train_frames": {
+        "chapter-1-room-2": 7309,
+        "chapter-1-room-1": 4307
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.794637,
+        "chapter-1-room-1": 1.348502
+      }
+    },
+    "SD-k3": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-235103",
+      "sha256": "887de93a51dbb15d5336ab0bc9f64933c435179e0ada8e0c7fa12e17a794e9d1",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "donor_seed": 6,
+      "seed": 3,
+      "train_frames": {
+        "chapter-1-room-2": 7444,
+        "chapter-1-room-1": 5863
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.893807,
+        "chapter-1-room-1": 1.134829
+      }
+    }
+  },
+  "label": "training for the descriptive mixed self-distillation pilot (branch K); nothing reads a held-out set",
+  "runs": [
+    {
+      "id": "mixed-self-distillation-pilot-SD-k0",
+      "stage": "mixed-self-distillation-train",
+      "arm": "SD",
+      "k": 0,
+      "seed": 40,
+      "init_from": "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip",
+      "clone_sha256": "56dc7fd85a2cee79697a137ef741347dc91968fac2e2ddd21a69ffdb0b9e43b4",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-self-distillation-pilot-SD-k0",
+      "checkpoint": "runs/train/mixed-self-distillation-pilot-SD-k0/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 3, SD clone seed 0 (donor play with donor targets, equal room weight), stall option; the M-k0 command with only --init-from and --run-dir changed",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "40",
+        "--run-dir",
+        "runs/train/mixed-self-distillation-pilot-SD-k0"
+      ]
+    },
+    {
+      "id": "mixed-self-distillation-pilot-SD-k1",
+      "stage": "mixed-self-distillation-train",
+      "arm": "SD",
+      "k": 1,
+      "seed": 41,
+      "init_from": "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip",
+      "clone_sha256": "128055ee8503fa64c5e23cb9c9012845fbcdd736840185961ceb45fe2d4978f8",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-self-distillation-pilot-SD-k1",
+      "checkpoint": "runs/train/mixed-self-distillation-pilot-SD-k1/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 4, SD clone seed 1 (donor play with donor targets, equal room weight), stall option; the M-k1 command with only --init-from and --run-dir changed",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "41",
+        "--run-dir",
+        "runs/train/mixed-self-distillation-pilot-SD-k1"
+      ]
+    },
+    {
+      "id": "mixed-self-distillation-pilot-SD-k2",
+      "stage": "mixed-self-distillation-train",
+      "arm": "SD",
+      "k": 2,
+      "seed": 42,
+      "init_from": "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip",
+      "clone_sha256": "babfa470a541f7733be7794bc8ece3f796950f8c56edfa1fa19fce5a0c4f1c44",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-self-distillation-pilot-SD-k2",
+      "checkpoint": "runs/train/mixed-self-distillation-pilot-SD-k2/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 5, SD clone seed 2 (donor play with donor targets, equal room weight), stall option; the M-k2 command with only --init-from and --run-dir changed",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "42",
+        "--run-dir",
+        "runs/train/mixed-self-distillation-pilot-SD-k2"
+      ]
+    },
+    {
+      "id": "mixed-self-distillation-pilot-SD-k3",
+      "stage": "mixed-self-distillation-train",
+      "arm": "SD",
+      "k": 3,
+      "seed": 43,
+      "init_from": "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip",
+      "clone_sha256": "887de93a51dbb15d5336ab0bc9f64933c435179e0ada8e0c7fa12e17a794e9d1",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "run_dir": "runs/train/mixed-self-distillation-pilot-SD-k3",
+      "checkpoint": "runs/train/mixed-self-distillation-pilot-SD-k3/checkpoints/latest.zip",
+      "resumable": true,
+      "limit_minutes": 60,
+      "condition": "Room 1 donor seed 6, SD clone seed 3 (donor play with donor targets, equal room weight), stall option; the M-k3 command with only --init-from and --run-dir changed",
+      "command": [
+        "scripts/train_room1.py",
+        "--task-definition",
+        "config/room2.json",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--init-from",
+        "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip",
+        "--total-timesteps",
+        "500000",
+        "--checkpoint-every",
+        "100000",
+        "--eval-every",
+        "0",
+        "--stall-frames",
+        "296",
+        "--seed",
+        "43",
+        "--run-dir",
+        "runs/train/mixed-self-distillation-pilot-SD-k3"
+      ]
+    }
+  ]
+}

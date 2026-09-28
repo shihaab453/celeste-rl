@@ -1,0 +1,367 @@
+{
+ "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "8bc601cefa6e8e7aee0daf64539de24542c47c4b4d51601db172f24e50727392",
+ "evaluation_plan_sha256": "0e1bff42d4fa6ccb7bbe0a8356d632f436ee1f28e2267d95767b0d973cbb7408",
+ "evaluation_commit": "d06316a0e85b2e60bb3820290902ef277786a689",
+ "clone_analysis_sha256": "5ed82271f9f115f55bc39efd20303a684044f751ab14f6a6a5a768af0c6d122c",
+ "clone_floor": 0.142,
+ "final_floor": 0.2046,
+ "runs": {
+  "SD-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6447,
+     "retained_share_clone_floor": 0.8078
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.3625,
+     "state_weighted": 0.365,
+     "successes": 73,
+     "retained_share_final_floor_descriptive": 0.2821
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.1382,
+     "state_weighted": 0.14,
+     "successes": 28,
+     "retained_share_final_floor_descriptive": -0.1186
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1078,
+     "state_weighted": 0.115,
+     "successes": 23,
+     "retained_share_final_floor_descriptive": -0.1729
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.0836,
+     "state_weighted": 0.08,
+     "successes": 16,
+     "retained_share_final_floor_descriptive": -0.2162
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.0807,
+     "state_weighted": 0.085,
+     "successes": 17,
+     "retained_share_final_floor_descriptive": -0.2214
+    }
+   ],
+   "drop_one_unit": 0.9063,
+   "room2": {
+    "final_clears_of_50": 44,
+    "training": {
+     "clear_per_100k": [
+      0.125,
+      0.236,
+      0.466,
+      0.618,
+      0.641
+     ],
+     "first_50k_window_at_half": 350000
+    }
+   },
+   "explained_variance_first_10_updates": [
+    -0.469,
+    0.066,
+    0.222,
+    0.451,
+    0.326,
+    0.389,
+    0.321,
+    0.207,
+    0.209,
+    0.461
+   ]
+  },
+  "SD-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6265,
+     "retained_share_clone_floor": 0.7726
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.4742,
+     "state_weighted": 0.47,
+     "successes": 94,
+     "retained_share_final_floor_descriptive": 0.4776
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.4802,
+     "state_weighted": 0.48,
+     "successes": 96,
+     "retained_share_final_floor_descriptive": 0.4882
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.4267,
+     "state_weighted": 0.415,
+     "successes": 83,
+     "retained_share_final_floor_descriptive": 0.3934
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.4007,
+     "state_weighted": 0.405,
+     "successes": 81,
+     "retained_share_final_floor_descriptive": 0.3474
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.259,
+     "state_weighted": 0.255,
+     "successes": 51,
+     "retained_share_final_floor_descriptive": 0.0964
+    }
+   ],
+   "drop_one_unit": 0.586,
+   "room2": {
+    "final_clears_of_50": 46,
+    "training": {
+     "clear_per_100k": [
+      0.405,
+      0.853,
+      0.894,
+      0.915,
+      0.935
+     ],
+     "first_50k_window_at_half": 150000
+    }
+   },
+   "explained_variance_first_10_updates": [
+    0.68,
+    0.67,
+    0.582,
+    0.638,
+    0.537,
+    0.588,
+    0.668,
+    0.599,
+    0.661,
+    0.505
+   ]
+  },
+  "SD-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6358,
+     "retained_share_clone_floor": 0.7819
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.5325,
+     "state_weighted": 0.53,
+     "successes": 106,
+     "retained_share_final_floor_descriptive": 0.5764
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.5511,
+     "state_weighted": 0.545,
+     "successes": 109,
+     "retained_share_final_floor_descriptive": 0.6091
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.29,
+     "state_weighted": 0.295,
+     "successes": 59,
+     "retained_share_final_floor_descriptive": 0.1501
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.2608,
+     "state_weighted": 0.27,
+     "successes": 54,
+     "retained_share_final_floor_descriptive": 0.0988
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.0746,
+     "state_weighted": 0.075,
+     "successes": 15,
+     "retained_share_final_floor_descriptive": -0.2285
+    }
+   ],
+   "drop_one_unit": 0.8887,
+   "room2": {
+    "final_clears_of_50": 41,
+    "training": {
+     "clear_per_100k": [
+      0.029,
+      0.217,
+      0.765,
+      0.844,
+      0.874
+     ],
+     "first_50k_window_at_half": 250000
+    }
+   },
+   "explained_variance_first_10_updates": [
+    0.606,
+    0.748,
+    0.645,
+    0.845,
+    0.795,
+    0.711,
+    0.692,
+    0.728,
+    0.83,
+    0.868
+   ]
+  },
+  "SD-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.5161,
+     "retained_share_clone_floor": 0.7232
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.4071,
+     "state_weighted": 0.405,
+     "successes": 81,
+     "retained_share_final_floor_descriptive": 0.4453
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.3874,
+     "state_weighted": 0.39,
+     "successes": 78,
+     "retained_share_final_floor_descriptive": 0.402
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.1921,
+     "state_weighted": 0.19,
+     "successes": 38,
+     "retained_share_final_floor_descriptive": -0.0275
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.1474,
+     "state_weighted": 0.155,
+     "successes": 31,
+     "retained_share_final_floor_descriptive": -0.1258
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.0748,
+     "state_weighted": 0.08,
+     "successes": 16,
+     "retained_share_final_floor_descriptive": -0.2855
+    }
+   ],
+   "drop_one_unit": 0.8531,
+   "room2": {
+    "final_clears_of_50": 35,
+    "training": {
+     "clear_per_100k": [
+      0.029,
+      0.099,
+      0.467,
+      0.584,
+      0.574
+     ],
+     "first_50k_window_at_half": 300000
+    }
+   },
+   "explained_variance_first_10_updates": [
+    0.32,
+    0.531,
+    0.764,
+    0.714,
+    0.75,
+    0.786,
+    0.837,
+    0.876,
+    0.807,
+    0.854
+   ]
+  }
+ },
+ "room2_v1_heldout_finals_descriptive": {
+  "SD-k0": {
+   "route_macro": 0.7688,
+   "state_weighted": 0.77,
+   "successes": 154
+  },
+  "SD-k1": {
+   "route_macro": 0.8507,
+   "state_weighted": 0.85,
+   "successes": 170
+  },
+  "SD-k2": {
+   "route_macro": 0.8435,
+   "state_weighted": 0.84,
+   "successes": 168
+  },
+  "SD-k3": {
+   "route_macro": 0.759,
+   "state_weighted": 0.76,
+   "successes": 152
+  },
+  "M-k0": {
+   "route_macro": 0.8011,
+   "state_weighted": 0.8,
+   "successes": 160
+  },
+  "M-k1": {
+   "route_macro": 0.8584,
+   "state_weighted": 0.86,
+   "successes": 172
+  },
+  "M-k2": {
+   "route_macro": 0.8277,
+   "state_weighted": 0.825,
+   "successes": 165
+  },
+  "M-k3": {
+   "route_macro": 0.8075,
+   "state_weighted": 0.805,
+   "successes": 161
+  },
+  "R-k0": {
+   "route_macro": 0.8642,
+   "state_weighted": 0.86,
+   "successes": 172
+  },
+  "R-k1": {
+   "route_macro": 0.7973,
+   "state_weighted": 0.79,
+   "successes": 158
+  },
+  "R-k2": {
+   "route_macro": 0.79,
+   "state_weighted": 0.785,
+   "successes": 157
+  },
+  "R-k3": {
+   "route_macro": 0.8275,
+   "state_weighted": 0.825,
+   "successes": 165
+  }
+ },
+ "decision": {
+  "branch": "K-decay",
+  "median_drop": 0.8709,
+  "room2_finals_clearing_45_of_50": "1 of 4",
+  "next": "an anchor inside PPO (design reviewed; code and its own review first)"
+ }
+}

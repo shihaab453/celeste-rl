@@ -1,0 +1,602 @@
+{
+ "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "78b2c068fe450933cd2da3abf222c70db072bfb441bd0069d61e052810804cf0",
+ "evaluation_plan_sha256": "b269254df0598d2b73abf36a56b5e5bcecd6e4b6fe823697764f5108b68977fc",
+ "evaluation_commit": "95bff2c866eb64a02cdef7798daa6b59e28b2da9",
+ "clone_floor": 0.142,
+ "imitation_only_reference": 0.1216,
+ "clones": {
+  "SD-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1": {
+    "route_macro": 0.6447,
+    "state_weighted": 0.63,
+    "successes": 126,
+    "retained_share": 0.8078
+   },
+   "room2_clone_clears_of_50": 9,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9619,
+     "frame_accuracy": 0.5811,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    },
+    "chapter-1-room-1": {
+     "frames": 804,
+     "trajectories": 6,
+     "input_accuracy": 0.9421,
+     "frame_accuracy": 0.5361,
+     "always_zero_input_accuracy": 0.7902,
+     "always_zero_frame_accuracy": 0.0012,
+     "persistence_input_accuracy": 0.885,
+     "persistence_frame_accuracy": 0.393,
+     "inputs_per_frame": 4.41
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7520,
+    "chapter-1-room-1": 4472
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.79734,
+    "chapter-1-room-1": 1.340787
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.1667,
+    "R-k_clone_route_macro": 0.2137,
+    "S-play-k_route_macro": 0.6922,
+    "S-demo-k_route_macro": 0.6408,
+    "M-k_room2_clone_clears_of_50": 11,
+    "R-k_room2_clone_clears_of_50": 5,
+    "M-k_room2_heldback": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9603,
+     "frame_accuracy": 0.5705,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    },
+    "R-k_room2_heldback": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9624,
+     "frame_accuracy": 0.6031,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    }
+   }
+  },
+  "SD-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1": {
+    "route_macro": 0.6265,
+    "state_weighted": 0.64,
+    "successes": 128,
+    "retained_share": 0.7726
+   },
+   "room2_clone_clears_of_50": 22,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9574,
+     "frame_accuracy": 0.5404,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    },
+    "chapter-1-room-1": {
+     "frames": 2047,
+     "trajectories": 6,
+     "input_accuracy": 0.991,
+     "frame_accuracy": 0.853,
+     "always_zero_input_accuracy": 0.8871,
+     "always_zero_frame_accuracy": 0.0093,
+     "persistence_input_accuracy": 0.9702,
+     "persistence_frame_accuracy": 0.6282,
+     "inputs_per_frame": 2.37
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7384,
+    "chapter-1-room-1": 8619
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 1.083627,
+    "chapter-1-room-1": 0.928356
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.1407,
+    "R-k_clone_route_macro": 0.1543,
+    "S-play-k_route_macro": 0.7353,
+    "S-demo-k_route_macro": 0.5956,
+    "M-k_room2_clone_clears_of_50": 13,
+    "R-k_room2_clone_clears_of_50": 21,
+    "M-k_room2_heldback": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9565,
+     "frame_accuracy": 0.5409,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    },
+    "R-k_room2_heldback": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9556,
+     "frame_accuracy": 0.5284,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    }
+   }
+  },
+  "SD-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1": {
+    "route_macro": 0.6358,
+    "state_weighted": 0.63,
+    "successes": 126,
+    "retained_share": 0.7819
+   },
+   "room2_clone_clears_of_50": 10,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9585,
+     "frame_accuracy": 0.5511,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    },
+    "chapter-1-room-1": {
+     "frames": 1413,
+     "trajectories": 6,
+     "input_accuracy": 0.9684,
+     "frame_accuracy": 0.6745,
+     "always_zero_input_accuracy": 0.8351,
+     "always_zero_frame_accuracy": 0.0,
+     "persistence_input_accuracy": 0.9394,
+     "persistence_frame_accuracy": 0.5364,
+     "inputs_per_frame": 3.46
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7309,
+    "chapter-1-room-1": 4307
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.794637,
+    "chapter-1-room-1": 1.348502
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.2148,
+    "R-k_clone_route_macro": 0.1674,
+    "S-play-k_route_macro": 0.832,
+    "S-demo-k_route_macro": 0.6956,
+    "M-k_room2_clone_clears_of_50": 10,
+    "R-k_room2_clone_clears_of_50": 13,
+    "M-k_room2_heldback": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9566,
+     "frame_accuracy": 0.5495,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    },
+    "R-k_room2_heldback": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9577,
+     "frame_accuracy": 0.5471,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    }
+   }
+  },
+  "SD-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1": {
+    "route_macro": 0.5161,
+    "state_weighted": 0.51,
+    "successes": 102,
+    "retained_share": 0.7232
+   },
+   "room2_clone_clears_of_50": 9,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9615,
+     "frame_accuracy": 0.584,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    },
+    "chapter-1-room-1": {
+     "frames": 2008,
+     "trajectories": 6,
+     "input_accuracy": 0.9657,
+     "frame_accuracy": 0.6394,
+     "always_zero_input_accuracy": 0.8541,
+     "always_zero_frame_accuracy": 0.0159,
+     "persistence_input_accuracy": 0.9448,
+     "persistence_frame_accuracy": 0.5319,
+     "inputs_per_frame": 3.06
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7444,
+    "chapter-1-room-1": 5863
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.893807,
+    "chapter-1-room-1": 1.134829
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.2183,
+    "R-k_clone_route_macro": 0.166,
+    "S-play-k_route_macro": 0.5629,
+    "S-demo-k_route_macro": 0.5004,
+    "M-k_room2_clone_clears_of_50": 14,
+    "R-k_room2_clone_clears_of_50": 10,
+    "M-k_room2_heldback": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9614,
+     "frame_accuracy": 0.5721,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    },
+    "R-k_room2_heldback": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9592,
+     "frame_accuracy": 0.5593,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    }
+   }
+  },
+  "D-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1": {
+    "route_macro": 0.6269,
+    "state_weighted": 0.62,
+    "successes": 124,
+    "retained_share": 0.7792
+   },
+   "room2_clone_clears_of_50": 13,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9602,
+     "frame_accuracy": 0.5701,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    },
+    "chapter-1-room-1": {
+     "frames": 740,
+     "trajectories": 2,
+     "input_accuracy": 0.9003,
+     "frame_accuracy": 0.2649,
+     "always_zero_input_accuracy": 0.7844,
+     "always_zero_frame_accuracy": 0.0108,
+     "persistence_input_accuracy": 0.8882,
+     "persistence_frame_accuracy": 0.3297,
+     "inputs_per_frame": 4.53
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7520,
+    "chapter-1-room-1": 1948
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.629521,
+    "chapter-1-room-1": 2.430185
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.1667,
+    "R-k_clone_route_macro": 0.2137,
+    "S-play-k_route_macro": 0.6922,
+    "S-demo-k_route_macro": 0.6408,
+    "M-k_room2_clone_clears_of_50": 11,
+    "R-k_room2_clone_clears_of_50": 5,
+    "M-k_room2_heldback": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9603,
+     "frame_accuracy": 0.5705,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    },
+    "R-k_room2_heldback": {
+     "frames": 2275,
+     "trajectories": 5,
+     "input_accuracy": 0.9624,
+     "frame_accuracy": 0.6031,
+     "always_zero_input_accuracy": 0.8962,
+     "always_zero_frame_accuracy": 0.0523,
+     "persistence_input_accuracy": 0.9811,
+     "persistence_frame_accuracy": 0.8659,
+     "inputs_per_frame": 2.18
+    }
+   }
+  },
+  "D-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1": {
+    "route_macro": 0.5335,
+    "state_weighted": 0.54,
+    "successes": 108,
+    "retained_share": 0.6243
+   },
+   "room2_clone_clears_of_50": 8,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.954,
+     "frame_accuracy": 0.5085,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    },
+    "chapter-1-room-1": {
+     "frames": 632,
+     "trajectories": 2,
+     "input_accuracy": 0.9572,
+     "frame_accuracy": 0.432,
+     "always_zero_input_accuracy": 0.881,
+     "always_zero_frame_accuracy": 0.0237,
+     "persistence_input_accuracy": 0.9672,
+     "persistence_frame_accuracy": 0.587,
+     "inputs_per_frame": 2.5
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7384,
+    "chapter-1-room-1": 2056
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.63922,
+    "chapter-1-room-1": 2.29572
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.1407,
+    "R-k_clone_route_macro": 0.1543,
+    "S-play-k_route_macro": 0.7353,
+    "S-demo-k_route_macro": 0.5956,
+    "M-k_room2_clone_clears_of_50": 13,
+    "R-k_room2_clone_clears_of_50": 21,
+    "M-k_room2_heldback": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9565,
+     "frame_accuracy": 0.5409,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    },
+    "R-k_room2_heldback": {
+     "frames": 2411,
+     "trajectories": 5,
+     "input_accuracy": 0.9556,
+     "frame_accuracy": 0.5284,
+     "always_zero_input_accuracy": 0.8919,
+     "always_zero_frame_accuracy": 0.0365,
+     "persistence_input_accuracy": 0.9796,
+     "persistence_frame_accuracy": 0.8611,
+     "inputs_per_frame": 2.27
+    }
+   }
+  },
+  "D-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1": {
+    "route_macro": 0.5317,
+    "state_weighted": 0.535,
+    "successes": 107,
+    "retained_share": 0.6171
+   },
+   "room2_clone_clears_of_50": 8,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9591,
+     "frame_accuracy": 0.5587,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    },
+    "chapter-1-room-1": {
+     "frames": 699,
+     "trajectories": 2,
+     "input_accuracy": 0.9422,
+     "frame_accuracy": 0.4077,
+     "always_zero_input_accuracy": 0.8555,
+     "always_zero_frame_accuracy": 0.0043,
+     "persistence_input_accuracy": 0.9377,
+     "persistence_frame_accuracy": 0.4936,
+     "inputs_per_frame": 3.03
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7309,
+    "chapter-1-room-1": 1989
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.636065,
+    "chapter-1-room-1": 2.337355
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.2148,
+    "R-k_clone_route_macro": 0.1674,
+    "S-play-k_route_macro": 0.832,
+    "S-demo-k_route_macro": 0.6956,
+    "M-k_room2_clone_clears_of_50": 10,
+    "R-k_room2_clone_clears_of_50": 13,
+    "M-k_room2_heldback": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9566,
+     "frame_accuracy": 0.5495,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    },
+    "R-k_room2_heldback": {
+     "frames": 2486,
+     "trajectories": 5,
+     "input_accuracy": 0.9577,
+     "frame_accuracy": 0.5471,
+     "always_zero_input_accuracy": 0.8931,
+     "always_zero_frame_accuracy": 0.0479,
+     "persistence_input_accuracy": 0.9806,
+     "persistence_frame_accuracy": 0.8648,
+     "inputs_per_frame": 2.25
+    }
+   }
+  },
+  "D-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1": {
+    "route_macro": 0.5341,
+    "state_weighted": 0.53,
+    "successes": 106,
+    "retained_share": 0.758
+   },
+   "room2_clone_clears_of_50": 14,
+   "heldback_imitation": {
+    "chapter-1-room-2": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9588,
+     "frame_accuracy": 0.5444,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    },
+    "chapter-1-room-1": {
+     "frames": 699,
+     "trajectories": 2,
+     "input_accuracy": 0.9492,
+     "frame_accuracy": 0.4077,
+     "always_zero_input_accuracy": 0.873,
+     "always_zero_frame_accuracy": 0.0229,
+     "persistence_input_accuracy": 0.9427,
+     "persistence_frame_accuracy": 0.4564,
+     "inputs_per_frame": 2.67
+    }
+   },
+   "train_frames": {
+    "chapter-1-room-2": 7444,
+    "chapter-1-room-1": 1989
+   },
+   "per_frame_weight": {
+    "chapter-1-room-2": 0.633598,
+    "chapter-1-room-1": 2.371292
+   },
+   "beside": {
+    "M-k_clone_route_macro": 0.2183,
+    "R-k_clone_route_macro": 0.166,
+    "S-play-k_route_macro": 0.5629,
+    "S-demo-k_route_macro": 0.5004,
+    "M-k_room2_clone_clears_of_50": 14,
+    "R-k_room2_clone_clears_of_50": 10,
+    "M-k_room2_heldback": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9614,
+     "frame_accuracy": 0.5721,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    },
+    "R-k_room2_heldback": {
+     "frames": 2351,
+     "trajectories": 5,
+     "input_accuracy": 0.9592,
+     "frame_accuracy": 0.5593,
+     "always_zero_input_accuracy": 0.8956,
+     "always_zero_frame_accuracy": 0.0659,
+     "persistence_input_accuracy": 0.981,
+     "persistence_frame_accuracy": 0.8626,
+     "inputs_per_frame": 2.19
+    }
+   }
+  }
+ },
+ "decision": {
+  "branch": "K",
+  "median_sd_retained_share": 0.7772,
+  "next": "the PPO stage (declared fine-tuning), then K-hold, K-decay or K-cost on the one-unit drop"
+ },
+ "descriptive": {
+  "median_d_retained_share": 0.6911
+ }
+}

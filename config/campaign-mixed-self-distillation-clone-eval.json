@@ -1,0 +1,492 @@
+{
+  "name": "mixed-self-distillation-clone-eval-v1",
+  "written": "2026-09-28T01:24:22+01:00",
+  "pilot_plan": "config/mixed-self-distillation-pilot.json",
+  "pilot_plan_sha256": "2e1c3f1f37e52ce1c96dd955f5f310eae887b281667b633a43d268ced29d6d5b",
+  "clone_note": "SD-k0 and SD-k1 were fitted by run_mixed_sd_clones.ps1 (log runs/clone-logs/mixed-self-distillation-clones-20260927.log); the other six refused at 23:25 because PyCharm had modified tracked .idea files (dirty tree, nothing written), and were fitted after a git restore by the resume script (log runs/clone-logs/mixed-self-distillation-clones-20260927-resume.log), all at 5981e37",
+  "clones": {
+    "SD-k0": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-205018",
+      "sha256": "56dc7fd85a2cee79697a137ef741347dc91968fac2e2ddd21a69ffdb0b9e43b4",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "donor_seed": 3,
+      "seed": 0,
+      "train_frames": {
+        "chapter-1-room-2": 7520,
+        "chapter-1-room-1": 4472
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.79734,
+        "chapter-1-room-1": 1.340787
+      }
+    },
+    "SD-k1": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-224504",
+      "sha256": "128055ee8503fa64c5e23cb9c9012845fbcdd736840185961ceb45fe2d4978f8",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "donor_seed": 4,
+      "seed": 1,
+      "train_frames": {
+        "chapter-1-room-2": 7384,
+        "chapter-1-room-1": 8619
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 1.083627,
+        "chapter-1-room-1": 0.928356
+      }
+    },
+    "SD-k2": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-233034",
+      "sha256": "babfa470a541f7733be7794bc8ece3f796950f8c56edfa1fa19fce5a0c4f1c44",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "donor_seed": 5,
+      "seed": 2,
+      "train_frames": {
+        "chapter-1-room-2": 7309,
+        "chapter-1-room-1": 4307
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.794637,
+        "chapter-1-room-1": 1.348502
+      }
+    },
+    "SD-k3": {
+      "dir": "runs/clone/chapter-1-room-2/20260927-235103",
+      "sha256": "887de93a51dbb15d5336ab0bc9f64933c435179e0ada8e0c7fa12e17a794e9d1",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "donor_seed": 6,
+      "seed": 3,
+      "train_frames": {
+        "chapter-1-room-2": 7444,
+        "chapter-1-room-1": 5863
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.893807,
+        "chapter-1-room-1": 1.134829
+      }
+    },
+    "D-k0": {
+      "dir": "runs/clone/chapter-1-room-2/20260928-001416",
+      "sha256": "2daabf8ab2864d0c0501092290ec4e723edf370d1974e5c04c63630185e49f37",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed3/checkpoints/latest.zip",
+      "donor_seed": 3,
+      "seed": 0,
+      "train_frames": {
+        "chapter-1-room-2": 7520,
+        "chapter-1-room-1": 1948
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.629521,
+        "chapter-1-room-1": 2.430185
+      }
+    },
+    "D-k1": {
+      "dir": "runs/clone/chapter-1-room-2/20260928-003124",
+      "sha256": "743dc93a226d60138ab7534d2a7219e2851a2477260773307502fb5c72ee1344",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed4/checkpoints/latest.zip",
+      "donor_seed": 4,
+      "seed": 1,
+      "train_frames": {
+        "chapter-1-room-2": 7384,
+        "chapter-1-room-1": 2056
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.63922,
+        "chapter-1-room-1": 2.29572
+      }
+    },
+    "D-k2": {
+      "dir": "runs/clone/chapter-1-room-2/20260928-004900",
+      "sha256": "3e8e3207377b37b501948b9dab435de22c5fcb22a6acb783c438f8d923535d9b",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed5/checkpoints/latest.zip",
+      "donor_seed": 5,
+      "seed": 2,
+      "train_frames": {
+        "chapter-1-room-2": 7309,
+        "chapter-1-room-1": 1989
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.636065,
+        "chapter-1-room-1": 2.337355
+      }
+    },
+    "D-k3": {
+      "dir": "runs/clone/chapter-1-room-2/20260928-010523",
+      "sha256": "57cfc5d7cafbfb6d1abb84da1c490654cf45e3bc099b7e561ff6eb04d770660f",
+      "commit": "5981e37e12b929a0625cc3238136751287882682",
+      "donor": "runs/train/overnight-B-seed6/checkpoints/latest.zip",
+      "donor_seed": 6,
+      "seed": 3,
+      "train_frames": {
+        "chapter-1-room-2": 7444,
+        "chapter-1-room-1": 1989
+      },
+      "per_frame_weight": {
+        "chapter-1-room-2": 0.633598,
+        "chapter-1-room-1": 2.371292
+      }
+    }
+  },
+  "label": "descriptive mixed self-distillation clone-point evaluations; Room 1 aggregates only; the Room 2 v2 set is never read",
+  "runs": [
+    {
+      "id": "room1-SD-k0-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip",
+      "checkpoint_sha256": "56dc7fd85a2cee79697a137ef741347dc91968fac2e2ddd21a69ffdb0b9e43b4",
+      "run_dir": "runs/evaluation/_planned-room1-SD-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-SD-k0-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip",
+      "checkpoint_sha256": "56dc7fd85a2cee79697a137ef741347dc91968fac2e2ddd21a69ffdb0b9e43b4",
+      "run_dir": "runs/evaluation/_planned-room2-SD-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-205018/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-SD-k1-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip",
+      "checkpoint_sha256": "128055ee8503fa64c5e23cb9c9012845fbcdd736840185961ceb45fe2d4978f8",
+      "run_dir": "runs/evaluation/_planned-room1-SD-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-SD-k1-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip",
+      "checkpoint_sha256": "128055ee8503fa64c5e23cb9c9012845fbcdd736840185961ceb45fe2d4978f8",
+      "run_dir": "runs/evaluation/_planned-room2-SD-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-224504/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-SD-k2-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip",
+      "checkpoint_sha256": "babfa470a541f7733be7794bc8ece3f796950f8c56edfa1fa19fce5a0c4f1c44",
+      "run_dir": "runs/evaluation/_planned-room1-SD-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-SD-k2-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip",
+      "checkpoint_sha256": "babfa470a541f7733be7794bc8ece3f796950f8c56edfa1fa19fce5a0c4f1c44",
+      "run_dir": "runs/evaluation/_planned-room2-SD-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-233034/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-SD-k3-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip",
+      "checkpoint_sha256": "887de93a51dbb15d5336ab0bc9f64933c435179e0ada8e0c7fa12e17a794e9d1",
+      "run_dir": "runs/evaluation/_planned-room1-SD-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-SD-k3-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip",
+      "checkpoint_sha256": "887de93a51dbb15d5336ab0bc9f64933c435179e0ada8e0c7fa12e17a794e9d1",
+      "run_dir": "runs/evaluation/_planned-room2-SD-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260927-235103/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-D-k0-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-001416/cloned.zip",
+      "checkpoint_sha256": "2daabf8ab2864d0c0501092290ec4e723edf370d1974e5c04c63630185e49f37",
+      "run_dir": "runs/evaluation/_planned-room1-D-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-001416/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-D-k0-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-001416/cloned.zip",
+      "checkpoint_sha256": "2daabf8ab2864d0c0501092290ec4e723edf370d1974e5c04c63630185e49f37",
+      "run_dir": "runs/evaluation/_planned-room2-D-k0-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-001416/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-D-k1-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-003124/cloned.zip",
+      "checkpoint_sha256": "743dc93a226d60138ab7534d2a7219e2851a2477260773307502fb5c72ee1344",
+      "run_dir": "runs/evaluation/_planned-room1-D-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-003124/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-D-k1-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-003124/cloned.zip",
+      "checkpoint_sha256": "743dc93a226d60138ab7534d2a7219e2851a2477260773307502fb5c72ee1344",
+      "run_dir": "runs/evaluation/_planned-room2-D-k1-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-003124/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-D-k2-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-004900/cloned.zip",
+      "checkpoint_sha256": "3e8e3207377b37b501948b9dab435de22c5fcb22a6acb783c438f8d923535d9b",
+      "run_dir": "runs/evaluation/_planned-room1-D-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-004900/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-D-k2-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-004900/cloned.zip",
+      "checkpoint_sha256": "3e8e3207377b37b501948b9dab435de22c5fcb22a6acb783c438f8d923535d9b",
+      "run_dir": "runs/evaluation/_planned-room2-D-k2-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-004900/cloned.zip"
+      ]
+    },
+    {
+      "id": "room1-D-k3-clone",
+      "stage": "mixed-self-distillation-room1",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-010523/cloned.zip",
+      "checkpoint_sha256": "57cfc5d7cafbfb6d1abb84da1c490654cf45e3bc099b7e561ff6eb04d770660f",
+      "run_dir": "runs/evaluation/_planned-room1-D-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-010523/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "room2-D-k3-clone",
+      "stage": "mixed-self-distillation-room2",
+      "checkpoint": "runs/clone/chapter-1-room-2/20260928-010523/cloned.zip",
+      "checkpoint_sha256": "57cfc5d7cafbfb6d1abb84da1c490654cf45e3bc099b7e561ff6eb04d770660f",
+      "run_dir": "runs/evaluation/_planned-room2-D-k3-clone",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_checkpoint.py",
+        "--task-definition",
+        "config/room2.json",
+        "--episodes",
+        "50",
+        "--seed",
+        "20260924",
+        "--reward-version",
+        "rew-v2",
+        "--shaping-scale",
+        "2.0",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20260928-010523/cloned.zip"
+      ]
+    }
+  ]
+}
