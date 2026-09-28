@@ -264,6 +264,10 @@ def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, en
         return {"status": "timed_out", "seconds": round(time.time() - started), "command": command[1:]}
     for line in tail:
         log(logfile, f"  | {line}")
+    if code != 0:
+        # A child that crashes before printing anything leaves only its traceback, on stderr.
+        for line in (finished.stderr or "").strip().splitlines()[-6:]:
+            log(logfile, f"  ! {line}")
     outcome = {"status": "ok" if code == 0 else f"exit_{code}",
                "seconds": round(time.time() - started), "command": command[1:]}
     artifact = result_artifact(stdout)
