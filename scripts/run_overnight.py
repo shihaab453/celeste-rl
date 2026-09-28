@@ -83,6 +83,21 @@ def log(path: Path, message: str) -> None:
             handle.write(line + "\n")
 
 
+# Children name their output folders after the current second (runs/<kind>/%Y%m%d-%H%M%S), so two started in the same
+# second collide and the second crashes. Side by side, starts are therefore spaced at least this far apart.
+START_SPACING_SECONDS = 1.5
+_START_LOCK = threading.Lock()
+_LAST_START = [float("-inf")]
+
+
+def wait_for_start_slot() -> None:
+    with _START_LOCK:
+        wait = _LAST_START[0] + START_SPACING_SECONDS - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _LAST_START[0] = time.monotonic()
+
+
 @dataclass(frozen=True)
 class GameCopy:
     """A game copy and the ports its child process uses. No ports: the defaults, exactly as a single copy always ran."""
@@ -252,6 +267,7 @@ def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, en
     command = build_command(entry, game_dir, resume=resume)
     limit = entry.get("limit_minutes", 75) * 60
     started = time.time()
+    wait_for_start_slot()
     log(logfile, f"start {entry['id']}{' (resume)' if resume else ''}: {' '.join(command[1:])}")
     try:
         finished = subprocess.run(command, cwd=REPO, capture_output=True, text=True, timeout=limit, env=env)

@@ -106,5 +106,24 @@ class SideBySideTests(unittest.TestCase):
             side_by_side([{"id": "bad"}, {"id": "good"}], copies, run_one, lambda done: None)
 
 
+
+class StartSpacingTests(unittest.TestCase):
+    def test_concurrent_starts_are_at_least_the_spacing_apart(self):
+        starts, lock = [], threading.Lock()
+
+        def start():
+            run_overnight.wait_for_start_slot()
+            with lock:
+                starts.append(time.monotonic())
+
+        threads = [threading.Thread(target=start) for _ in range(3)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        starts.sort()
+        gaps = [later - earlier for earlier, later in zip(starts, starts[1:])]
+        self.assertTrue(all(gap >= run_overnight.START_SPACING_SECONDS - 0.01 for gap in gaps), gaps)
+
 if __name__ == "__main__":
     unittest.main()
