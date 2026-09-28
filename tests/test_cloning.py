@@ -38,6 +38,7 @@ from tests.test_env import Room3Bridge
 
 def demonstrations(count: int, frames: int, seed: int = 0) -> Demonstrations:
     space, rng = observation_space(), np.random.default_rng(seed)
+    space.seed(seed)  # the space samples from its own generator; unseeded, every process drew different frames
     total = count * frames
     obs = {key: np.stack([space[key].sample() for _ in range(total)]) for key in OBS_KEYS}
     actions = np.zeros((total, len(ACTION_INPUTS)), dtype=np.int8)
