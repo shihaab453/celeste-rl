@@ -72,6 +72,12 @@ class LossTests(unittest.TestCase):
         unmasked_norm = th.linalg.vector_norm(th.stack([p.grad.norm() for p in donor.parameters() if p.grad is not None]))
         self.assertGreater(float(unmasked_norm), 100 * float(norm))
 
+    def test_entropy_bits_counts_fair_coin_tosses(self):
+        from celeste_rl.training.anchor import entropy_bits
+        self.assertAlmostEqual(entropy_bits(np.full((5, 3), 0.5)), 3.0)  # three fair coins per frame
+        self.assertAlmostEqual(entropy_bits(np.zeros((5, 3))), 0.0, places=6)
+        self.assertAlmostEqual(entropy_bits(np.ones((5, 3))), 0.0, places=6)
+
     def test_only_enabled_inputs_are_scored(self):
         self.assertEqual(sorted(ENABLED + DISABLED), list(range(len(ENABLED) + len(DISABLED))))
         self.assertFalse(set(ENABLED) & set(DISABLED))
@@ -178,6 +184,8 @@ class RecordTests(unittest.TestCase):
         rows = (self.folder / "anchor.csv").read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(rows), 1 + 2)  # header and one row per update (64 steps / 32 per rollout)
         self.assertIn("heldback_frame_agreement", rows[0])
+        self.assertTrue(rows[0].rstrip().endswith("heldback_entropy_bits"))
+        self.assertGreater(float(rows[1].split(",")[-1]), 0)  # a fresh policy is random: positive bits
 
     def test_build_anchor_accepts_only_this_donors_recording(self):
         from record_policy_play import save

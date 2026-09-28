@@ -51,7 +51,8 @@ PPO_TRAIN_SHA256 = "7c8d09940123242f0ac401c5ec2cc858b8bf3339f571c222382f048ffd83
 DISABLED = [ACTION_INPUTS.index(name) for name in MENU_INPUTS]
 ENABLED = [i for i in range(len(ACTION_INPUTS)) if i not in DISABLED]
 ANCHOR_CSV_FIELDS = ("update", "minibatches", "anchor_excess_mean", "anchor_grad_norm", "ppo_grad_norm",
-                     "combined_grad_norm_before_clip", "heldback_input_agreement", "heldback_frame_agreement")
+                     "combined_grad_norm_before_clip", "heldback_input_agreement", "heldback_frame_agreement",
+                     "heldback_entropy_bits")
 
 
 def ppo_train_source_sha256() -> str:
@@ -109,13 +110,21 @@ def batch_indices(size: int, batch: int, seed: int, update: int, minibatch: int)
     return np.random.default_rng([seed, update, minibatch]).integers(0, size, min(batch, size))
 
 
-def heldback_agreement(policy, anchor: Anchor) -> tuple[float, float]:
-    """How often the policy's most likely buttons equal the donor's, on the held-back episodes (enabled inputs)."""
+def heldback_agreement(policy, anchor: Anchor) -> tuple[float, float, float]:
+    """On the held-back episodes (enabled inputs): how often the policy's most likely buttons equal the donor's
+    (per input, per whole frame), and the policy's Room 1 randomness in bits per frame (the summed Bernoulli entropy
+    of the enabled inputs over ln 2: how many fair coin tosses its choices amount to)."""
     policy.set_training_mode(False)
     with th.no_grad():
         probs = policy.get_distribution(anchor.obs(anchor.held, slice(None))).distribution.probs.numpy()[:, ENABLED]
     same = (probs >= 0.5) == (anchor.held.targets[:, ENABLED] >= 0.5)
-    return round(float(same.mean()), 4), round(float(same.all(axis=1).mean()), 4)
+    return round(float(same.mean()), 4), round(float(same.all(axis=1).mean()), 4), round(entropy_bits(probs), 4)
+
+
+def entropy_bits(probs: np.ndarray) -> float:
+    """Mean over frames of the summed Bernoulli entropy of the given inputs, in bits (fair coin tosses) per frame."""
+    p = np.clip(np.asarray(probs, dtype=np.float64), 1e-12, 1 - 1e-12)
+    return float((-(p * np.log2(p) + (1 - p) * np.log2(1 - p))).sum(axis=1).mean())
 
 
 def _norm(grads: list[th.Tensor | None]) -> float:
@@ -151,13 +160,14 @@ class AnchoredPPO(SupervisedPPO):
             super().train()
         finally:
             restore()
-        agree_inputs, agree_frames = heldback_agreement(self.policy, anchor)
+        agree_inputs, agree_frames, entropy_bits = heldback_agreement(self.policy, anchor)
         self.last_anchor_row = {"update": update, "minibatches": state["minibatch"],
                                 "anchor_excess_mean": round(float(np.mean(state["excess"])), 6)
                                 if state["excess"] else "",
                                 "anchor_grad_norm": state["anchor_norm"], "ppo_grad_norm": state["ppo_norm"],
                                 "combined_grad_norm_before_clip": state["combined_norm"],
-                                "heldback_input_agreement": agree_inputs, "heldback_frame_agreement": agree_frames}
+                                "heldback_input_agreement": agree_inputs, "heldback_frame_agreement": agree_frames,
+                                "heldback_entropy_bits": entropy_bits}
         if anchor.run_dir is not None:
             path = Path(anchor.run_dir) / "anchor.csv"
             new = not path.exists()
