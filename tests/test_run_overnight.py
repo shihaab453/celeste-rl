@@ -59,6 +59,17 @@ class BuildCommandTests(unittest.TestCase):
         self.assertFalse(any(argument.startswith("--game-dir=") for argument in command))
         self.assertEqual(command[-1], str(Path("C:/right-game").resolve()))
 
+    def test_an_anchored_run_resumes_with_its_anchor_settings_only(self) -> None:
+        self.entry["command"] = ["scripts/train_anchored.py", "--anchor-play", "runs/policy-play/x",
+                                 "--anchor-donor", "d.zip", "--anchor-donor-sha256", "abc", "--anchor-coef", "1.0",
+                                 "--anchor-split-seed", "0", "--anchor-seed", "0", "--task-definition", "config/room2.json",
+                                 "--seed", "40", "--run-dir", "runs/seed-1"]
+        command = run_overnight.build_command(self.entry, Path("C:/games/celeste"), resume=True)
+        self.assertEqual(command[1:], [
+            "scripts/train_anchored.py", "--anchor-play", "runs/policy-play/x", "--anchor-donor", "d.zip",
+            "--anchor-donor-sha256", "abc", "--anchor-coef", "1.0", "--anchor-split-seed", "0", "--anchor-seed", "0",
+            "--resume", "runs/seed-1", "--game-dir", str(Path("C:/games/celeste").resolve())])
+
     def test_resume_rejects_non_training_command(self) -> None:
         self.entry["command"][0] = "scripts/evaluate_heldout.py"
 

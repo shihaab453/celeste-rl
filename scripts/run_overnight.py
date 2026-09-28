@@ -239,9 +239,17 @@ def build_command(entry: dict, game_dir: Path, resume: bool = False) -> list[str
     if not declared:
         raise ValueError(f"campaign entry {entry.get('id', '<unknown>')} has no command")
     if resume:
-        if Path(declared[0]).name.lower() != "train_room1.py":
+        script = Path(declared[0]).name.lower()
+        if script == "train_room1.py":
+            child_arguments = [declared[0], "--resume", str(entry["run_dir"])]
+        elif script == "train_anchored.py":
+            # An anchored run resumes with its anchor settings passed again; train_anchored.py refuses a resume whose
+            # anchor record differs from the run's first session.
+            anchor = [arg for index, arg in enumerate(declared[1:], start=1)
+                      if arg.startswith("--anchor-") or declared[index - 1].startswith("--anchor-")]
+            child_arguments = [declared[0], *anchor, "--resume", str(entry["run_dir"])]
+        else:
             raise ValueError(f"campaign entry {entry.get('id', '<unknown>')} does not support --resume")
-        child_arguments = [declared[0], "--resume", str(entry["run_dir"])]
     else:
         child_arguments = _without_option(declared, "--game-dir")
     child_arguments.extend(["--game-dir", str(game_dir.resolve())])
