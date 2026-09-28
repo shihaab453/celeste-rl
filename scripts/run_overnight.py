@@ -24,10 +24,13 @@ What this does that a shell loop does not:
 - **Stops rather than starts** a run that cannot finish before the declared stop time.
 - **Optionally runs 2 or 3 at once** (`--copy DIR:DEBUGRC_PORT:LOCKSTEP_PORT`, once per game copy): each job gets
   its own game copy and ports through CELESTE_RL_DEBUGRC_PORT and CELESTE_RL_LOCKSTEP_PORT, and
-  `--threads-per-job N` sets OMP_NUM_THREADS for each child. Each copy's Everest settings must name its DebugRC
-  port. The 2026-09-28 feasibility test found episodes identical in 1, 2 and 3 copies and 1.8x / 2.4x throughput
-  with one torch thread per job. Without --copy, everything runs as before: one copy, default ports, the child
-  environment unchanged.
+  Each copy's Everest settings must name its DebugRC port. Proven on two committed plans (2026-09-28): episodes
+  identical to the sequential runs. A job starts only when available memory is at least --memory-floor-gb.
+- **Sets and records the torch thread count for every child** (`--threads-per-job`, default 10, this laptop's
+  default and the count every result so far used): OMP_NUM_THREADS and MKL_NUM_THREADS, in the summary. The thread
+  count changes floating-point reduction order, so it is part of what a result depends on (one Room 1 evaluation
+  differs between 1 and 10 threads).
+- **Retries once a child that crashed on an output-folder collision** (children name folders by the second).
 """
 from __future__ import annotations
 
@@ -85,7 +88,7 @@ def log(path: Path, message: str) -> None:
 
 # Children name their output folders after the current second (runs/<kind>/%Y%m%d-%H%M%S), so two started in the same
 # second collide and the second crashes. Side by side, starts are therefore spaced at least this far apart.
-START_SPACING_SECONDS = 1.5
+START_SPACING_SECONDS = 3.0
 _START_LOCK = threading.Lock()
 _LAST_START = [float("-inf")]
 
@@ -98,6 +101,46 @@ def wait_for_start_slot() -> None:
         _LAST_START[0] = time.monotonic()
 
 
+DEFAULT_THREADS = 10  # the default torch chose on this laptop for every result before 2026-09-28
+MEMORY_FLOOR_GB = 2.5  # side by side, a job waits until at least this much memory is available
+
+
+def available_memory_gb() -> float | None:
+    """Available physical memory in GB (Windows), or None where it cannot be read."""
+    if os.name != "nt":
+        return None
+    import ctypes
+
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+    status = MemoryStatus()
+    status.dwLength = ctypes.sizeof(MemoryStatus)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        return None
+    return round(status.ullAvailPhys / 1024 ** 3, 2)
+
+
+def wait_for_memory(floor_gb: float, logfile: Path, entry_id: str, read=available_memory_gb,
+                    poll_seconds: float = 10.0, sleep=time.sleep) -> float | None:
+    """Block until available memory reaches `floor_gb` (or cannot be read). Returns the value seen at the start."""
+    waited = False
+    while True:
+        free = read()
+        if free is None or free >= floor_gb:
+            if waited:
+                log(logfile, f"  {entry_id}: {free} GB available, starting")
+            return free
+        if not waited:
+            log(logfile, f"  {entry_id} waits: {free} GB available, below {floor_gb} GB")
+            waited = True
+        sleep(poll_seconds)
+
+
 @dataclass(frozen=True)
 class GameCopy:
     """A game copy and the ports its child process uses. No ports: the defaults, exactly as a single copy always ran."""
@@ -106,15 +149,13 @@ class GameCopy:
     debug_port: int | None = None
     lockstep_port: int | None = None
 
-    def env(self, threads: int | None) -> dict | None:
-        """The child's environment; None (inherit unchanged) for a default copy without a thread setting."""
-        if self.debug_port is None and threads is None:
-            return None
-        env = dict(os.environ)
+    def env(self, threads: int) -> dict:
+        """The child's environment: the runner's own, the thread count set explicitly, and this copy's ports."""
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("CELESTE_RL_DEBUGRC_PORT", "CELESTE_RL_LOCKSTEP_PORT")}
+        env.update(OMP_NUM_THREADS=str(threads), MKL_NUM_THREADS=str(threads))
         if self.debug_port is not None:
             env.update(CELESTE_RL_DEBUGRC_PORT=str(self.debug_port), CELESTE_RL_LOCKSTEP_PORT=str(self.lockstep_port))
-        if threads is not None:
-            env.update(OMP_NUM_THREADS=str(threads), MKL_NUM_THREADS=str(threads))
         return env
 
 
@@ -289,6 +330,8 @@ def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, en
     artifact = result_artifact(stdout)
     if artifact is not None:
         outcome["artifact"] = artifact
+    elif code != 0 and "FileExistsError" in (finished.stderr or ""):
+        outcome["folder_collision"] = True
     return outcome
 
 
@@ -309,10 +352,11 @@ def reported_success_rate(record: dict):
 
 
 def write_summary(path: Path, plan: dict, plan_hash: str, commit: str, results: list[dict],
-                  parallel: dict | None = None) -> None:
+                  parallel: dict | None = None, threads: int | None = None) -> None:
     path.write_text(json.dumps(
         {"plan": plan["name"], "plan_sha256": plan_hash, "commit": commit,
          "definitions": plan.get("definitions"), "results": results,
+         **({"threads_per_job": threads} if threads is not None else {}),
          **({"parallel": parallel} if parallel else {})}, indent=2, default=str), encoding="utf-8")
 
 
@@ -332,6 +376,38 @@ def outcome_of(run_dir: Path) -> dict:
             "final_success_rate": final and final["stochastic_success_rate"],
             "final_median_max_x": final and final.get("median_max_x"),
             "final_deterministic": final and final["deterministic"]["ending"]}
+
+
+def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at: datetime | None = None,
+              side: bool = False, memory_floor_gb: float = MEMORY_FLOOR_GB, run=None,
+              free_memory=available_memory_gb) -> dict:
+    """One plan entry on one game copy: the stop-time check, the memory guard (side by side only), the run, one
+    resume for an aborted training run, and one plain retry for an output-folder collision."""
+    run = run or execute
+    if stop_at and datetime.now() + timedelta(minutes=entry.get("limit_minutes", 75)) > stop_at:
+        log(logfile, f"skip {entry['id']}: cannot finish before the declared stop time")
+        return {**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None}
+    free = wait_for_memory(memory_floor_gb, logfile, entry["id"], read=free_memory) if side else free_memory()
+    env = copy.env(threads)
+    clear_game(copy.game_dir, logfile)
+    result = run(entry, logfile, copy.game_dir, env=env)
+    has_manifest = (REPO / entry["run_dir"] / "manifest.json").exists()
+    if result.get("folder_collision") and not has_manifest:
+        # Crashed before doing anything, because another child took the same per-second folder name.
+        log(logfile, f"  {entry['id']} collided on its output folder name; retrying once")
+        result = merge_attempts(result, run(entry, logfile, copy.game_dir, env=env))
+    elif result["status"] != "ok" and has_manifest and entry.get("resumable", True):
+        # An aborted run exhausted its fault budget; give it exactly one resume, then move on.
+        log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
+        clear_game(copy.game_dir, logfile)
+        result = merge_attempts(result, run(entry, logfile, copy.game_dir, resume=True, env=env))
+    record = {**entry, **result, **outcome_of(REPO / entry["run_dir"]), "threads_per_job": threads,
+              "available_memory_gb_at_start": free}
+    if side or copy.debug_port is not None:
+        record["game_copy"] = str(copy.game_dir)
+    log(logfile, f"done {entry['id']}: {record['status']} in {record['seconds'] // 60} min, "
+                 f"final success {reported_success_rate(record)}")
+    return record
 
 
 def side_by_side(entries: list[dict], copies: list[GameCopy], run_one, publish) -> list[dict]:
@@ -366,14 +442,20 @@ def main() -> int:
     parser.add_argument("--allow-dirty", action="store_true")
     parser.add_argument("--copy", action="append", default=[], metavar="DIR:DEBUGRC_PORT:LOCKSTEP_PORT",
                         help="run jobs side by side, one per game copy (repeat for each copy; replaces --game-dir)")
-    parser.add_argument("--threads-per-job", type=int, help="OMP_NUM_THREADS for each child (1 is best side by side)")
+    parser.add_argument("--threads-per-job", type=int, default=DEFAULT_THREADS,
+                        help=f"torch threads for every child, set and recorded (default {DEFAULT_THREADS}, the count "
+                             "every earlier result used); 1 is faster side by side but changes some results")
+    parser.add_argument("--memory-floor-gb", type=float, default=MEMORY_FLOOR_GB,
+                        help="side by side, a job starts only when this much memory is available")
     args = parser.parse_args()
+    if args.threads_per_job < 1:
+        parser.error("--threads-per-job must be at least 1")
     try:
         copies = [parse_copy(text) for text in args.copy] or [GameCopy(args.game_dir)]
     except ValueError as error:
         parser.error(str(error))
     parallel = ({"copies": [{"game_dir": str(c.game_dir), "ports": [c.debug_port, c.lockstep_port]} for c in copies],
-                 "threads_per_job": args.threads_per_job} if args.copy or args.threads_per_job else None)
+                 "memory_floor_gb": args.memory_floor_gb} if args.copy else None)
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
     plan_hash = hashlib.sha256(args.plan.read_bytes()).hexdigest()
@@ -405,41 +487,28 @@ def main() -> int:
     for entry in plan["runs"]:
         log(logfile, f"  planned {entry['id']}: {entry.get('condition', '')} "
                      f"limit {entry.get('limit_minutes', 75)} min")
+    log(logfile, f"threads per job {args.threads_per_job} (OMP_NUM_THREADS, MKL_NUM_THREADS)")
     if parallel:
         log(logfile, f"side by side: {len(copies)} game copies {parallel['copies']}, "
-                     f"threads per job {args.threads_per_job}")
+                     f"memory floor {args.memory_floor_gb} GB")
     if args.dry_run:
         log(logfile, "dry run: nothing executed")
         return 0
 
-    def run_entry(entry: dict, copy: GameCopy) -> dict:
-        if stop_at and datetime.now() + timedelta(minutes=entry.get("limit_minutes", 75)) > stop_at:
-            log(logfile, f"skip {entry['id']}: cannot finish before the declared stop time")
-            return {**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None}
-        env = copy.env(args.threads_per_job)
-        clear_game(copy.game_dir, logfile)
-        result = execute(entry, logfile, copy.game_dir, env=env)
-        # An aborted run exhausted its fault budget; give it exactly one resume, then move on.
-        if result["status"] != "ok" and (REPO / entry["run_dir"] / "manifest.json").exists() and entry.get("resumable", True):
-            log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
-            clear_game(copy.game_dir, logfile)
-            retry = execute(entry, logfile, copy.game_dir, resume=True, env=env)
-            result = merge_attempts(result, retry)
-        record = {**entry, **result, **outcome_of(REPO / entry["run_dir"])}
-        if parallel:
-            record["game_copy"] = str(copy.game_dir)
-        log(logfile, f"done {entry['id']}: {record['status']} in {record['seconds'] // 60} min, "
-                     f"final success {reported_success_rate(record)}")
-        return record
+    def one(entry: dict, copy: GameCopy) -> dict:
+        return run_entry(entry, copy, logfile, args.threads_per_job, stop_at, side=len(copies) > 1,
+                         memory_floor_gb=args.memory_floor_gb)
+
+    def publish(done: list[dict]) -> None:
+        write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], done, parallel, args.threads_per_job)
 
     if len(copies) == 1:
         results = []
         for entry in plan["runs"]:
-            results.append(run_entry(entry, copies[0]))
-            write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], results, parallel)
+            results.append(one(entry, copies[0]))
+            publish(results)
     else:
-        results = side_by_side(plan["runs"], copies, run_entry, lambda done: write_summary(
-            output_dir / "summary.json", plan, plan_hash, git["commit"], done, parallel))
+        results = side_by_side(plan["runs"], copies, one, publish)
 
     finished = [r for r in results if r.get("status") == "ok"]
     log(logfile, f"campaign finished: {len(finished)} of {len(plan['runs'])} runs completed")

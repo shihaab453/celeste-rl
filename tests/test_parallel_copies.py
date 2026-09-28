@@ -9,6 +9,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scripts import run_overnight
 from scripts.run_overnight import GameCopy, copy_problems, parse_copy, side_by_side
@@ -48,12 +49,14 @@ class CopyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_copy("C:/games/copy-2:32289")
 
-    def test_the_child_environment(self):
-        self.assertIsNone(GameCopy(Path("x")).env(None))  # a single default copy inherits unchanged
-        env = GameCopy(Path("x"), 32289, 32290).env(1)
+    def test_the_child_environment_always_sets_threads_and_only_its_own_ports(self):
+        default = GameCopy(Path("x")).env(10)
+        self.assertEqual((default["OMP_NUM_THREADS"], default["MKL_NUM_THREADS"]), ("10", "10"))
+        with mock.patch.dict(os.environ, {"CELESTE_RL_DEBUGRC_PORT": "1", "CELESTE_RL_LOCKSTEP_PORT": "2"}):
+            self.assertNotIn("CELESTE_RL_DEBUGRC_PORT", GameCopy(Path("x")).env(10))  # never an inherited port
+            env = GameCopy(Path("x"), 32289, 32290).env(1)
         self.assertEqual((env["CELESTE_RL_DEBUGRC_PORT"], env["CELESTE_RL_LOCKSTEP_PORT"], env["OMP_NUM_THREADS"]),
                          ("32289", "32290", "1"))
-        self.assertNotIn("CELESTE_RL_DEBUGRC_PORT", GameCopy(Path("x")).env(1))
 
     def test_copies_must_have_their_own_ports_directories_and_matching_settings(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -124,6 +127,65 @@ class StartSpacingTests(unittest.TestCase):
         starts.sort()
         gaps = [later - earlier for earlier, later in zip(starts, starts[1:])]
         self.assertTrue(all(gap >= run_overnight.START_SPACING_SECONDS - 0.01 for gap in gaps), gaps)
+
+
+class RunEntryTests(unittest.TestCase):
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.folder, ignore_errors=True))
+        self.logfile = self.folder / "campaign.log"
+        self.entry = {"id": "eval-1", "run_dir": "runs/evaluation/_planned-never-exists", "limit_minutes": 1}
+        self.copy = GameCopy(Path("copy-2"), 32289, 32290)
+
+    def fake(self, outcomes):
+        calls = []
+
+        def run(entry, logfile, game_dir, resume=False, env=None):
+            calls.append({"resume": resume, "threads": env["OMP_NUM_THREADS"], "port": env["CELESTE_RL_DEBUGRC_PORT"]})
+            return dict(outcomes[len(calls) - 1])
+        return run, calls
+
+    def test_a_folder_collision_is_retried_once_on_the_same_copy_and_both_attempts_kept(self):
+        run, calls = self.fake([{"status": "exit_1", "seconds": 1, "folder_collision": True},
+                                {"status": "ok", "seconds": 60}])
+        with mock.patch.object(run_overnight, "clear_game"):
+            record = run_overnight.run_entry(self.entry, self.copy, self.logfile, 10, side=True, run=run,
+                                             free_memory=lambda: 8.0)
+        self.assertEqual(record["status"], "ok")
+        self.assertEqual(len(record["attempts"]), 2)
+        self.assertEqual(calls, [{"resume": False, "threads": "10", "port": "32289"}] * 2)
+        self.assertEqual((record["threads_per_job"], record["available_memory_gb_at_start"]), (10, 8.0))
+        self.assertEqual(record["game_copy"], "copy-2")
+
+    def test_an_ordinary_failure_is_not_retried(self):
+        run, calls = self.fake([{"status": "exit_2", "seconds": 1}])
+        with mock.patch.object(run_overnight, "clear_game"):
+            record = run_overnight.run_entry(self.entry, self.copy, self.logfile, 10, side=True, run=run,
+                                             free_memory=lambda: 8.0)
+        self.assertEqual((record["status"], len(calls)), ("exit_2", 1))
+
+    def test_side_by_side_jobs_wait_for_memory_and_sequential_ones_do_not(self):
+        readings, sleeps = iter([1.0, 2.0, 3.0]), []
+        free = run_overnight.wait_for_memory(2.5, self.logfile, "eval-1", read=lambda: next(readings),
+                                             sleep=sleeps.append)
+        self.assertEqual((free, len(sleeps)), (3.0, 2))
+        self.assertIn("waits: 1.0 GB available", self.logfile.read_text(encoding="utf-8"))
+        run, _ = self.fake([{"status": "ok", "seconds": 1}])
+        with mock.patch.object(run_overnight, "clear_game"), \
+                mock.patch.object(run_overnight, "wait_for_memory") as waited:
+            record = run_overnight.run_entry(self.entry, self.copy, self.logfile, 10, side=False, run=run,
+                                             free_memory=lambda: 0.5)
+        waited.assert_not_called()
+        self.assertEqual(record["available_memory_gb_at_start"], 0.5)
+
+    def test_unreadable_memory_never_blocks(self):
+        self.assertIsNone(run_overnight.wait_for_memory(2.5, self.logfile, "x", read=lambda: None,
+                                                        sleep=self.fail))
+
+    def test_the_summary_records_the_thread_count(self):
+        path = self.folder / "summary.json"
+        run_overnight.write_summary(path, {"name": "p"}, "h", "c", [], None, 10)
+        self.assertEqual(__import__("json").loads(path.read_text(encoding="utf-8"))["threads_per_job"], 10)
 
 if __name__ == "__main__":
     unittest.main()
