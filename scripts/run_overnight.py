@@ -102,6 +102,8 @@ def wait_for_start_slot() -> None:
         _LAST_START[0] = time.monotonic()
 
 
+# What a child's stderr says when the game could not be started (for example Steam was not running).
+LAUNCH_FAILURE_SIGNS = ("Celeste exited during startup", "DebugRC did not answer")
 DEFAULT_THREADS = 10  # the default torch chose on this laptop for every result before 2026-09-28
 MEMORY_FLOOR_GB = 2.5  # side by side, a job waits until at least this much memory is available
 
@@ -127,18 +129,24 @@ def available_memory_gb() -> float | None:
 
 
 def wait_for_memory(floor_gb: float, logfile: Path, entry_id: str, read=available_memory_gb,
-                    poll_seconds: float = 10.0, sleep=time.sleep) -> float | None:
-    """Block until available memory reaches `floor_gb` (or cannot be read). Returns the value seen at the start."""
-    waited = False
+                    poll_seconds: float = 10.0, sleep=time.sleep, clock=time.monotonic,
+                    report_every: float = 600.0) -> float | None:
+    """Block until available memory reaches `floor_gb` (or cannot be read), logging at the start of a wait and every
+    `report_every` seconds of it. Returns the value seen when the job may start."""
+    started = next_report = None
     while True:
         free = read()
         if free is None or free >= floor_gb:
-            if waited:
-                log(logfile, f"  {entry_id}: {free} GB available, starting")
+            if started is not None:
+                log(logfile, f"  {entry_id}: {free} GB available after {round((clock() - started) / 60)} min, starting")
             return free
-        if not waited:
+        now = clock()
+        if started is None:
+            started, next_report = now, now + report_every
             log(logfile, f"  {entry_id} waits: {free} GB available, below {floor_gb} GB")
-            waited = True
+        elif now >= next_report:
+            next_report += report_every
+            log(logfile, f"  {entry_id} still waiting after {round((now - started) / 60)} min: {free} GB available")
         sleep(poll_seconds)
 
 
@@ -333,6 +341,8 @@ def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, en
         outcome["artifact"] = artifact
     elif code != 0 and "FileExistsError" in (finished.stderr or ""):
         outcome["folder_collision"] = True
+    elif code != 0 and any(sign in (finished.stderr or "") for sign in LAUNCH_FAILURE_SIGNS):
+        outcome["launch_failure"] = True
     return outcome
 
 
@@ -381,21 +391,34 @@ def outcome_of(run_dir: Path) -> dict:
 
 def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at: datetime | None = None,
               side: bool = False, memory_floor_gb: float = MEMORY_FLOOR_GB, run=None,
-              free_memory=available_memory_gb) -> dict:
-    """One plan entry on one game copy: the stop-time check, the memory guard (side by side only), the run, one
-    resume for an aborted training run, and one plain retry for an output-folder collision."""
+              free_memory=available_memory_gb, now=None) -> dict:
+    """One plan entry on one game copy: the stop-time check (again after any memory wait), the memory guard (side by
+    side only), the run, one resume for an aborted training run, and one plain retry for a child that crashed before
+    doing anything (an output-folder collision, or the game failing to launch)."""
     run = run or execute
-    if stop_at and datetime.now() + timedelta(minutes=entry.get("limit_minutes", 75)) > stop_at:
+
+    def out_of_time() -> bool:
+        return bool(stop_at and (now or datetime.now)() + timedelta(minutes=entry.get("limit_minutes", 75))
+                    > stop_at)
+
+    if out_of_time():
         log(logfile, f"skip {entry['id']}: cannot finish before the declared stop time")
         return {**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None}
     free = wait_for_memory(memory_floor_gb, logfile, entry["id"], read=free_memory) if side else free_memory()
+    if out_of_time():
+        log(logfile, f"skip {entry['id']}: after waiting for memory it can no longer finish before the stop time")
+        return {**entry, "status": "skipped_out_of_time", "seconds": 0, "manifest": None,
+                "available_memory_gb_at_start": free}
     env = copy.env(threads)
     clear_game(copy.game_dir, logfile)
     result = run(entry, logfile, copy.game_dir, env=env)
     has_manifest = (REPO / entry["run_dir"] / "manifest.json").exists()
-    if result.get("folder_collision") and not has_manifest:
-        # Crashed before doing anything, because another child took the same per-second folder name.
-        log(logfile, f"  {entry['id']} collided on its output folder name; retrying once")
+    if (result.get("folder_collision") or result.get("launch_failure")) and not has_manifest:
+        # Crashed before doing anything: another child took the same per-second folder name, or the game did not
+        # start. Nothing was written, so one plain retry cannot duplicate anything.
+        reason = "collided on its output folder name" if result.get("folder_collision") else "could not launch the game"
+        log(logfile, f"  {entry['id']} {reason}; retrying once")
+        clear_game(copy.game_dir, logfile)
         result = merge_attempts(result, run(entry, logfile, copy.game_dir, env=env))
     elif result["status"] != "ok" and has_manifest and entry.get("resumable", True):
         # An aborted run exhausted its fault budget; give it exactly one resume, then move on.

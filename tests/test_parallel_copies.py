@@ -178,6 +178,39 @@ class RunEntryTests(unittest.TestCase):
         waited.assert_not_called()
         self.assertEqual(record["available_memory_gb_at_start"], 0.5)
 
+    def test_a_launch_failure_is_retried_once_after_clearing_the_copy(self):
+        run, calls = self.fake([{"status": "exit_1", "seconds": 1, "launch_failure": True},
+                                {"status": "ok", "seconds": 60}])
+        with mock.patch.object(run_overnight, "clear_game") as cleared:
+            record = run_overnight.run_entry(self.entry, self.copy, self.logfile, 10, run=run, free_memory=lambda: 8.0)
+        self.assertEqual((record["status"], len(calls), cleared.call_count), ("ok", 2, 2))
+        self.assertIn("could not launch the game; retrying once", self.logfile.read_text(encoding="utf-8"))
+
+    def test_the_stop_time_is_checked_again_after_waiting_for_memory(self):
+        from datetime import datetime, timedelta
+        start = datetime(2026, 9, 28, 12, 0)
+        times = iter([start, start + timedelta(minutes=2)])  # before and after the memory wait
+        run, calls = self.fake([{"status": "ok", "seconds": 1}])
+        with mock.patch.object(run_overnight, "clear_game"),                 mock.patch.object(run_overnight, "wait_for_memory", return_value=3.0):
+            record = run_overnight.run_entry({**self.entry, "limit_minutes": 4}, self.copy, self.logfile, 10,
+                                             stop_at=start + timedelta(minutes=5), side=True, run=run,
+                                             now=lambda: next(times))
+        self.assertEqual((record["status"], len(calls)), ("skipped_out_of_time", 0))
+
+    def test_a_long_memory_wait_is_logged_every_ten_minutes(self):
+        now = [0.0]
+        readings = iter([1.0] * 130 + [3.0])
+
+        def sleep(seconds):
+            now[0] += seconds
+
+        run_overnight.wait_for_memory(2.5, self.logfile, "eval-1", read=lambda: next(readings), sleep=sleep,
+                                      clock=lambda: now[0])
+        text = self.logfile.read_text(encoding="utf-8")
+        self.assertIn("still waiting after 10 min", text)
+        self.assertIn("still waiting after 20 min", text)
+        self.assertIn("after 22 min, starting", text)
+
     def test_unreadable_memory_never_blocks(self):
         self.assertIsNone(run_overnight.wait_for_memory(2.5, self.logfile, "x", read=lambda: None,
                                                         sleep=self.fail))
