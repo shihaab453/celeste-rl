@@ -1,8 +1,8 @@
 {
   "name": "ppo-anchor-pilot-train-v1",
-  "written": "2026-09-28T17:06:17+01:00",
+  "written": "2026-09-28T17:32:12+01:00",
   "pilot_plan": "config/ppo-anchor-pilot.json",
-  "pilot_plan_sha256": "3c763f5683ae01d4cabee591f9bcd0143c1e58688884d5e1e7e44153bb66ff85",
+  "pilot_plan_sha256": "fe0f9c53cf0025a32d969424791e1445b8ad21b7ff14e0b2c30dc919adf446a3",
   "control": "the SD-k PPO runs of config/campaign-mixed-self-distillation-train.json (not rerun)",
   "label": "training for the descriptive PPO anchor pilot; nothing reads a held-out set",
   "runs": [
@@ -17,7 +17,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k0",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k0/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k0, seed 40",
       "command": [
         "scripts/train_anchored.py",
@@ -66,7 +66,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k1",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k1/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k1, seed 41",
       "command": [
         "scripts/train_anchored.py",
@@ -115,7 +115,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k2",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k2/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k2, seed 42",
       "command": [
         "scripts/train_anchored.py",
@@ -164,7 +164,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A1-k3",
       "checkpoint": "runs/train/ppo-anchor-pilot-A1-k3/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A1: anchor lambda 1; clone SD-k3, seed 43",
       "command": [
         "scripts/train_anchored.py",
@@ -213,7 +213,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-E0-k0",
       "checkpoint": "runs/train/ppo-anchor-pilot-E0-k0/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k0, seed 40",
       "command": [
         "scripts/train_room1.py",
@@ -252,7 +252,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-E0-k1",
       "checkpoint": "runs/train/ppo-anchor-pilot-E0-k1/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k1, seed 41",
       "command": [
         "scripts/train_room1.py",
@@ -291,7 +291,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-E0-k2",
       "checkpoint": "runs/train/ppo-anchor-pilot-E0-k2/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k2, seed 42",
       "command": [
         "scripts/train_room1.py",
@@ -330,7 +330,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-E0-k3",
       "checkpoint": "runs/train/ppo-anchor-pilot-E0-k3/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k3, seed 43",
       "command": [
         "scripts/train_room1.py",
@@ -369,7 +369,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A10-k0",
       "checkpoint": "runs/train/ppo-anchor-pilot-A10-k0/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A10: anchor lambda 10; clone SD-k0, seed 40",
       "command": [
         "scripts/train_anchored.py",
@@ -418,7 +418,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A10-k1",
       "checkpoint": "runs/train/ppo-anchor-pilot-A10-k1/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A10: anchor lambda 10; clone SD-k1, seed 41",
       "command": [
         "scripts/train_anchored.py",
@@ -467,7 +467,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A10-k2",
       "checkpoint": "runs/train/ppo-anchor-pilot-A10-k2/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A10: anchor lambda 10; clone SD-k2, seed 42",
       "command": [
         "scripts/train_anchored.py",
@@ -516,7 +516,7 @@
       "run_dir": "runs/train/ppo-anchor-pilot-A10-k3",
       "checkpoint": "runs/train/ppo-anchor-pilot-A10-k3/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 90,
+      "limit_minutes": 180,
       "condition": "A10: anchor lambda 10; clone SD-k3, seed 43",
       "command": [
         "scripts/train_anchored.py",

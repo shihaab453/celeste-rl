@@ -48,7 +48,9 @@
   },
   "running": {
     "training": "the 12 arm runs side by side, 3 at a time on the three game copies (run_overnight.py --copy, memory floor 2.5 GB), approved by the orchestrator on the training identity proof at b81362c (runs/train/proof-alone-SD-k0 and proof-side-SD-k0/1/2 bit-identical to their originals); the control ran one at a time",
-    "evaluation": "side by side on the three copies at 10 threads"
+    "evaluation": "side by side on the three copies at 10 threads",
+    "time_limit": "180 minutes per training run: side by side each run takes about twice as long as alone (about 60 to 65 min per 500k on the full charger, up to about 115 min throttled); the limit only catches hangs, which bridge timeouts already catch. A run that is killed and resumed is valid but not bit-identical; the analyzer reports every resumed run by name",
+    "v2_sets_unread": "the evaluation-plan generator and the analyzer refuse any command or result that names config/heldout_starts-room1-v2.json or config/heldout_starts-room2-v2.json, so the fresh sets stay unread by construction"
   },
   "measurements": {
     "primary_room1": "Room 1 held-out route-macro at every 100k checkpoint of every arm; each run's one-unit drop (clone - 500k) / (donor before - 0.142); final-floor shares descriptive only",
@@ -65,9 +67,11 @@
       "Does not hold: median drop above 0.6 (the control is at 0.87)."
     ],
     "reading_them_together": [
-      "If E0 holds: entropy control is the lever. If an anchor arm also holds, prefer E0 as the simpler fix unless its Room 2 cost is larger.",
-      "If an anchor arm holds and E0 does not: the anchor is the lever.",
-      "If nothing holds: anchor the value head too, or use a weight anchor (each its own reviewed change).",
+      "(a) Rank by branch first: a clean 'Holds' beats 'Holds with a Room 2 cost'; arms that are Partial or do not hold are not candidates.",
+      "(b) Within the same branch, prefer E0 (the simpler fix) unless its Room 2 v1 median is more than 0.05 below the best anchor arm's.",
+      "(c) Among anchor arms, rank by branch, then by median drop (smaller is better).",
+      "(d) If the top two candidates are within 0.15 on median drop and within 0.05 on the Room 2 v1 median, the reading is 'tie': with 4 runs per arm such differences are noise, and the owner and the orchestrator choose between them by simplicity and cost, recorded as a choice, not as a result.",
+      "If E0 is the reading: entropy control is the lever. If an anchor arm is: the anchor is. If nothing holds: anchor the value head too, or a weight anchor (each its own reviewed change).",
       "No arm is picked after the fact; every arm's branch is reported."
     ]
   },
@@ -81,7 +85,7 @@
     "The anchor frames lie within a few pixels of most Room 1 test starts (coverage-ceiling descriptive: 59% to 76% within 4 px), so the anchor rehearses Room 1 near the test's paths; E0 does not. Legitimate for retention, and stated whenever the anchor arms and E0 are compared."
   ],
   "plans_and_generators": "a mechanically generated, committed training plan pinning the four clones and the anchor settings (dry run first); the randomness script and the analyzer committed before any evaluation; then a committed evaluation plan pinning every checkpoint",
-  "cost": "12 PPO runs of about 30 min each: about 2.5 to 3 hours side by side (about 6 one at a time); about 64 evaluations, about 1 hour side by side; about 4 hours in all",
+  "cost": "12 PPO runs in 4 waves of 3 side by side: about 4 to 4.5 hours (about 6 one at a time); about 64 evaluations, about 1 hour side by side; about 5 to 5.5 hours in all",
   "code_checks": {
     "evaluation": "before any evaluation: scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5 must PASS (the evaluators' import closure equals the floor's evaluation code plus exactly the reviewed port-default change; diff sha256 49d48087...); otherwise re-measure the floor in the same plan",
     "training": "before any run: scripts/check_evaluation_code.py --entry scripts/train_room1.py --baseline 331e6c9 --approved 44ffab5 must PASS (the training code E0 shares with the control, trained at 331e6c9, differs only by the reviewed port-default change; passed 2026-09-28, diff sha256 49d48087...). The anchor arms add only reviewed code: scripts/train_anchored.py, celeste_rl/training/anchor.py, celeste_rl/policy_play.py and celeste_rl/cloning.py."
@@ -93,5 +97,18 @@
     "donors": "Phase 3B arm B seeds 7 and 8, never used in any pilot (the pilots used 3 to 6), with new fine-tuning seeds as needed",
     "size": "the number of runs from a power estimate using this pilot's effect sizes, declared before any confirmation run",
     "status": "declared direction only; its own plan and review come after this pilot"
-  }
+  },
+  "amendments": [
+    {
+      "date": "2026-09-28",
+      "before_any_pilot_data": true,
+      "reason": "orchestrator review of the pilot code (1454709): go after these",
+      "changed": [
+        "decision_branches.reading_them_together (tie rule)",
+        "running.time_limit (180 min)",
+        "running.v2_sets_unread",
+        "cost"
+      ]
+    }
+  ]
 }

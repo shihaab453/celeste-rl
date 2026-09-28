@@ -43,18 +43,35 @@ class ReadingTests(unittest.TestCase):
         return {arm: {"branch": branch, "median_drop": drop, "room2_v1_median": v1}
                 for arm, (branch, drop, v1) in branches.items()}
 
-    def test_prefer_e0_when_both_hold_unless_its_room2_cost_is_larger(self):
-        both = self.decisions(A1=("Holds", 0.1, 0.80), A10=("Partial", 0.4, 0.80), E0=("Holds", 0.2, 0.81))
-        self.assertEqual(read_together(both)["preferred_arm"], "E0")
-        costly = self.decisions(A1=("Holds", 0.1, 0.80), A10=("Partial", 0.4, 0.80),
-                                E0=("Holds with a Room 2 cost", 0.2, 0.70))
-        self.assertEqual(read_together(costly)["preferred_arm"], "A1")
+    def test_a_clean_hold_beats_a_hold_with_a_room2_cost(self):
+        reading = read_together(self.decisions(A1=("Holds", 0.2, 0.78), A10=("Partial", 0.4, 0.8),
+                                               E0=("Holds with a Room 2 cost", 0.05, 0.70)))
+        self.assertEqual((reading["preferred_arm"], reading["tie"]), ("A1", False))
 
-    def test_single_levers_and_nothing(self):
-        only_anchor = self.decisions(A1=("Holds", 0.2, 0.8), A10=("Holds", 0.1, 0.8), E0=("Does not hold", 0.9, 0.8))
-        self.assertEqual(read_together(only_anchor)["preferred_arm"], "A10")
-        nothing = self.decisions(A1=("Partial", 0.4, 0.8), A10=("Does not hold", 0.7, 0.8), E0=("Partial", 0.5, 0.8))
-        self.assertIsNone(read_together(nothing)["lever"])
+    def test_within_a_branch_e0_is_preferred_unless_more_than_005_worse_on_room2(self):
+        # E0 0.03 below the anchor on Room 2: still preferred, and far enough apart on drop not to tie.
+        close = read_together(self.decisions(A1=("Holds", 0.24, 0.80), A10=("Does not hold", 0.9, 0.8),
+                                             E0=("Holds", 0.05, 0.77)))
+        self.assertEqual(close["preferred_arm"], "E0")
+        # E0 0.08 below: the anchor arm ranks first.
+        worse = read_together(self.decisions(A1=("Holds", 0.24, 0.85), A10=("Does not hold", 0.9, 0.8),
+                                             E0=("Holds", 0.05, 0.77)))
+        self.assertEqual(worse["preferred_arm"], "A1")
+
+    def test_close_top_two_are_a_tie(self):
+        reading = read_together(self.decisions(A1=("Holds", 0.10, 0.80), A10=("Holds", 0.20, 0.79),
+                                               E0=("Partial", 0.4, 0.8)))
+        self.assertTrue(reading["tie"])
+        self.assertEqual(sorted(reading["tied"]), ["A1", "A10"])
+        self.assertIsNone(reading["preferred_arm"])
+
+    def test_anchor_arms_rank_by_drop_and_nothing_holding_has_no_lever(self):
+        only = read_together(self.decisions(A1=("Holds", 0.24, 0.8), A10=("Holds", 0.02, 0.9),
+                                            E0=("Does not hold", 0.9, 0.8)))
+        self.assertEqual(only["preferred_arm"], "A10")
+        nothing = read_together(self.decisions(A1=("Partial", 0.4, 0.8), A10=("Does not hold", 0.7, 0.8),
+                                               E0=("Partial", 0.5, 0.8)))
+        self.assertIsNone(nothing["lever"])
 
 
 class RecordCheckTests(unittest.TestCase):
