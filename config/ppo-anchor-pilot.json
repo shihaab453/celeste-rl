@@ -1,0 +1,85 @@
+{
+  "name": "ppo-anchor-pilot-v1",
+  "written": "2026-09-28T16:30:00+01:00",
+  "status": "proposal, before any data; for the orchestrator's review before any run",
+  "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 1 set is a development set (aggregates only); the Room 2 v2 held-out set is never read",
+  "question": "In the mixed self-distillation pilot, cloning kept the donors' Room 1 skill and PPO on Room 2 then wore it away (median one-unit drop 0.87, 'K-decay, with a Room 2 cost'), while the policies became random in both rooms. Does an anchor inside PPO (keeping Room 1 near the donor's own probabilities), or turning off PPO's entropy bonus, keep the skill, and at what cost to Room 2?",
+  "why": "docs/results/mixed-self-distillation-ppo.json (K-decay) and -descriptive.json (randomness: of the donor's confident Room 1 choices at 500k, 15% to 41% became uncertain and 2% to 5% flipped). The orchestrator's 2026-09-28 verdicts asked for the anchor arms plus E0 as the direct test of the randomness hypothesis.",
+  "arms": {
+    "A1": "AnchoredPPO (scripts/train_anchored.py), lambda 1",
+    "A10": "AnchoredPPO, lambda 10",
+    "E0": "no anchor, train_room1.py with --ent-coef 0 (the flag exists: train_room1.py builds one per TrainConfig field; ent_coef is recorded in the manifest and compared on resume)",
+    "control": "the existing SD-k PPO runs runs/train/mixed-self-distillation-pilot-SD-k<k> (the same clone and seed, ent_coef 0.01, no anchor); not rerun",
+    "order_if_budget_forces": "A1 and E0 first, then A10"
+  },
+  "held_fixed": {
+    "clones": "the four SD-k clones pinned in config/campaign-mixed-self-distillation-train.json (sha256 there)",
+    "command": "the SD-k PPO command of config/campaign-mixed-self-distillation-train.json: scripts/train_room1.py --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from runs/clone/chapter-1-room-2/20260927-205018/cloned.zip --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed 40 --run-dir <new>; only the arm's change is added",
+    "seeds": "run k uses clone SD-k, seed 40 + k, anchor split seed k, anchor batch seed k",
+    "evaluation": "Room 1 held-out (scripts/evaluate_heldout.py --starts config/heldout_starts.json --repeats 1 --seed 20260920) at every 100k checkpoint; Room 2 canonical (scripts/evaluate_checkpoint.py --task-definition config/room2.json --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0) on the finals; Room 2 v1 held-out (--task-definition config/room2.json --starts config/heldout_starts-room2.json --repeats 1 --seed 20260922 --reward-version rew-v2 --shaping-scale 2.0) on the finals",
+    "floors": "clone floor 0.142 and final floor 0.2046 (docs/results/retention-pilot.json); the one-unit drop",
+    "threads": "10 torch threads, set explicitly and recorded by run_overnight.py (--threads-per-job 10); the control ran at the same count, then the machine default"
+  },
+  "anchor_data": {
+    "recordings": {
+      "3": {
+        "play": "runs/policy-play/chapter-1-room-1/20260926-164255",
+        "dataset_sha256": "b0a723c2411a5d56b1e4a95cc2715cd98128a6587eebba61ea4158c4161be49e",
+        "frames": 5276
+      },
+      "4": {
+        "play": "runs/policy-play/chapter-1-room-1/20260926-170822",
+        "dataset_sha256": "8efdcc987cc6becd760a587bae13ff234e084a70351a7fa4dd1de777907cc615",
+        "frames": 10666
+      },
+      "5": {
+        "play": "runs/policy-play/chapter-1-room-1/20260926-165351",
+        "dataset_sha256": "1583af09bc8543b5d3a12293ad7677043c47887aeaf29fa04f57ceb3f16793b0",
+        "frames": 5720
+      },
+      "6": {
+        "play": "runs/policy-play/chapter-1-room-1/20260926-170623",
+        "dataset_sha256": "6ff673757fa800c477d34a318ea2d82306280d890bde99dfcbe1b083d7358a2c",
+        "frames": 7871
+      }
+    },
+    "use": "donor 3 + k's recording with --anchor-split-seed k and --anchor-seed k: the same 19 fitted episodes as the SD-k clone; the 6 held back are the per-update early warning (agreement and Room 1 randomness in anchor.csv)",
+    "donors": "config/retention-pilot.json donors, seeds 3 to 6, sha256 as pinned there"
+  },
+  "running": {
+    "training": "the 12 arm runs side by side, 3 at a time on the three game copies (run_overnight.py --copy, memory floor 2.5 GB), approved by the orchestrator on the training identity proof at b81362c (runs/train/proof-alone-SD-k0 and proof-side-SD-k0/1/2 bit-identical to their originals); the control ran one at a time",
+    "evaluation": "side by side on the three copies at 10 threads"
+  },
+  "measurements": {
+    "primary_room1": "Room 1 held-out route-macro at every 100k checkpoint of every arm; each run's one-unit drop (clone - 500k) / (donor before - 0.142); final-floor shares descriptive only",
+    "room2": "canonical finals (clears of 50); Room 2 v1 held-out finals (development set, aggregates only), against the M-k median computed by the analyzer from docs/results/mixed-self-distillation-ppo.json (0.8176); training clear rates per 100k",
+    "randomness": "per-room randomness (bits per frame) at every 100k checkpoint for every arm and the control, from one committed script on the same frames as describe_mixed_self_distillation.py (Room 1: the donor's recording; Room 2: the Room 2 demonstration dataset); anchor.csv's per-update held-back randomness is an extra early warning only",
+    "confident_choices": "at 500k, for every arm and the control: of the donor's confident Room 1 choices, the share still confident the same way, uncertain, and flipped; from the same script",
+    "anchor_records": "anchor.csv per update (gradient norms, excess, held-back agreement and randomness); the analyzer checks that every session of an anchored run carries the identical anchor record and that each update has 16 minibatches"
+  },
+  "decision_branches": {
+    "per_arm": [
+      "Holds: median one-unit drop at most 0.25, and the Room 2 v1 median at least the M-k median minus 0.05 (0.8176 - 0.05 = 0.7676), and at least 3 of 4 canonical finals clear 45 of 50.",
+      "Holds with a Room 2 cost: the drop is at most 0.25 but a Room 2 condition fails.",
+      "Partial: median drop above 0.25 and at most 0.6; report it as a dose-response against lambda.",
+      "Does not hold: median drop above 0.6 (the control is at 0.87)."
+    ],
+    "reading_them_together": [
+      "If E0 holds: entropy control is the lever. If an anchor arm also holds, prefer E0 as the simpler fix unless its Room 2 cost is larger.",
+      "If an anchor arm holds and E0 does not: the anchor is the lever.",
+      "If nothing holds: anchor the value head too, or use a weight anchor (each its own reviewed change).",
+      "No arm is picked after the fact; every arm's branch is reported."
+    ]
+  },
+  "declared_confounds": [
+    "The anchor frames are the frames the SD-k clones were fitted on.",
+    "The critic is not anchored; it shares feature layers with the actor, which the anchor also pulls.",
+    "The donors' own Room 1 probabilities are fairly random (1.1 to 5.3 bits per frame), so the anchor holds Room 1 at the donor's randomness, not below it.",
+    "ent_coef 0 also removes exploration pressure in Room 2, which may slow Room 2 learning; E0's Room 2 measures show it.",
+    "The control ran one at a time two days earlier; the arms run side by side (proven bit-identical for training).",
+    "Four donors, all from one recipe (Phase 3B arm B)."
+  ],
+  "evaluation_code_check": "before any evaluation: scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5 must PASS (the evaluators' import closure equals the floor's evaluation code plus exactly the reviewed port-default change; diff sha256 49d48087...); otherwise re-measure the floor in the same plan",
+  "plans_and_generators": "a mechanically generated, committed training plan pinning the four clones and the anchor settings (dry run first); the randomness script and the analyzer committed before any evaluation; then a committed evaluation plan pinning every checkpoint",
+  "cost": "12 PPO runs of about 30 min each: about 2.5 to 3 hours side by side (about 6 one at a time); about 64 evaluations, about 1 hour side by side; about 4 hours in all"
+}
