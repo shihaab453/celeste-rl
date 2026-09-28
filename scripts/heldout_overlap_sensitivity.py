@@ -23,6 +23,7 @@ sys.path.insert(0, str(REPO))
 
 from analyze_heldout_ab import AnalysisError, _repo_path, analyse, file_sha256, validate_run  # noqa: E402
 from celeste_rl.heldout import validate_manifest  # noqa: E402
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 
 
 def load_rows(plan: dict, campaign: dict) -> tuple[dict, list[int], list[str]]:
@@ -59,7 +60,7 @@ def main() -> int:
             raise AnalysisError(f"{args.output} already exists")
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
         campaign = json.loads(args.campaign.read_text(encoding="utf-8"))
-        if campaign.get("plan_sha256") != file_sha256(args.plan):
+        if not matches_text_hash(args.plan, campaign.get("plan_sha256")):
             raise AnalysisError("campaign summary does not identify the exact plan")
         lists = json.loads(args.exclude.read_text(encoding="utf-8"))
         rows, seeds, routes = load_rows(plan, campaign)

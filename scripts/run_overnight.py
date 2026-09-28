@@ -53,6 +53,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from celeste_rl import game_process, runtime  # noqa: E402
+from celeste_rl.texthash import text_sha256  # noqa: E402
 
 
 RESULT_SUMMARY_FIELDS = (
@@ -458,7 +459,8 @@ def main() -> int:
                  "memory_floor_gb": args.memory_floor_gb} if args.copy else None)
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
-    plan_hash = hashlib.sha256(args.plan.read_bytes()).hexdigest()
+    # Line-ending safe (celeste_rl/texthash.py): the same whether the plan is checked out with LF or CRLF.
+    plan_hash = text_sha256(args.plan)
     output_dir = REPO / "runs" / "campaign" / f"{datetime.now():%Y%m%d-%H%M%S}-{plan['name']}"
     output_dir.mkdir(parents=True)
     logfile = output_dir / "campaign.log"

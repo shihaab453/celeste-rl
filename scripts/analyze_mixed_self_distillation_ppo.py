@@ -24,7 +24,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 from analyze_mixed_self_distillation import ppo_drop, retained_share  # noqa: E402
 from analyze_retention_pilot import explained_variance, room2_training  # noqa: E402
 
@@ -62,7 +64,7 @@ def main() -> int:
     plan_path = REPO / "config/campaign-mixed-self-distillation-ppo-eval.json"
     plan, summary = load(plan_path), load(REPO / args.summary)
     clone_analysis = load(REPO / args.clone_analysis)
-    if summary["plan_sha256"] != sha(plan_path):
+    if not matches_text_hash(plan_path, summary["plan_sha256"]):
         raise SystemExit("the evaluation summary does not match the committed evaluation plan")
     if clone_analysis["decision"]["branch"] != "K":
         raise SystemExit("the clone-point analysis is not branch K, so there is no PPO stage to analyse")

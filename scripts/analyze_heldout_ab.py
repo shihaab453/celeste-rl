@@ -19,6 +19,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from celeste_rl.heldout import validate_manifest  # noqa: E402
+from celeste_rl.texthash import matches_text_hash  # noqa: E402
 
 
 class AnalysisError(ValueError):
@@ -244,7 +245,7 @@ def main() -> int:
         plan = json.loads(args.plan.read_text(encoding="utf-8"))
         campaign = json.loads(args.campaign.read_text(encoding="utf-8"))
         plan_hash = file_sha256(args.plan)
-        if campaign.get("plan") != plan.get("name") or campaign.get("plan_sha256") != plan_hash:
+        if campaign.get("plan") != plan.get("name") or not matches_text_hash(args.plan, campaign.get("plan_sha256")):
             raise AnalysisError("campaign summary does not identify the exact predeclared plan")
         protocol = plan["evaluation_protocol"]
         heldout_path = _repo_path(protocol["heldout_set"])
