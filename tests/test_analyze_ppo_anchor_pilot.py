@@ -16,6 +16,7 @@ from analyze_ppo_anchor_pilot import (  # noqa: E402
     e0_problems,
     one_unit_drop,
     read_together,
+    session_commits,
 )
 
 THRESHOLD = 0.8176 - 0.05
@@ -80,11 +81,19 @@ class RecordCheckTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.run)
         self.anchor = {"coef": 1.0, "seed": 0}
 
-    def write(self, sessions, minibatches, config=None):
+    def write(self, sessions, minibatches, config=None, updates=None, grads=None, accepted_steps=None):
+        """A run folder: one anchor.csv row per entry of `minibatches`. The update column steps by n_epochs (4) as
+        SB3's counter does, unless `updates` says otherwise; the manifest's accepted steps default to one 2,048-step
+        rollout per row."""
+        updates = updates if updates is not None else [4 * index for index in range(len(minibatches))]
+        grads = grads if grads is not None else [0.02] * len(minibatches)
+        steps = len(minibatches) * 2048 if accepted_steps is None else accepted_steps
         (self.run / "manifest.json").write_text(json.dumps(
-            {"config": config or {"ent_coef": 0.01}, "sessions": [{"provenance": p} for p in sessions]}), encoding="utf-8")
-        (self.run / "anchor.csv").write_text("update,minibatches\n" + "".join(f"{i},{m}\n" for i, m in enumerate(minibatches)),
-                                             encoding="utf-8")
+            {"config": config or {"ent_coef": 0.01}, "accepted_steps": steps,
+             "sessions": [{"provenance": p} for p in sessions]}), encoding="utf-8")
+        (self.run / "anchor.csv").write_text(
+            "update,minibatches,anchor_grad_norm\n"
+            + "".join(f"{u},{m},{g}\n" for u, m, g in zip(updates, minibatches, grads)), encoding="utf-8")
 
     def test_a_clean_anchored_run_passes(self):
         self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], [16, 16, 16])
@@ -97,6 +106,40 @@ class RecordCheckTests(unittest.TestCase):
         self.assertTrue(anchored_run_problems(self.run, 10.0))
         self.write([{"anchor": self.anchor}], [16, 15])
         self.assertTrue(anchored_run_problems(self.run, 1.0))
+
+    def test_updates_a_resume_replayed_are_caught_as_repeated_rows(self):
+        # A resume from a checkpoint older than the records appends the replayed updates a second time.
+        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], [16] * 5, updates=[0, 4, 8, 4, 8])
+        problems = anchored_run_problems(self.run, 1.0)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("repeated update numbers: [4, 8]", problems[0])
+
+    def test_a_missing_row_or_a_gap_in_the_update_numbers_fails(self):
+        self.write([{"anchor": self.anchor}], [16, 16, 16], accepted_steps=4 * 2048)  # 4 updates, 3 rows
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+        self.write([{"anchor": self.anchor}], [16, 16, 16], updates=[0, 4, 12])
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+
+    def test_the_anchor_gradient_must_be_above_zero_when_lambda_is(self):
+        self.write([{"anchor": self.anchor}], [16, 16, 16], grads=[0.02, 0.0, 0.03])
+        problems = anchored_run_problems(self.run, 1.0)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("anchor gradient not above 0 in updates ['4']", problems[0])
+        self.write([{"anchor": self.anchor}], [16, 16], grads=[0.02, "nan"])
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+        # Lambda 0 has no anchor gradient to require.
+        self.write([{"anchor": {"coef": 0.0, "seed": 0}}], [16, 16], grads=[0.0, 0.0])
+        self.assertEqual(anchored_run_problems(self.run, 0.0), [])
+
+    def test_a_manifest_with_more_epochs_expects_a_wider_step(self):
+        self.write([{"anchor": self.anchor}], [16, 16], config={"ent_coef": 0.01, "n_epochs": 10, "n_steps": 1024},
+                   updates=[0, 10], accepted_steps=2 * 1024)
+        self.assertEqual(anchored_run_problems(self.run, 1.0), [])
+
+    def test_session_commits_lists_every_session_shortened(self):
+        manifest = {"sessions": [{"provenance": {"commit": "54c955695001e7732f427aba93495b27a7e5a4ac"}},
+                                 {"provenance": {"commit": "9a3ee81f67d4970c519e04494eb951bc0242573a"}}]}
+        self.assertEqual(session_commits(manifest), ["54c95569", "9a3ee81f"])
 
     def test_e0_must_have_no_entropy_bonus_and_no_anchor(self):
         self.write([{}], [], config={"ent_coef": 0.0})

@@ -21,9 +21,14 @@ on the Room 2 v1 median.
 Record checks, refusing on failure: the evaluation summary matches the committed plan (line-ending safe); every
 result is attributable and pins the planned checkpoint; the training summary matches the committed training plan with
 every run ok at 10 threads; E0's manifest records ent_coef 0 and no anchor; every session of an anchored run carries
-the identical anchor record with the planned lambda (check (b)); every update in anchor.csv has 16 minibatches
-(check (c)); nothing names the fresh v2 held-out sets. Resumed runs are reported by name (sessions and runner
-attempts), not refused: a resumed run is valid but not bit-identical to an uninterrupted one.
+the identical anchor record with the planned lambda (check (b)); anchor.csv has exactly one row per update (update
+numbers 0, n_epochs, 2 n_epochs, ... for accepted steps / n_steps updates, none repeated or missing: anchor.csv is not
+rolled back on a resume, so a resume that replayed updates would repeat them), every update with 16 minibatches, and a
+nonzero anchor gradient in every row when lambda is above 0 (check (c), tightened after the training and before any
+evaluation was read); nothing names the fresh v2 held-out sets. Resumed runs are reported by name (sessions, runner
+attempts and the commit of every session), not refused: a resumed run is valid but not bit-identical to an
+uninterrupted one. The report gives the training summary's commit as the campaign START commit and, per run, the commit
+of every session, because a resumed run trained partly at an earlier commit.
 """
 from __future__ import annotations
 
@@ -111,10 +116,35 @@ def read_together(decisions: dict[str, dict]) -> dict:
             "why": f"{first} ranks first on branch, then the declared E0 preference or median drop"}
 
 
+def session_commits(manifest: dict) -> list[str]:
+    """The commit every session of a run trained at (a resumed run has more than one)."""
+    return [session["provenance"]["commit"][:8] for session in manifest["sessions"]]
+
+
+def anchor_row_problems(run_dir: Path, rows: list[dict], manifest: dict, coef: float) -> list[str]:
+    """Check (c), row by row: one row per update with none repeated or missing (a resume from a checkpoint older than
+    the records would append the updates it replays a second time), and a nonzero anchor gradient when lambda is above 0."""
+    config = manifest["config"]
+    n_epochs, n_steps = config.get("n_epochs", 4), config.get("n_steps", 2048)
+    expected = [n_epochs * index for index in range(manifest["accepted_steps"] // n_steps)]
+    updates = [int(row["update"]) for row in rows]
+    problems = []
+    if updates != expected:
+        repeated = sorted({update for update in updates if updates.count(update) > 1})
+        problems.append(f"{run_dir}: anchor.csv has {len(updates)} rows, expected {len(expected)} (one per update, "
+                        f"in steps of {n_epochs}); repeated update numbers: {repeated[:5]}")
+    if coef > 0:
+        flat = [row["update"] for row in rows if not float(row["anchor_grad_norm"]) > 0]
+        if flat:
+            problems.append(f"{run_dir}: anchor gradient not above 0 in updates {flat[:5]}")
+    return problems
+
+
 def anchored_run_problems(run_dir: Path, coef: float) -> list[str]:
     """Checks (b) and (c) for one anchored run."""
     problems = []
-    sessions = load(run_dir / "manifest.json")["sessions"]
+    manifest = load(run_dir / "manifest.json")
+    sessions = manifest["sessions"]
     records = [session["provenance"].get("anchor") for session in sessions]
     if any(record is None for record in records) or any(record != records[0] for record in records):
         problems.append(f"{run_dir}: not every session carries the identical anchor record")
@@ -125,7 +155,7 @@ def anchored_run_problems(run_dir: Path, coef: float) -> list[str]:
     if not rows or wrong:
         problems.append(f"{run_dir}: anchor.csv has {len(rows)} rows; updates without {MINIBATCHES_PER_UPDATE} "
                         f"minibatches: {wrong[:5]}")
-    return problems
+    return problems + anchor_row_problems(run_dir, rows, manifest, coef)
 
 
 def e0_problems(run_dir: Path) -> list[str]:
@@ -184,12 +214,15 @@ def main() -> int:
     if problems:
         raise SystemExit("record checks failed:\n  " + "\n  ".join(problems))
 
-    resumed = {}
+    resumed, commits = {}, {}
     for record in train_summary["results"]:
-        sessions = len(load(REPO / record["run_dir"] / "manifest.json")["sessions"])
+        manifest = load(REPO / record["run_dir"] / "manifest.json")
+        sessions = len(manifest["sessions"])
         attempts = len(record.get("attempts", [])) or 1
+        commits[record["id"]] = session_commits(manifest)
         if sessions > 1 or attempts > 1:
             resumed[record["id"]] = {"sessions": sessions, "runner_attempts": attempts,
+                                     "session_commits": commits[record["id"]],
                                      "note": "valid, but not bit-identical to an uninterrupted run"}
 
     retention = load(REPO / "docs/results/retention-pilot.json")
@@ -223,12 +256,14 @@ def main() -> int:
                    "room2_finals": [control["runs"][f"SD-k{k}"]["room2"]["final_clears_of_50"] for k in range(4)]}
     report = {"label": load(REPO / "config/ppo-anchor-pilot.json")["label"],
               "analysis_code_sha256": text_sha256(Path(__file__)), "evaluation_plan_sha256": summary["plan_sha256"],
-              "evaluation_commit": summary["commit"], "training_commit": train_summary["commit"],
+              "evaluation_commit": summary["commit"], "training_campaign_start_commit": train_summary["commit"],
+              "training_session_commits": commits,
               "clone_floor": clone_floor, "final_floor": final_floor,
               "room2_v1_reference": {"m_k_median": round(statistics.median(m_k), 4), "threshold": round(threshold, 4)},
               "runs": runs, "decisions": decisions, "control": control_row, "reading": read_together(decisions),
               "resumed_runs": resumed or "none",
-              "record_checks": "passed: plan hashes, attributable results, 10 threads, E0 ent_coef 0, (b), (c)"}
+              "record_checks": ("passed: plan hashes, attributable results, 10 threads, E0 ent_coef 0, (b), (c) "
+                                "(one anchor.csv row per update, nonzero anchor gradient)")}
     args.output.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
     for arm, decision in decisions.items():
         print(f"{arm}: {json.dumps(decision)}")
