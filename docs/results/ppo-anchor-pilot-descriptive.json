@@ -1,0 +1,504 @@
+{
+  "label": "descriptive; companion to the PPO anchor pilot analysis; aggregates only",
+  "analysis_code_sha256": "0bcb73167afb3b2df171262b943e51f0d22695051e20234fca00d50dda1b943d",
+  "inputs": {
+    "config/ppo-anchor-pilot.json": "fe0f9c53cf0025a32d969424791e1445b8ad21b7ff14e0b2c30dc919adf446a3",
+    "config/campaign-mixed-self-distillation-train.json": "d234679791695cb582ca3a2178960f52e8fed8c0d2bb1b5b722c83c93cf45d0d",
+    "config/campaign-mixed-self-distillation-ppo-eval.json": "0e1bff42d4fa6ccb7bbe0a8356d632f436ee1f28e2267d95767b0d973cbb7408",
+    "config/campaign-ppo-anchor-eval.json": "2e7becfcd5a80d64e4fe05ce372519acc4c7663046a71877cc95bd8561d07b46",
+    "config/retention-pilot.json": "6f07add90fab22fc6c03487d27c0065fe2a1f05f0fc608c5da3921e253214ae5",
+    "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz": "ea17c59c0dddb999b7362b39c5030fb5eccc4c874d4094a64e2e1f4b7356373f"
+  },
+  "frames": {
+    "room1": "the 6 held-back episodes of donor 3 + k's recording (split seed k)",
+    "room2": "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz"
+  },
+  "randomness_bits_per_frame": {
+    "k0": {
+      "donor": {
+        "room1": 5.325
+      },
+      "clone": {
+        "room1": 4.84,
+        "room2": 0.35
+      },
+      "control": {
+        "step_000100352": {
+          "room1": 6.2,
+          "room2": 0.784
+        },
+        "step_000200704": {
+          "room1": 7.048,
+          "room2": 1.293
+        },
+        "step_000301056": {
+          "room1": 7.921,
+          "room2": 2.136
+        },
+        "step_000401408": {
+          "room1": 9.063,
+          "room2": 4.068
+        },
+        "step_000501760": {
+          "room1": 9.63,
+          "room2": 5.803
+        }
+      },
+      "A1": {
+        "step_000100352": {
+          "room1": 5.076,
+          "room2": 0.703
+        },
+        "step_000200704": {
+          "room1": 4.915,
+          "room2": 0.93
+        },
+        "step_000301056": {
+          "room1": 5.174,
+          "room2": 1.291
+        },
+        "step_000401408": {
+          "room1": 5.231,
+          "room2": 1.725
+        },
+        "step_000501760": {
+          "room1": 5.261,
+          "room2": 2.253
+        }
+      },
+      "A10": {
+        "step_000100352": {
+          "room1": 4.885,
+          "room2": 0.512
+        },
+        "step_000200704": {
+          "room1": 5.026,
+          "room2": 0.798
+        },
+        "step_000301056": {
+          "room1": 5.047,
+          "room2": 1.03
+        },
+        "step_000401408": {
+          "room1": 5.068,
+          "room2": 1.243
+        },
+        "step_000501760": {
+          "room1": 5.103,
+          "room2": 1.542
+        }
+      },
+      "E0": {
+        "step_000100352": {
+          "room1": 5.561,
+          "room2": 0.672
+        },
+        "step_000200704": {
+          "room1": 5.584,
+          "room2": 0.895
+        },
+        "step_000301056": {
+          "room1": 5.237,
+          "room2": 1.027
+        },
+        "step_000401408": {
+          "room1": 5.553,
+          "room2": 1.189
+        },
+        "step_000501760": {
+          "room1": 4.987,
+          "room2": 1.11
+        }
+      }
+    },
+    "k1": {
+      "donor": {
+        "room1": 0.938
+      },
+      "clone": {
+        "room1": 0.956,
+        "room2": 0.342
+      },
+      "control": {
+        "step_000100352": {
+          "room1": 1.382,
+          "room2": 0.632
+        },
+        "step_000200704": {
+          "room1": 1.991,
+          "room2": 1.001
+        },
+        "step_000301056": {
+          "room1": 2.644,
+          "room2": 1.427
+        },
+        "step_000401408": {
+          "room1": 3.071,
+          "room2": 1.962
+        },
+        "step_000501760": {
+          "room1": 3.784,
+          "room2": 2.506
+        }
+      },
+      "A1": {
+        "step_000100352": {
+          "room1": 1.029,
+          "room2": 0.618
+        },
+        "step_000200704": {
+          "room1": 0.989,
+          "room2": 0.742
+        },
+        "step_000301056": {
+          "room1": 0.96,
+          "room2": 0.806
+        },
+        "step_000401408": {
+          "room1": 1.041,
+          "room2": 0.907
+        },
+        "step_000501760": {
+          "room1": 1.019,
+          "room2": 0.979
+        }
+      },
+      "A10": {
+        "step_000100352": {
+          "room1": 0.967,
+          "room2": 0.521
+        },
+        "step_000200704": {
+          "room1": 0.971,
+          "room2": 0.684
+        },
+        "step_000301056": {
+          "room1": 0.971,
+          "room2": 0.834
+        },
+        "step_000401408": {
+          "room1": 0.965,
+          "room2": 0.9
+        },
+        "step_000501760": {
+          "room1": 0.973,
+          "room2": 0.966
+        }
+      },
+      "E0": {
+        "step_000100352": {
+          "room1": 1.087,
+          "room2": 0.598
+        },
+        "step_000200704": {
+          "room1": 1.296,
+          "room2": 0.763
+        },
+        "step_000301056": {
+          "room1": 1.356,
+          "room2": 0.807
+        },
+        "step_000401408": {
+          "room1": 1.499,
+          "room2": 0.857
+        },
+        "step_000501760": {
+          "room1": 1.511,
+          "room2": 0.911
+        }
+      }
+    },
+    "k2": {
+      "donor": {
+        "room1": 2.872
+      },
+      "clone": {
+        "room1": 2.762,
+        "room2": 0.373
+      },
+      "control": {
+        "step_000100352": {
+          "room1": 3.355,
+          "room2": 0.662
+        },
+        "step_000200704": {
+          "room1": 4.44,
+          "room2": 0.937
+        },
+        "step_000301056": {
+          "room1": 6.419,
+          "room2": 1.597
+        },
+        "step_000401408": {
+          "room1": 7.439,
+          "room2": 2.951
+        },
+        "step_000501760": {
+          "room1": 8.146,
+          "room2": 5.41
+        }
+      },
+      "A1": {
+        "step_000100352": {
+          "room1": 2.82,
+          "room2": 0.586
+        },
+        "step_000200704": {
+          "room1": 2.939,
+          "room2": 0.719
+        },
+        "step_000301056": {
+          "room1": 3.103,
+          "room2": 0.933
+        },
+        "step_000401408": {
+          "room1": 2.929,
+          "room2": 0.989
+        },
+        "step_000501760": {
+          "room1": 2.979,
+          "room2": 1.041
+        }
+      },
+      "A10": {
+        "step_000100352": {
+          "room1": 2.847,
+          "room2": 0.602
+        },
+        "step_000200704": {
+          "room1": 2.851,
+          "room2": 0.769
+        },
+        "step_000301056": {
+          "room1": 2.865,
+          "room2": 0.838
+        },
+        "step_000401408": {
+          "room1": 2.891,
+          "room2": 0.974
+        },
+        "step_000501760": {
+          "room1": 2.9,
+          "room2": 1.176
+        }
+      },
+      "E0": {
+        "step_000100352": {
+          "room1": 2.952,
+          "room2": 0.581
+        },
+        "step_000200704": {
+          "room1": 3.131,
+          "room2": 0.727
+        },
+        "step_000301056": {
+          "room1": 3.098,
+          "room2": 0.795
+        },
+        "step_000401408": {
+          "room1": 3.11,
+          "room2": 0.86
+        },
+        "step_000501760": {
+          "room1": 2.941,
+          "room2": 0.942
+        }
+      }
+    },
+    "k3": {
+      "donor": {
+        "room1": 2.678
+      },
+      "clone": {
+        "room1": 2.155,
+        "room2": 0.336
+      },
+      "control": {
+        "step_000100352": {
+          "room1": 2.915,
+          "room2": 0.646
+        },
+        "step_000200704": {
+          "room1": 4.329,
+          "room2": 0.991
+        },
+        "step_000301056": {
+          "room1": 5.532,
+          "room2": 1.587
+        },
+        "step_000401408": {
+          "room1": 7.057,
+          "room2": 2.839
+        },
+        "step_000501760": {
+          "room1": 8.121,
+          "room2": 4.855
+        }
+      },
+      "A1": {
+        "step_000100352": {
+          "room1": 2.313,
+          "room2": 0.651
+        },
+        "step_000200704": {
+          "room1": 2.358,
+          "room2": 0.853
+        },
+        "step_000301056": {
+          "room1": 2.282,
+          "room2": 0.943
+        },
+        "step_000401408": {
+          "room1": 2.235,
+          "room2": 1.054
+        },
+        "step_000501760": {
+          "room1": 2.434,
+          "room2": 1.235
+        }
+      },
+      "A10": {
+        "step_000100352": {
+          "room1": 2.191,
+          "room2": 0.555
+        },
+        "step_000200704": {
+          "room1": 2.264,
+          "room2": 0.673
+        },
+        "step_000301056": {
+          "room1": 2.237,
+          "room2": 0.763
+        },
+        "step_000401408": {
+          "room1": 2.281,
+          "room2": 0.848
+        },
+        "step_000501760": {
+          "room1": 2.303,
+          "room2": 0.943
+        }
+      },
+      "E0": {
+        "step_000100352": {
+          "room1": 2.584,
+          "room2": 0.532
+        },
+        "step_000200704": {
+          "room1": 3.172,
+          "room2": 0.691
+        },
+        "step_000301056": {
+          "room1": 2.944,
+          "room2": 0.747
+        },
+        "step_000401408": {
+          "room1": 2.912,
+          "room2": 0.836
+        },
+        "step_000501760": {
+          "room1": 3.397,
+          "room2": 0.936
+        }
+      }
+    }
+  },
+  "confident_room1_choices_at_500k": {
+    "control-k0": {
+      "donor_confident_choices": 12839,
+      "still_confident_same": 0.554,
+      "now_uncertain": 0.415,
+      "flipped_confident_opposite": 0.031
+    },
+    "A1-k0": {
+      "donor_confident_choices": 12839,
+      "still_confident_same": 0.922,
+      "now_uncertain": 0.07,
+      "flipped_confident_opposite": 0.007
+    },
+    "A10-k0": {
+      "donor_confident_choices": 12839,
+      "still_confident_same": 0.933,
+      "now_uncertain": 0.061,
+      "flipped_confident_opposite": 0.006
+    },
+    "E0-k0": {
+      "donor_confident_choices": 12839,
+      "still_confident_same": 0.862,
+      "now_uncertain": 0.12,
+      "flipped_confident_opposite": 0.018
+    },
+    "control-k1": {
+      "donor_confident_choices": 41583,
+      "still_confident_same": 0.829,
+      "now_uncertain": 0.152,
+      "flipped_confident_opposite": 0.019
+    },
+    "A1-k1": {
+      "donor_confident_choices": 41583,
+      "still_confident_same": 0.988,
+      "now_uncertain": 0.011,
+      "flipped_confident_opposite": 0.001
+    },
+    "A10-k1": {
+      "donor_confident_choices": 41583,
+      "still_confident_same": 0.989,
+      "now_uncertain": 0.01,
+      "flipped_confident_opposite": 0.001
+    },
+    "E0-k1": {
+      "donor_confident_choices": 41583,
+      "still_confident_same": 0.956,
+      "now_uncertain": 0.04,
+      "flipped_confident_opposite": 0.004
+    },
+    "control-k2": {
+      "donor_confident_choices": 26074,
+      "still_confident_same": 0.543,
+      "now_uncertain": 0.397,
+      "flipped_confident_opposite": 0.06
+    },
+    "A1-k2": {
+      "donor_confident_choices": 26074,
+      "still_confident_same": 0.96,
+      "now_uncertain": 0.037,
+      "flipped_confident_opposite": 0.003
+    },
+    "A10-k2": {
+      "donor_confident_choices": 26074,
+      "still_confident_same": 0.963,
+      "now_uncertain": 0.034,
+      "flipped_confident_opposite": 0.003
+    },
+    "E0-k2": {
+      "donor_confident_choices": 26074,
+      "still_confident_same": 0.936,
+      "now_uncertain": 0.057,
+      "flipped_confident_opposite": 0.007
+    },
+    "control-k3": {
+      "donor_confident_choices": 37649,
+      "still_confident_same": 0.597,
+      "now_uncertain": 0.374,
+      "flipped_confident_opposite": 0.029
+    },
+    "A1-k3": {
+      "donor_confident_choices": 37649,
+      "still_confident_same": 0.953,
+      "now_uncertain": 0.039,
+      "flipped_confident_opposite": 0.008
+    },
+    "A10-k3": {
+      "donor_confident_choices": 37649,
+      "still_confident_same": 0.96,
+      "now_uncertain": 0.034,
+      "flipped_confident_opposite": 0.007
+    },
+    "E0-k3": {
+      "donor_confident_choices": 37649,
+      "still_confident_same": 0.895,
+      "now_uncertain": 0.092,
+      "flipped_confident_opposite": 0.013
+    }
+  }
+}
