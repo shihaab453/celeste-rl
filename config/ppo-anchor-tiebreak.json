@@ -1,7 +1,7 @@
 {
   "name": "ppo-anchor-tiebreak-v1",
-  "written": "2026-09-29T20:00:00+01:00",
-  "status": "proposal for the orchestrator's review; nothing has run; written AFTER the pilot results were read (declared reading: a tie between E0 and A1) and BEFORE any tie-break run",
+  "written": "2026-09-29T19:10:00+01:00",
+  "status": "amended after the orchestrator's review and BEFORE any tie-break run (see amendments); written AFTER the pilot results were read (declared reading: a tie between E0 and A1)",
   "label": "descriptive tie-break between E0 and A1 to choose the arm for the confirmation; no confirmatory claim; the Room 1 set is a development set (aggregates only); the Room 1 v2 set and the Room 2 v2 set are never read",
   "question": "The PPO anchor pilot (config/ppo-anchor-pilot.json, results in docs/results/ppo-anchor-pilot.json) read as a tie between E0 (PPO's entropy bonus turned off) and A1 (anchor lambda 1). With 4 runs per arm the difference is inside the noise. Which of the two do we carry into the confirmation on the fresh Room 1 v2 set?",
   "tie_choice_record": {
@@ -30,7 +30,8 @@
     "order": "interleaved A1-k0, E0-k0, A1-k1, E0-k1, A1-k2, E0-k2, A1-k3, E0-k3 so neither arm is systematically run first or last"
   },
   "running": {
-    "training": "8 runs side by side, 3 at a time on the three game copies (run_overnight.py --copy), 180 minutes per run (the limit only catches hangs; in the pilot with 3 side by side E0 took 79 to 82 minutes, A1-k3 104, and the A10 runs up to 177)",
+    "training": "8 runs side by side, 3 at a time on the three game copies (run_overnight.py --copy), 240 minutes per run (the limit only catches hangs; in the pilot with 3 side by side E0 took 79 to 82 minutes, A1-k3 104 beside two E0 runs, and the A10 runs up to 177 of 180 beside two other anchored runs; A1 costs the same as A10, and a timed-out A1 run would be killed and resumed, recreating the pilot's confound that only A1 runs were resumed)",
+    "failure_policy": "a run that ends not ok after the runner's one resume, or that has to be stopped by hand, is rerun from scratch with the same seed in a new folder (runs/train/ppo-tiebreak-<arm>-k<k>-rerun<n>) through a committed plan amendment, and reported by name with the failed attempt; the rule is applied only to 8 complete runs per arm; a run that the runner resumed once and that then finished ok counts, and is reported by name with its replayed anchor.csv rows",
     "evaluation": "side by side on the three copies at 10 threads, 56 evaluations",
     "interruption": "a run that is killed and resumed is valid but not bit-identical; the analyzer reports every resumed run by name and its replayed anchor.csv rows",
     "v2_sets_unread": "the plan generator and the analyzer refuse any command or result that names config/heldout_starts-room1-v2.json or config/heldout_starts-room2-v2.json"
@@ -42,12 +43,15 @@
   "decision_rule": {
     "pooling": "8 runs per arm: the pilot's four (PPO seeds 40 to 43, from docs/results/ppo-anchor-pilot.json) and these four (PPO seeds 50 to 53); each run's one-unit drop from its own Room 1 held-out curve",
     "rule": "Carry E0 forward unless BOTH hold: (1) at least 3 more E0 runs than A1 runs have a one-unit drop ABOVE 0.25 (counted over the 8 pooled runs of each arm), and (2) E0's pooled median drop is MORE THAN 0.10 above A1's pooled median drop. If both hold, carry A1 forward. Otherwise carry E0 forward, the declared tie-break (simplicity and cost). The comparisons are strict where written above and more than, and at least 3 is inclusive.",
-    "why_these_thresholds": "chosen by the orchestrator after seeing the pilot (post hoc, and stated as such): the pilot alone has E0 at 2 above 0.25 against A1's 0 (a gap of 2) and a median gap of 0.138; requiring a gap of 3 or more runs AND a median gap over 0.10 asks the new runs to show E0's late decay is a property of the arm and not of two seeds, and it includes a per-run condition because a median of 4 hides a split (orchestrator finding F7)",
-    "not_in_the_rule": "Room 2 measures, randomness and everything under measurements.descriptive_only are reported and cannot move the decision; if the rule picks A1, its Room 2 numbers are checked by the owner and the orchestrator before the confirmation is planned (a recorded choice)",
+    "why_these_thresholds": "chosen by the orchestrator after seeing the pilot (post hoc, and stated as such). The pilot alone already gives a count gap of 2 (E0 2 of 4 above 0.25, A1 0 of 4) and a median gap of 0.138, so the COUNT condition needs only one more net bad E0 run; the MEDIAN condition is what does the work. Holding the pilot's runs fixed and assuming the new A1 runs behave like the pilot's: 0 new E0 runs above 0.25 gives E0; 1 gives a median gap of about 0.04, so E0; 2 or more gives a median gap of about 0.12 to 0.14, so A1. The rule therefore switches to A1 only if the new batch repeats the pilot's pattern, about half of E0's runs losing more than a quarter of the margin. The per-run condition is there because a median of 4 hides a split (orchestrator finding F7). The median gap is compared after rounding to 6 decimals, so an exact 0.10 is not more than 0.10.",
+    "not_in_the_rule": "Room 2 measures, randomness and everything under measurements.descriptive_only are reported and cannot move the decision. Whichever arm the rule names (E0 or A1), the analyzer applies the pilot's Room 2 conditions to its 8 pooled runs (Room 2 v1 median at least 0.7676, and at least 6 of 8 canonical finals at 45 or more); a failure goes to the owner and the orchestrator as a recorded choice before the confirmation is planned, and does not change the rule's answer",
+    "inputs_pinned": "the pilot's drops come from docs/results/ppo-anchor-pilot.json, pinned in the analyzer by its text sha256 fbbf136858b4d6b7f198d705814dee7347c9bed5aa1f20c00a3ab8758c6911ea; the analyzer refuses if it differs, checks that each new run's manifest records seed 50 + k and the planned clone, and requires exactly 5 Room 1 checkpoints per run; the evaluation plan generator refuses a run whose latest.zip (used for the Room 2 finals) is not the same policy as its step_000501760.zip (used for the Room 1 final)",
     "no_other_outcome": "no arm is picked after the fact; both arms' pooled figures are reported whatever the rule says"
   },
   "declared_confounds": [
-    "The 8 runs per arm are not 8 independent draws: they come from only 4 clones (two PPO seeds each), and E0's large drops were on clones k1 and k3, so a clone effect can count twice in the pooled counts.",
+    "The 8 runs per arm are not 8 independent draws: they come from only 4 clones (two PPO seeds each), and E0's large drops were on clones k1 and k3, so a clone effect can count twice in the pooled counts. This is accepted on purpose: whether E0 is reliable across these starting policies is the question, and a clone-level rule on 4 clones would have almost no power; every clone and batch is reported separately.",
+    "Each clone's Room 1 starting point is a single 200-start measurement, shared by all four runs on that clone (two arms, two seeds). Its noise is roughly 0.056 in drop units and moves those runs together, including across the 0.25 line; E0-k1's 0.305 is about one such unit above 0.25.",
+    "A1's two runs per clone share more randomness than E0's: the new A1 runs reuse the pilot's anchor split seed and anchor batch seed (only the PPO seed is new), so A1's seed-to-seed spread may look smaller partly by construction.",
     "The rule's thresholds were set after the pilot results were read.",
     "The pilot and the tie-break batches ran at different times; the pilot's A1-k0, A1-k1 and A1-k2 were resumed once (two sessions, commits 54c9556 then 9a3ee81, valid but not bit-identical to an uninterrupted run), the new runs should not be; both batches are reported separately as well as pooled.",
     "The anchor frames lie within a few pixels of most Room 1 test starts (coverage-ceiling descriptive: 59% to 76% within 4 px), so the anchor rehearses Room 1 near the test's paths; E0 does not. Legitimate for retention, and stated whenever A1 and E0 are compared.",
@@ -60,10 +64,24 @@
     "90b9b47 (2026-09-29): analyzer check (c) refined to accept anchor.csv drop-backs explained by a resumed session; the evaluation plan's pins are checked; blank values refuse instead of crashing. The committed pilot result reproduces exactly with it."
   ],
   "plans_and_generators": "scripts/make_tiebreak_plans.py (committed) generates the training plan from the pilot's committed plan and, after training, the evaluation plan from the training summary, both refusing to overwrite; scripts/analyze_ppo_tiebreak.py (committed, with tests) applies the rule mechanically; all committed before any run; a dry run first",
-  "cost": "8 PPO runs, 3 at a time: about 4 to 4.5 hours; 56 evaluations, about 1 hour side by side; about 5 to 5.5 hours in all",
+  "cost": "8 PPO runs, 3 at a time: about 5 hours (two anchored runs side by side are slower than the pilot's 104 minutes for A1-k3 beside two E0 runs); 56 evaluations, about 1 hour side by side; about 6 hours in all",
   "code_checks": {
     "training": "before any run: scripts/check_evaluation_code.py --entry scripts/train_room1.py --baseline 331e6c9 --approved 44ffab5 must PASS (the same check as the pilot)",
     "evaluation": "before any evaluation: scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5 must PASS (the same check as the pilot); the runtime pins must match"
   },
-  "after_the_tiebreak": "the arm the rule names is the one the confirmation compares against the control on the fresh Room 1 v2 set, with the donors, size and plan declared in config/ppo-anchor-pilot.json (confirmation) and its own review; the confirmation is not planned here"
+  "after_the_tiebreak": "the arm the rule names is the one the confirmation compares against the control on the fresh Room 1 v2 set, with the donors, size and plan declared in config/ppo-anchor-pilot.json (confirmation) and its own review; the confirmation is not planned here",
+  "amendments": [
+    {
+      "date": "2026-09-29",
+      "before_any_run": true,
+      "reason": "orchestrator review of the declaration, generator, analyzer and plan at 79c5026 (findings T1 to T17); the first version was public at 79c5026 before this amendment",
+      "changed": [
+        "written: was 20:00, later than its own commit (19:17:18) and than the training plan that pinned it (19:15:58); corrected to 19:10, when it was written",
+        "decision_rule.why_these_thresholds: states that the pilot already gives a count gap of 2 and what the new runs must show (T3); the median gap is rounded before the strict comparison (T2)",
+        "decision_rule.not_in_the_rule: the Room 2 check applies to whichever arm the rule names, not only A1 (T14); decision_rule.inputs_pinned added (T6, T8, T10)",
+        "declared_confounds: the shared clone measurement and the shared anchor seeds of A1 added; pooling kept, with the reason (T4, T5)",
+        "running.training: limit 180 to 240 minutes (T12); running.failure_policy added (T13); cost about 6 hours (T12)"
+      ]
+    }
+  ]
 }

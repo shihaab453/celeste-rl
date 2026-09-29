@@ -6,11 +6,12 @@ Run from the repo root with the RL interpreter:
 
 train: config/campaign-ppo-tiebreak-train.json, 8 runs (E0 and A1 for k = 0 to 3, interleaved). Each is the pilot's
     command for the same arm and k (config/campaign-ppo-anchor-train.json) with ONLY --seed (40 + k -> 50 + k) and
-    --run-dir changed, checked below; the clone is verified against its pinned sha256. The plan pins the declaration
+    --run-dir changed, checked below; the clone is verified against its pinned sha256; the run limit is 240 minutes. The plan pins the declaration
     (config/ppo-anchor-tiebreak.json) and the pilot plan it was derived from.
 eval: config/campaign-ppo-tiebreak-eval.json, for every run the Room 1 held-out evaluation at every step checkpoint,
     the Room 2 canonical final and the Room 2 v1 held-out final. The commands are the pilot's evaluation commands
-    (config/campaign-ppo-anchor-eval.json) with only the checkpoint changed; every checkpoint is pinned by sha256.
+    (config/campaign-ppo-anchor-eval.json) with only the checkpoint changed; every checkpoint is pinned by sha256, and
+    each run's latest.zip must hold the same policy as its step_000501760.zip.
 """
 from __future__ import annotations
 
@@ -33,6 +34,18 @@ EVAL = REPO / "config/campaign-ppo-tiebreak-eval.json"
 UNREAD_SETS = ("heldout_starts-room1-v2.json", "heldout_starts-room2-v2.json")  # never in a command (plan rule)
 ORDER = [(arm, k) for k in range(4) for arm in ("A1", "E0")]  # interleaved, so neither arm is run first or last
 PILOT_SEED, NEW_SEED = 40, 50
+# The limit only catches hangs. The pilot's anchored runs took up to 177 of 180 minutes with three side by side; a
+# timed-out A1 run would be killed and resumed, recreating the pilot's "only A1 runs were resumed" confound.
+LIMIT_MINUTES = 240
+FINAL_STEP = "step_000501760.zip"
+
+
+def same_zip_contents(first: Path, second: Path) -> bool:
+    """True when two checkpoints hold the same members with the same bytes (zip timestamps may differ)."""
+    import zipfile
+    with zipfile.ZipFile(first) as a, zipfile.ZipFile(second) as b:
+        return (sorted(a.namelist()) == sorted(b.namelist())
+                and all(a.read(name) == b.read(name) for name in a.namelist()))
 
 
 def sha(path: Path) -> str:
@@ -88,6 +101,7 @@ def train_plan() -> None:
         entry.pop("resume", None)  # the pilot's three resume flags belong to the pilot's plan only
         entry.update({
             "id": f"ppo-tiebreak-{arm}-k{k}", "stage": "ppo-anchor-tiebreak-train", "seed": NEW_SEED + k,
+            "limit_minutes": LIMIT_MINUTES,
             "run_dir": run_dir(arm, k), "checkpoint": f"{run_dir(arm, k)}/checkpoints/latest.zip",
             "condition": source["condition"].replace(f"seed {PILOT_SEED + k}", f"PPO seed {NEW_SEED + k} (tie-break)"),
             "command": tiebreak_command(source["command"], k, run_dir(arm, k), source["run_dir"]),
@@ -123,7 +137,11 @@ def eval_plan(summary_path: Path) -> None:
     runs = []
     for arm, k in ORDER:
         folder = run_dir(arm, k)
-        for step in sorted((REPO / folder / "checkpoints").glob("step_*.zip")):
+        checkpoints = REPO / folder / "checkpoints"
+        # The Room 2 finals use latest.zip and the Room 1 final uses the last step checkpoint: they must be one policy.
+        if not same_zip_contents(checkpoints / "latest.zip", checkpoints / FINAL_STEP):
+            raise SystemExit(f"{folder}: latest.zip and {FINAL_STEP} do not hold the same policy")
+        for step in sorted(checkpoints.glob("step_*.zip")):
             runs.append(eval_entry(f"tb-room1-{arm}-k{k}-{step.stem}", f"{folder}/checkpoints/{step.name}",
                                    templates["room1"], "ppo-anchor-tiebreak-room1"))
         runs.append(eval_entry(f"tb-room2-{arm}-k{k}-final", f"{folder}/checkpoints/latest.zip", templates["room2"],

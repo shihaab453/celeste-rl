@@ -48,13 +48,30 @@ from celeste_rl.texthash import matches_text_hash, text_sha256  # noqa: E402
 ARMS = ("A1", "E0")
 HIGH, COUNT_GAP, MEDIAN_GAP = 0.25, 3, 0.10  # the declared thresholds: "above", "at least", "more than"
 DECLARATION = REPO / "config/ppo-anchor-tiebreak.json"
+# Half of the decision's inputs are the pilot's drops: the pilot result is pinned by its line-ending safe text hash.
+PILOT_RESULT = REPO / "docs/results/ppo-anchor-pilot.json"
+PILOT_RESULT_SHA256 = "fbbf136858b4d6b7f198d705814dee7347c9bed5aa1f20c00a3ab8758c6911ea"
+CHECKPOINTS_PER_RUN = 5
+ROOM2_FINALS_NEEDED = 6  # the pilot's "at least 3 of 4 canonical finals at 45 or more", over 8 pooled runs
+
+
+def room2_check(v1_median: float, finals: list[int], threshold: float) -> dict:
+    """The pilot's Room 2 conditions on the pooled runs of one arm: the Room 2 v1 median at least the threshold, and at
+    least 6 of 8 canonical finals at 45 or more. Applied to whichever arm the rule names; it never changes the answer."""
+    at_45 = sum(clears >= 45 for clears in finals)
+    return {"v1_median": v1_median, "v1_threshold": threshold, "v1_condition_met": v1_median >= threshold,
+            "canonical_finals_at_45_or_more": f"{at_45} of {len(finals)}",
+            "finals_condition_met": at_45 >= ROOM2_FINALS_NEEDED,
+            "passes": v1_median >= threshold and at_45 >= ROOM2_FINALS_NEEDED}
 
 
 def decide_tiebreak(e0_drops: list[float], a1_drops: list[float]) -> dict:
     """The declared rule: A1 only if E0 has at least COUNT_GAP more runs above HIGH AND E0's median drop is more than
     MEDIAN_GAP above A1's; otherwise E0 (the declared tie-break, simplicity and cost)."""
     e0_high, a1_high = sum(drop > HIGH for drop in e0_drops), sum(drop > HIGH for drop in a1_drops)
-    gap = statistics.median(e0_drops) - statistics.median(a1_drops)
+    # Rounded before the strict comparison: in floating point 0.4 - 0.3 is 0.10000000000000003, which would count an
+    # exact 0.10 gap as "more than 0.10" (the drops themselves are rounded to 4 decimals).
+    gap = round(statistics.median(e0_drops) - statistics.median(a1_drops), 6)
     count_met, median_met = e0_high - a1_high >= COUNT_GAP, gap > MEDIAN_GAP
     carry = "A1" if count_met and median_met else "E0"
     return {"carry_forward": carry, "e0_runs_above_0.25": e0_high, "a1_runs_above_0.25": a1_high,
@@ -113,10 +130,17 @@ def main() -> int:
         raise SystemExit(f"missing evaluations: {sorted(set(planned) - set(results))}")
 
     problems = []
+    train_entries = {entry["id"]: entry for entry in load(train_path)["runs"]}
     for k in range(4):
         for arm in ARMS:
             folder = REPO / f"runs/train/ppo-tiebreak-{arm}-k{k}"
             problems += e0_problems(folder) if arm == "E0" else anchored_run_problems(folder, 1.0)
+            config = load(folder / "manifest.json")["config"]
+            entry = train_entries[f"ppo-tiebreak-{arm}-k{k}"]
+            if config.get("seed") != 50 + k or config.get("seed") != entry["seed"]:
+                problems.append(f"{folder}: seed {config.get('seed')}, planned {50 + k}")
+            if config.get("init_from") != entry["init_from"]:
+                problems.append(f"{folder}: started from {config.get('init_from')}, planned {entry['init_from']}")
     if problems:
         raise SystemExit("record checks failed:\n  " + "\n  ".join(problems))
 
@@ -139,7 +163,10 @@ def main() -> int:
     retention = load(REPO / "docs/results/retention-pilot.json")
     clone_floor = retention["floor"]["clone"]["route_macro"]
     clones = load(REPO / "docs/results/mixed-self-distillation-clone.json")["clones"]
-    pilot = load(REPO / "docs/results/ppo-anchor-pilot.json")
+    if not matches_text_hash(PILOT_RESULT, PILOT_RESULT_SHA256):
+        raise SystemExit(f"{PILOT_RESULT.name} is not the pilot result the declaration pools with (text sha256 "
+                         f"{PILOT_RESULT_SHA256[:16]}...)")
+    pilot = load(PILOT_RESULT)
     if pilot["clone_floor"] != clone_floor:
         raise SystemExit("the pilot result and the retention floor disagree on the clone floor")
 
@@ -151,8 +178,9 @@ def main() -> int:
             names = sorted(i for i in planned if i.startswith(f"tb-room1-{arm}-k{k}-step_"))
             for entry_id in names:
                 curve.append(round(results[entry_id]["route_macro_success_rate"], 4))
-            if not names or not names[-1].endswith(FINAL):
-                raise SystemExit(f"{arm}-k{k}: no {FINAL} evaluation")
+            if len(names) != CHECKPOINTS_PER_RUN or not names[-1].endswith(FINAL):
+                raise SystemExit(f"{arm}-k{k}: {len(names)} Room 1 checkpoints evaluated, expected "
+                                 f"{CHECKPOINTS_PER_RUN} ending at {FINAL}")
             along = drops_along(curve, clone["donor_before"], clone_floor)
             drop = along[-1]
             new_runs[f"{arm}-k{k}"] = {
@@ -174,7 +202,30 @@ def main() -> int:
         macros = [point["route_macro"] for point in curve] if curve else run["room1_route_macro_clone_then_checkpoints"]
         return round(statistics.mean(drops_along(macros, run["donor_before"], clone_floor)[1:]), 4)
 
+    def all_drops(run):  # the drop at every checkpoint after the clone, for a pilot run or a new run
+        macros = ([point["route_macro"] for point in run["room1_curve"]] if "room1_curve" in run
+                  else run["room1_route_macro_clone_then_checkpoints"])
+        return drops_along(macros, run["donor_before"], clone_floor)
+
+    runs_by_arm = {arm: [pilot_run(arm, k) for k in range(4)] + [new_runs[f"{arm}-k{k}"] for k in range(4)] for arm in ARMS}
+    reference = pilot["room2_v1_reference"]
+    room2_by_arm = {arm: {"finals": [run["room2_final_clears_of_50"] for run in runs_by_arm[arm]],
+                          "v1_median": round(statistics.median(run["room2_v1_final"] for run in runs_by_arm[arm]), 4)}
+                    for arm in ARMS}
+    carried = decision["carry_forward"]
+    decision["room2_check_of_the_named_arm"] = {
+        "arm": carried, **room2_check(room2_by_arm[carried]["v1_median"], room2_by_arm[carried]["finals"],
+                                      reference["threshold"]),
+        "note": ("the pilot's Room 2 conditions applied to whichever arm the rule names; a failure goes to the owner and "
+                 "the orchestrator as a recorded choice before the confirmation and does not change the rule's answer")}
+
     descriptive = {
+        "runs_with_a_drop_above_0.25_at_any_checkpoint_of_8": {
+            arm: sum(max(all_drops(run)) > HIGH for run in runs_by_arm[arm]) for arm in ARMS},
+        "room2_v1_pooled_median_against_the_m_k_reference": {
+            arm: {"median": room2_by_arm[arm]["v1_median"], "m_k_median": reference["m_k_median"],
+                  "threshold": reference["threshold"],
+                  "at_least_threshold": room2_by_arm[arm]["v1_median"] >= reference["threshold"]} for arm in ARMS},
         "per_clone_drop": {f"k{k}": {"E0_pilot": pilot_run("E0", k)["drop_one_unit"], "E0_new": new_runs[f"E0-k{k}"]["drop_one_unit"],
                                      "A1_pilot": pilot_run("A1", k)["drop_one_unit"], "A1_new": new_runs[f"A1-k{k}"]["drop_one_unit"]}
                            for k in range(4)},
@@ -196,7 +247,8 @@ def main() -> int:
         "note": "descriptive only: none of this can move the declared decision",
     }
     report = {"label": load(DECLARATION)["label"], "analysis_code_sha256": text_sha256(Path(__file__)),
-              "declaration_sha256": text_sha256(DECLARATION), "evaluation_plan_sha256": summary["plan_sha256"],
+              "declaration_sha256": text_sha256(DECLARATION), "pilot_result_sha256": PILOT_RESULT_SHA256,
+              "evaluation_plan_sha256": summary["plan_sha256"],
               "evaluation_commit": summary["commit"], "training_campaign_start_commit": train_summary["commit"],
               "training_session_commits": commits, "clone_floor": clone_floor, "decision": decision,
               "pooled_drops": {arm: {"pilot": batches[arm]["pilot"], "new": batches[arm]["new"]} for arm in ARMS},

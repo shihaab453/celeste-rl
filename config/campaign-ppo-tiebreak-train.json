@@ -1,8 +1,8 @@
 {
   "name": "ppo-anchor-tiebreak-train-v1",
-  "written": "2026-09-29T19:15:58+01:00",
+  "written": "2026-09-29T20:02:52+01:00",
   "declaration": "config/ppo-anchor-tiebreak.json",
-  "declaration_sha256": "2b32c9552d3bd7f3b0f183ca4e42548af5d6e75f08c450c5fd822c6a88aab1a6",
+  "declaration_sha256": "0ac46db540535158c3da6d4ae64663f6cd65a56ebb732caa0b21c30ffd687657",
   "pilot_training_plan": "config/campaign-ppo-anchor-train.json",
   "pilot_training_plan_sha256": "eaf7ac7959bb3f068b5f57fab69453fa14d8ba2150a967ab0d284e2f8be8f179",
   "label": "training for the descriptive PPO anchor tie-break (E0 against A1, new PPO seeds); nothing reads a held-out set",
@@ -18,7 +18,7 @@
       "run_dir": "runs/train/ppo-tiebreak-A1-k0",
       "checkpoint": "runs/train/ppo-tiebreak-A1-k0/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "A1: anchor lambda 1; clone SD-k0, PPO seed 50 (tie-break)",
       "command": [
         "scripts/train_anchored.py",
@@ -67,7 +67,7 @@
       "run_dir": "runs/train/ppo-tiebreak-E0-k0",
       "checkpoint": "runs/train/ppo-tiebreak-E0-k0/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k0, PPO seed 50 (tie-break)",
       "command": [
         "scripts/train_room1.py",
@@ -106,7 +106,7 @@
       "run_dir": "runs/train/ppo-tiebreak-A1-k1",
       "checkpoint": "runs/train/ppo-tiebreak-A1-k1/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "A1: anchor lambda 1; clone SD-k1, PPO seed 51 (tie-break)",
       "command": [
         "scripts/train_anchored.py",
@@ -155,7 +155,7 @@
       "run_dir": "runs/train/ppo-tiebreak-E0-k1",
       "checkpoint": "runs/train/ppo-tiebreak-E0-k1/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k1, PPO seed 51 (tie-break)",
       "command": [
         "scripts/train_room1.py",
@@ -194,7 +194,7 @@
       "run_dir": "runs/train/ppo-tiebreak-A1-k2",
       "checkpoint": "runs/train/ppo-tiebreak-A1-k2/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "A1: anchor lambda 1; clone SD-k2, PPO seed 52 (tie-break)",
       "command": [
         "scripts/train_anchored.py",
@@ -243,7 +243,7 @@
       "run_dir": "runs/train/ppo-tiebreak-E0-k2",
       "checkpoint": "runs/train/ppo-tiebreak-E0-k2/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k2, PPO seed 52 (tie-break)",
       "command": [
         "scripts/train_room1.py",
@@ -282,7 +282,7 @@
       "run_dir": "runs/train/ppo-tiebreak-A1-k3",
       "checkpoint": "runs/train/ppo-tiebreak-A1-k3/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "A1: anchor lambda 1; clone SD-k3, PPO seed 53 (tie-break)",
       "command": [
         "scripts/train_anchored.py",
@@ -331,7 +331,7 @@
       "run_dir": "runs/train/ppo-tiebreak-E0-k3",
       "checkpoint": "runs/train/ppo-tiebreak-E0-k3/checkpoints/latest.zip",
       "resumable": true,
-      "limit_minutes": 180,
+      "limit_minutes": 240,
       "condition": "E0: no anchor, ent_coef 0; clone SD-k3, PPO seed 53 (tie-break)",
       "command": [
         "scripts/train_room1.py",

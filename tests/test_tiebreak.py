@@ -9,8 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analyze_ppo_anchor_pilot import one_unit_drop  # noqa: E402
-from analyze_ppo_tiebreak import decide_tiebreak, drops_along  # noqa: E402
-from make_tiebreak_plans import tiebreak_command, value_after, with_checkpoint  # noqa: E402
+from analyze_ppo_tiebreak import decide_tiebreak, drops_along, room2_check  # noqa: E402
+from make_tiebreak_plans import same_zip_contents, tiebreak_command, value_after, with_checkpoint  # noqa: E402
 
 PILOT_E0 = [0.010, 0.1162, 0.3047, 0.3625]
 PILOT_A1 = [0.1062, 0.0212, 0.0861, 0.0584]
@@ -58,6 +58,18 @@ class DecisionRuleTests(unittest.TestCase):
         a1_worse = [0.5, 0.5, 0.5, 0.5, 0.1, 0.1, 0.1, 0.1]  # 4 above: gap 2
         self.assertEqual(decide_tiebreak(e0, a1_worse)["count_gap"], 2)
 
+    def test_a_median_gap_of_exactly_010_is_not_more_than_010(self):
+        # 0.4 - 0.3 is 0.10000000000000003 in floating point; the rule must still read it as exactly 0.10.
+        decision = decide_tiebreak([0.4] * 8, [0.3] * 5 + [0.0] * 3)
+        self.assertEqual((decision["median_gap_e0_minus_a1"], decision["median_condition_met"]), (0.1, False))
+        self.assertEqual(decision["carry_forward"], "E0")
+        self.assertTrue(decide_tiebreak([0.4001] * 8, [0.3] * 5 + [0.0] * 3)["median_condition_met"])
+
+    def test_the_room2_check_uses_the_pilots_conditions_over_eight_runs(self):
+        self.assertTrue(room2_check(0.80, [45] * 6 + [40] * 2, 0.7676)["passes"])
+        self.assertFalse(room2_check(0.80, [45] * 5 + [40] * 3, 0.7676)["passes"])
+        self.assertFalse(room2_check(0.76, [50] * 8, 0.7676)["passes"])
+
     def test_drops_along_uses_the_pilots_one_unit_formula(self):
         curve = [0.6447, 0.6, 0.5, 0.4]
         expected = [one_unit_drop(0.6447, value, 0.7643, 0.142) for value in curve[1:]]
@@ -88,6 +100,23 @@ class GeneratorTests(unittest.TestCase):
             value_after(["x", "--seed", "1", "--seed", "2"], "--seed")
         with self.assertRaises(SystemExit):
             value_after(["x"], "--seed")
+
+    def test_same_zip_contents_ignores_timestamps_but_not_bytes(self):
+        import tempfile
+        import zipfile
+        folder = Path(tempfile.mkdtemp())
+        self.addCleanup(__import__("shutil").rmtree, folder, True)
+
+        def make(name, data, when):
+            path = folder / name
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr(zipfile.ZipInfo("data", date_time=when), data)
+            return path
+        a = make("a.zip", b"policy", (2026, 9, 29, 3, 35, 7))
+        b = make("b.zip", b"policy", (2026, 9, 29, 3, 35, 8))
+        c = make("c.zip", b"other", (2026, 9, 29, 3, 35, 7))
+        self.assertTrue(same_zip_contents(a, b))
+        self.assertFalse(same_zip_contents(a, c))
 
     def test_with_checkpoint_changes_only_the_checkpoint(self):
         template = ["scripts/evaluate_heldout.py", "--checkpoint", "old.zip", "--starts", "config/heldout_starts.json"]
