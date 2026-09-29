@@ -199,15 +199,16 @@ def anchor_row_problems(run_dir: Path, rows: list[dict], manifest: dict, coef: f
     return problems
 
 
-def pin_problems(plan: dict, training_summary: Path, training_plan: Path, pilot_plan: Path) -> list[str]:
+def pin_problems(plan: dict, training_summary: Path, training_plan: Path, declaration: Path,
+                 declaration_key: str = "pilot_plan_sha256") -> list[str]:
     """The evaluation plan records the hashes of what it was generated from; each must still match its file."""
     problems = []
     if plan.get("training_campaign_sha256") != sha(training_summary):
         problems.append(f"the training summary {training_summary.name} is not the one the evaluation plan pins")
     if not matches_text_hash(training_plan, plan.get("training_plan_sha256", "")):
         problems.append(f"{training_plan.name} is not the training plan the evaluation plan pins")
-    if not matches_text_hash(pilot_plan, plan.get("pilot_plan_sha256", "")):
-        problems.append(f"{pilot_plan.name} is not the declaration the evaluation plan pins")
+    if not matches_text_hash(declaration, plan.get(declaration_key, "")):
+        problems.append(f"{declaration.name} is not the declaration the evaluation plan pins")
     return problems
 
 

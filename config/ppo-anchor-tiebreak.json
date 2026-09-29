@@ -1,0 +1,69 @@
+{
+  "name": "ppo-anchor-tiebreak-v1",
+  "written": "2026-09-29T20:00:00+01:00",
+  "status": "proposal for the orchestrator's review; nothing has run; written AFTER the pilot results were read (declared reading: a tie between E0 and A1) and BEFORE any tie-break run",
+  "label": "descriptive tie-break between E0 and A1 to choose the arm for the confirmation; no confirmatory claim; the Room 1 set is a development set (aggregates only); the Room 1 v2 set and the Room 2 v2 set are never read",
+  "question": "The PPO anchor pilot (config/ppo-anchor-pilot.json, results in docs/results/ppo-anchor-pilot.json) read as a tie between E0 (PPO's entropy bonus turned off) and A1 (anchor lambda 1). With 4 runs per arm the difference is inside the noise. Which of the two do we carry into the confirmation on the fresh Room 1 v2 set?",
+  "tie_choice_record": {
+    "date": "2026-09-29",
+    "recorded_as": "a choice, not a result (as config/ppo-anchor-pilot.json declares for a tie)",
+    "declared_tie_break": "by simplicity and cost (config/ppo-anchor-pilot.json, decision_branches.reading_them_together (d)); this points to E0: one flag instead of donor recordings, anchor code and donor checkpoints, and 79 to 82 minutes per run for E0 against 104 minutes for A1-k3, the only A1 run of the pilot that was not resumed (3 side by side, 10 threads)",
+    "decision": "the owner and the orchestrator chose to carry E0 forward as the default and to run this small tie-break before the confirmation, because the confirmation as declared compares the chosen arm with the control only and the fresh v2 set can be used once (orchestrator verdict on the pilot results, 2026-09-29, findings F4 to F6 and the recommendation after F7)",
+    "what_the_pilot_shows_about_E0_against_A1": "per-run one-unit drops E0 0.010, 0.116, 0.305, 0.362 and A1 0.106, 0.021, 0.086, 0.058 (clones k0 to k3); median 0.2105 against 0.0722; E0 above 0.25 in 2 of 4 runs, A1 in 0 of 4 (exact two-sided p about 0.43 on those counts); the E0 loss appears late (median drop 0.066, 0.118, 0.205, 0.210 at 200k, 300k, 400k, 500k against 0.035 to 0.072 for A1) and depends on the clone (on clone k2 E0 beats A1 at all 5 checkpoints)"
+  },
+  "arms": {
+    "E0": "no anchor, scripts/train_room1.py with --ent-coef 0 (as in the pilot)",
+    "A1": "AnchoredPPO (scripts/train_anchored.py), lambda 1 (as in the pilot)",
+    "not_rerun": "A10 (it held Room 1 but cost Room 2 in 2 of 4 finals and is not a candidate) and the control (the SD-k PPO runs, not rerun)"
+  },
+  "held_fixed": {
+    "clones": "the same four SD-k clones as the pilot (config/campaign-mixed-self-distillation-train.json; the plan checks each clone's sha256)",
+    "command": "exactly the pilot's command for the same arm and k (config/campaign-ppo-anchor-train.json), with only --seed and --run-dir changed; the generator checks this mechanically",
+    "evaluation": "identical to the pilot: Room 1 held-out (scripts/evaluate_heldout.py --starts config/heldout_starts.json --repeats 1 --seed 20260920) at every 100k checkpoint (5 per run), Room 2 canonical (scripts/evaluate_checkpoint.py, 50 episodes, seed 20260924, rew-v2, shaping 2.0) on the final, Room 2 v1 held-out (config/heldout_starts-room2.json, seed 20260922) on the final",
+    "floors": "clone floor 0.142 and final floor 0.2046 (docs/results/retention-pilot.json); the one-unit drop (clone - 500k) / (donor before - 0.142), the same formula as the pilot",
+    "threads": "10 torch threads, set explicitly and recorded by run_overnight.py, 3 game copies side by side, memory floor 2.5 GB, as in the pilot"
+  },
+  "new_runs": {
+    "count": "8: E0 and A1 for k = 0 to 3 (clone SD-k)",
+    "seeds": "PPO seed 50 + k (the pilot used 40 + k); for A1 the anchor split seed k and anchor batch seed k are unchanged (the same 19 fitted and 6 held-back episodes, the same anchor batch schedule); only the PPO sampling randomness is new",
+    "run_dirs": "runs/train/ppo-tiebreak-E0-k<k> and runs/train/ppo-tiebreak-A1-k<k>",
+    "order": "interleaved A1-k0, E0-k0, A1-k1, E0-k1, A1-k2, E0-k2, A1-k3, E0-k3 so neither arm is systematically run first or last"
+  },
+  "running": {
+    "training": "8 runs side by side, 3 at a time on the three game copies (run_overnight.py --copy), 180 minutes per run (the limit only catches hangs; in the pilot with 3 side by side E0 took 79 to 82 minutes, A1-k3 104, and the A10 runs up to 177)",
+    "evaluation": "side by side on the three copies at 10 threads, 56 evaluations",
+    "interruption": "a run that is killed and resumed is valid but not bit-identical; the analyzer reports every resumed run by name and its replayed anchor.csv rows",
+    "v2_sets_unread": "the plan generator and the analyzer refuse any command or result that names config/heldout_starts-room1-v2.json or config/heldout_starts-room2-v2.json"
+  },
+  "measurements": {
+    "primary": "each new run's Room 1 held-out route-macro at every 100k checkpoint and its one-unit drop, pooled with the pilot's E0 and A1 runs (8 per arm)",
+    "descriptive_only": "Room 2 canonical finals and Room 2 v1 held-out finals (pooled medians against the M-k median 0.8176), the per-clone comparison (E0 minus A1 on the same clone, pilot and new seed), the mean drop over the 200k to 500k checkpoints, the number of runs with a drop above 0.25 at any checkpoint, and each arm's pilot and new batch separately"
+  },
+  "decision_rule": {
+    "pooling": "8 runs per arm: the pilot's four (PPO seeds 40 to 43, from docs/results/ppo-anchor-pilot.json) and these four (PPO seeds 50 to 53); each run's one-unit drop from its own Room 1 held-out curve",
+    "rule": "Carry E0 forward unless BOTH hold: (1) at least 3 more E0 runs than A1 runs have a one-unit drop ABOVE 0.25 (counted over the 8 pooled runs of each arm), and (2) E0's pooled median drop is MORE THAN 0.10 above A1's pooled median drop. If both hold, carry A1 forward. Otherwise carry E0 forward, the declared tie-break (simplicity and cost). The comparisons are strict where written above and more than, and at least 3 is inclusive.",
+    "why_these_thresholds": "chosen by the orchestrator after seeing the pilot (post hoc, and stated as such): the pilot alone has E0 at 2 above 0.25 against A1's 0 (a gap of 2) and a median gap of 0.138; requiring a gap of 3 or more runs AND a median gap over 0.10 asks the new runs to show E0's late decay is a property of the arm and not of two seeds, and it includes a per-run condition because a median of 4 hides a split (orchestrator finding F7)",
+    "not_in_the_rule": "Room 2 measures, randomness and everything under measurements.descriptive_only are reported and cannot move the decision; if the rule picks A1, its Room 2 numbers are checked by the owner and the orchestrator before the confirmation is planned (a recorded choice)",
+    "no_other_outcome": "no arm is picked after the fact; both arms' pooled figures are reported whatever the rule says"
+  },
+  "declared_confounds": [
+    "The 8 runs per arm are not 8 independent draws: they come from only 4 clones (two PPO seeds each), and E0's large drops were on clones k1 and k3, so a clone effect can count twice in the pooled counts.",
+    "The rule's thresholds were set after the pilot results were read.",
+    "The pilot and the tie-break batches ran at different times; the pilot's A1-k0, A1-k1 and A1-k2 were resumed once (two sessions, commits 54c9556 then 9a3ee81, valid but not bit-identical to an uninterrupted run), the new runs should not be; both batches are reported separately as well as pooled.",
+    "The anchor frames lie within a few pixels of most Room 1 test starts (coverage-ceiling descriptive: 59% to 76% within 4 px), so the anchor rehearses Room 1 near the test's paths; E0 does not. Legitimate for retention, and stated whenever A1 and E0 are compared.",
+    "ent_coef 0 also removes exploration pressure in Room 2, which may slow Room 2 learning; E0's Room 2 measures show it.",
+    "Four donors, all from one recipe (Phase 3B arm B); the Room 1 development set has been used by Phase 3B and five pilots."
+  ],
+  "pilot_amendments_not_in_the_pilot_declaration": [
+    "9a3ee81 (2026-09-28 evening): run_overnight.py honors \"resume\": true on a plan entry, and config/campaign-ppo-anchor-train.json was amended in place for A1-k0, A1-k1 and A1-k2 after the first training campaign was stopped on purpose at 21:16 (plan sha256 05ca1e8c... before, eaf7ac79... after; only the note and three flags changed). config/ppo-anchor-pilot.json cannot be edited (both plans pin its hash), so it is listed here.",
+    "8add862 (2026-09-29): analyzer check (c) tightened after all 12 training records existed and before any evaluation was read (one anchor.csv row per update, nonzero anchor gradient, every session's commit reported).",
+    "90b9b47 (2026-09-29): analyzer check (c) refined to accept anchor.csv drop-backs explained by a resumed session; the evaluation plan's pins are checked; blank values refuse instead of crashing. The committed pilot result reproduces exactly with it."
+  ],
+  "plans_and_generators": "scripts/make_tiebreak_plans.py (committed) generates the training plan from the pilot's committed plan and, after training, the evaluation plan from the training summary, both refusing to overwrite; scripts/analyze_ppo_tiebreak.py (committed, with tests) applies the rule mechanically; all committed before any run; a dry run first",
+  "cost": "8 PPO runs, 3 at a time: about 4 to 4.5 hours; 56 evaluations, about 1 hour side by side; about 5 to 5.5 hours in all",
+  "code_checks": {
+    "training": "before any run: scripts/check_evaluation_code.py --entry scripts/train_room1.py --baseline 331e6c9 --approved 44ffab5 must PASS (the same check as the pilot)",
+    "evaluation": "before any evaluation: scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5 must PASS (the same check as the pilot); the runtime pins must match"
+  },
+  "after_the_tiebreak": "the arm the rule names is the one the confirmation compares against the control on the fresh Room 1 v2 set, with the donors, size and plan declared in config/ppo-anchor-pilot.json (confirmation) and its own review; the confirmation is not planned here"
+}
