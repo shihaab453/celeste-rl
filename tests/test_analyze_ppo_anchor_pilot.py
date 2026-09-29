@@ -1,6 +1,7 @@
 """Offline checks of the PPO anchor pilot's declared reading and record checks."""
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import sys
@@ -9,15 +10,19 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analyze_ppo_anchor_pilot import (  # noqa: E402
     anchored_run_problems,
     decide_arm,
     e0_problems,
     one_unit_drop,
+    pin_problems,
     read_together,
+    replayed_anchor_rows,
     session_commits,
 )
+from celeste_rl.texthash import text_sha256  # noqa: E402
 
 THRESHOLD = 0.8176 - 0.05
 
@@ -81,16 +86,19 @@ class RecordCheckTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.run)
         self.anchor = {"coef": 1.0, "seed": 0}
 
-    def write(self, sessions, minibatches, config=None, updates=None, grads=None, accepted_steps=None):
+    def write(self, sessions, minibatches, config=None, updates=None, grads=None, accepted_steps=None,
+              resumed_at=None):
         """A run folder: one anchor.csv row per entry of `minibatches`. The update column steps by n_epochs (4) as
         SB3's counter does, unless `updates` says otherwise; the manifest's accepted steps default to one 2,048-step
-        rollout per row."""
+        rollout per row; `resumed_at` gives each session's resumed_at steps (None leaves it out)."""
         updates = updates if updates is not None else [4 * index for index in range(len(minibatches))]
         grads = grads if grads is not None else [0.02] * len(minibatches)
         steps = len(minibatches) * 2048 if accepted_steps is None else accepted_steps
+        resumed_at = resumed_at or [None] * len(sessions)
         (self.run / "manifest.json").write_text(json.dumps(
             {"config": config or {"ent_coef": 0.01}, "accepted_steps": steps,
-             "sessions": [{"provenance": p} for p in sessions]}), encoding="utf-8")
+             "sessions": [{"provenance": p, **({"resumed_at": r} if r is not None else {})}
+                          for p, r in zip(sessions, resumed_at)]}), encoding="utf-8")
         (self.run / "anchor.csv").write_text(
             "update,minibatches,anchor_grad_norm\n"
             + "".join(f"{u},{m},{g}\n" for u, m, g in zip(updates, minibatches, grads)), encoding="utf-8")
@@ -107,12 +115,46 @@ class RecordCheckTests(unittest.TestCase):
         self.write([{"anchor": self.anchor}], [16, 15])
         self.assertTrue(anchored_run_problems(self.run, 1.0))
 
-    def test_updates_a_resume_replayed_are_caught_as_repeated_rows(self):
-        # A resume from a checkpoint older than the records appends the replayed updates a second time.
-        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], [16] * 5, updates=[0, 4, 8, 4, 8])
+    def test_updates_no_resume_explains_are_caught_as_repeated_rows(self):
+        # The second session says it resumed at the very start, but the file drops back to update 4.
+        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], [16] * 5, updates=[0, 4, 8, 4, 8],
+                   accepted_steps=3 * 2048, resumed_at=[0, 3 * 2048])
         problems = anchored_run_problems(self.run, 1.0)
         self.assertEqual(len(problems), 1)
         self.assertIn("repeated update numbers: [4, 8]", problems[0])
+        # A drop-back with a single session (nothing resumed) is refused too.
+        self.write([{"anchor": self.anchor}], [16] * 5, updates=[0, 4, 8, 4, 8], accepted_steps=3 * 2048)
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+
+    def test_a_resume_that_replayed_updates_is_accepted_and_the_replays_counted(self):
+        # Session 1 wrote updates 0 to 16 (5 rollouts) and was killed; its latest checkpoint was at 3 rollouts, so
+        # session 2 resumed at 3 * 2048 steps (update 12) and rewrote 12, 16 before going on to 20.
+        rows = [16] * 8
+        updates = [0, 4, 8, 12, 16, 12, 16, 20]
+        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], rows, updates=updates,
+                   accepted_steps=6 * 2048, resumed_at=[0, 3 * 2048])
+        self.assertEqual(anchored_run_problems(self.run, 1.0), [])
+        parsed = [{"update": str(u), "minibatches": "16", "anchor_grad_norm": "0.02"} for u in updates]
+        manifest = json.loads((self.run / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(replayed_anchor_rows(parsed, manifest), 2)
+        # The same rows with a session that resumed somewhere else are not explained.
+        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], rows, updates=updates,
+                   accepted_steps=6 * 2048, resumed_at=[0, 4 * 2048])
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+
+    def test_a_replay_still_has_to_end_at_every_update(self):
+        # Explained drop-back, but the last update never got a row.
+        self.write([{"anchor": self.anchor}, {"anchor": self.anchor}], [16] * 7,
+                   updates=[0, 4, 8, 12, 16, 12, 16], accepted_steps=6 * 2048, resumed_at=[0, 3 * 2048])
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+
+    def test_blank_or_non_numeric_values_are_refusals_not_crashes(self):
+        self.write([{"anchor": self.anchor}], [16, 16], grads=["", 0.02])
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+        self.write([{"anchor": self.anchor}], [16, ""], accepted_steps=2 * 2048)
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
+        self.write([{"anchor": self.anchor}], [16, 16], updates=[0, ""], accepted_steps=2 * 2048)
+        self.assertTrue(anchored_run_problems(self.run, 1.0))
 
     def test_a_missing_row_or_a_gap_in_the_update_numbers_fails(self):
         self.write([{"anchor": self.anchor}], [16, 16, 16], accepted_steps=4 * 2048)  # 4 updates, 3 rows
@@ -124,7 +166,7 @@ class RecordCheckTests(unittest.TestCase):
         self.write([{"anchor": self.anchor}], [16, 16, 16], grads=[0.02, 0.0, 0.03])
         problems = anchored_run_problems(self.run, 1.0)
         self.assertEqual(len(problems), 1)
-        self.assertIn("anchor gradient not above 0 in updates ['4']", problems[0])
+        self.assertIn("anchor gradient missing or not above 0 in updates ['4']", problems[0])
         self.write([{"anchor": self.anchor}], [16, 16], grads=[0.02, "nan"])
         self.assertTrue(anchored_run_problems(self.run, 1.0))
         # Lambda 0 has no anchor gradient to require.
@@ -135,6 +177,20 @@ class RecordCheckTests(unittest.TestCase):
         self.write([{"anchor": self.anchor}], [16, 16], config={"ent_coef": 0.01, "n_epochs": 10, "n_steps": 1024},
                    updates=[0, 10], accepted_steps=2 * 1024)
         self.assertEqual(anchored_run_problems(self.run, 1.0), [])
+
+    def test_the_evaluation_plans_pins_must_match_their_files(self):
+        summary, train, pilot = self.run / "summary.json", self.run / "train.json", self.run / "pilot.json"
+        summary.write_bytes(b'{"a": 1}')
+        train.write_text("{}", encoding="utf-8")
+        pilot.write_text('{"label": "x"}', encoding="utf-8")
+        plan = {"training_campaign_sha256": hashlib.sha256(summary.read_bytes()).hexdigest(),
+                "training_plan_sha256": text_sha256(train), "pilot_plan_sha256": text_sha256(pilot)}
+        self.assertEqual(pin_problems(plan, summary, train, pilot), [])
+        pilot.write_text('{"label": "changed"}', encoding="utf-8")
+        summary.write_bytes(b'{"a": 2}')
+        problems = pin_problems(plan, summary, train, pilot)
+        self.assertEqual(len(problems), 2)
+        self.assertTrue(pin_problems({}, summary, train, pilot))
 
     def test_session_commits_lists_every_session_shortened(self):
         manifest = {"sessions": [{"provenance": {"commit": "54c955695001e7732f427aba93495b27a7e5a4ac"}},

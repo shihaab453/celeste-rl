@@ -267,6 +267,14 @@ def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
         return [f"{entry['run_dir']} already holds a run"] if (run_dir / "manifest.json").exists() else []
     problems = [f"{entry['id']} is marked resume but {entry['run_dir']}/{name} does not exist"
                 for name in ("manifest.json", "checkpoints/latest.zip") if not (run_dir / name).exists()]
+    if (run_dir / "manifest.json").exists():
+        try:
+            status = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8")).get("status")
+        except (OSError, json.JSONDecodeError):
+            status = None
+            problems.append(f"{entry['id']} is marked resume but {entry['run_dir']}/manifest.json cannot be read")
+        if status == "finished":
+            problems.append(f"{entry['id']} is marked resume but {entry['run_dir']} has already finished")
     try:
         build_command(entry, Path("."), resume=True)
     except ValueError as error:

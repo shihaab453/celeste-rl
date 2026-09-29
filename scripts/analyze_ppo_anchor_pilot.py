@@ -22,10 +22,13 @@ Record checks, refusing on failure: the evaluation summary matches the committed
 result is attributable and pins the planned checkpoint; the training summary matches the committed training plan with
 every run ok at 10 threads; E0's manifest records ent_coef 0 and no anchor; every session of an anchored run carries
 the identical anchor record with the planned lambda (check (b)); anchor.csv has exactly one row per update (update
-numbers 0, n_epochs, 2 n_epochs, ... for accepted steps / n_steps updates, none repeated or missing: anchor.csv is not
-rolled back on a resume, so a resume that replayed updates would repeat them), every update with 16 minibatches, and a
-nonzero anchor gradient in every row when lambda is above 0 (check (c), tightened after the training and before any
-evaluation was read); nothing names the fresh v2 held-out sets. Resumed runs are reported by name (sessions, runner
+numbers 0, n_epochs, 2 n_epochs, ... for accepted steps / n_steps updates, none missing; anchor.csv is not rolled back
+on a resume, so a session that resumed from an older checkpoint replays updates and the file drops back exactly to
+that session's restart update number: only such drop-backs are accepted, and the replayed rows are reported), every
+update with 16 minibatches, and a nonzero anchor gradient in every row when lambda is above 0 (check (c), tightened
+after the training and before any evaluation was read, and refined 2026-09-29 to accept explained replays); a blank or
+non-numeric value is a refusal, not a crash; the evaluation plan's pins of the training summary, the training plan and
+the declaration still match their files; nothing names the fresh v2 held-out sets. Resumed runs are reported by name (sessions, runner
 attempts and the commit of every session), not refused: a resumed run is valid but not bit-identical to an
 uninterrupted one. The report gives the training summary's commit as the campaign START commit and, per run, the commit
 of every session, because a resumed run trained partly at an earlier commit.
@@ -121,22 +124,90 @@ def session_commits(manifest: dict) -> list[str]:
     return [session["provenance"]["commit"][:8] for session in manifest["sessions"]]
 
 
+def _integer(value) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _above_zero(value) -> bool:
+    """True for a number above 0; a blank, missing or NaN value is not."""
+    try:
+        return float(value) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def resume_update_numbers(manifest: dict) -> list[int]:
+    """The update number each resumed session restarts at: n_epochs * (its resumed_at steps / n_steps)."""
+    config = manifest["config"]
+    n_epochs, n_steps = config.get("n_epochs", 4), config.get("n_steps", 2048)
+    return [n_epochs * (session["resumed_at"] // n_steps) for session in manifest["sessions"][1:]
+            if isinstance(session.get("resumed_at"), int)]
+
+
+def effective_updates(updates: list[int], restarts: list[int]) -> tuple[list[int], int] | None:
+    """Follow the update numbers in file order. anchor.csv is not rolled back on a resume, so a session that resumed
+    from a checkpoint older than the rows already written replays those updates and the file drops back, exactly to that
+    session's restart update number; the earlier rows for the replayed updates are superseded. Returns the updates that
+    count and how many rows were replayed, or None when a drop-back is not explained by a resumed session."""
+    kept, replayed, remaining = [], 0, list(restarts)
+    for update in updates:
+        if kept and update <= kept[-1]:
+            if update not in remaining:
+                return None
+            remaining = remaining[remaining.index(update) + 1:]
+            while kept and kept[-1] >= update:
+                kept.pop()
+                replayed += 1
+        kept.append(update)
+    return kept, replayed
+
+
+def replayed_anchor_rows(rows: list[dict], manifest: dict) -> int:
+    """How many anchor.csv rows a resume replayed (0 when there is no drop-back or it is not explained)."""
+    updates = [_integer(row.get("update")) for row in rows]
+    if None in updates:
+        return 0
+    result = effective_updates(updates, resume_update_numbers(manifest))
+    return result[1] if result else 0
+
+
 def anchor_row_problems(run_dir: Path, rows: list[dict], manifest: dict, coef: float) -> list[str]:
-    """Check (c), row by row: one row per update with none repeated or missing (a resume from a checkpoint older than
-    the records would append the updates it replays a second time), and a nonzero anchor gradient when lambda is above 0."""
+    """Check (c), row by row: one row per update with none missing and none repeated except the replays a resumed
+    session explains (see effective_updates), and a nonzero anchor gradient when lambda is above 0. A blank or
+    non-numeric value is a refusal, not a crash."""
     config = manifest["config"]
     n_epochs, n_steps = config.get("n_epochs", 4), config.get("n_steps", 2048)
     expected = [n_epochs * index for index in range(manifest["accepted_steps"] // n_steps)]
-    updates = [int(row["update"]) for row in rows]
+    updates = [_integer(row.get("update")) for row in rows]
     problems = []
-    if updates != expected:
-        repeated = sorted({update for update in updates if updates.count(update) > 1})
-        problems.append(f"{run_dir}: anchor.csv has {len(updates)} rows, expected {len(expected)} (one per update, "
-                        f"in steps of {n_epochs}); repeated update numbers: {repeated[:5]}")
+    if None in updates:
+        problems.append(f"{run_dir}: anchor.csv has a blank or non-numeric update number")
+    else:
+        result = effective_updates(updates, resume_update_numbers(manifest))
+        if result is None or result[0] != expected:
+            repeated = sorted({update for update in updates if updates.count(update) > 1})
+            problems.append(f"{run_dir}: anchor.csv has {len(updates)} rows, expected {len(expected)} (one per update, "
+                            f"in steps of {n_epochs}, repeats only where a resumed session replays); "
+                            f"repeated update numbers: {repeated[:5]}")
     if coef > 0:
-        flat = [row["update"] for row in rows if not float(row["anchor_grad_norm"]) > 0]
+        flat = [row.get("update") for row in rows if not _above_zero(row.get("anchor_grad_norm"))]
         if flat:
-            problems.append(f"{run_dir}: anchor gradient not above 0 in updates {flat[:5]}")
+            problems.append(f"{run_dir}: anchor gradient missing or not above 0 in updates {flat[:5]}")
+    return problems
+
+
+def pin_problems(plan: dict, training_summary: Path, training_plan: Path, pilot_plan: Path) -> list[str]:
+    """The evaluation plan records the hashes of what it was generated from; each must still match its file."""
+    problems = []
+    if plan.get("training_campaign_sha256") != sha(training_summary):
+        problems.append(f"the training summary {training_summary.name} is not the one the evaluation plan pins")
+    if not matches_text_hash(training_plan, plan.get("training_plan_sha256", "")):
+        problems.append(f"{training_plan.name} is not the training plan the evaluation plan pins")
+    if not matches_text_hash(pilot_plan, plan.get("pilot_plan_sha256", "")):
+        problems.append(f"{pilot_plan.name} is not the declaration the evaluation plan pins")
     return problems
 
 
@@ -151,7 +222,7 @@ def anchored_run_problems(run_dir: Path, coef: float) -> list[str]:
     elif records[0].get("coef") != coef:
         problems.append(f"{run_dir}: anchor lambda {records[0].get('coef')}, planned {coef}")
     rows = list(csv.DictReader((run_dir / "anchor.csv").read_text(encoding="utf-8").splitlines()))
-    wrong = [row["update"] for row in rows if int(row["minibatches"]) != MINIBATCHES_PER_UPDATE]
+    wrong = [row.get("update") for row in rows if _integer(row.get("minibatches")) != MINIBATCHES_PER_UPDATE]
     if not rows or wrong:
         problems.append(f"{run_dir}: anchor.csv has {len(rows)} rows; updates without {MINIBATCHES_PER_UPDATE} "
                         f"minibatches: {wrong[:5]}")
@@ -186,6 +257,9 @@ def main() -> int:
             or train_summary.get("threads_per_job") != 10):
         raise SystemExit("the training summary does not match the committed training plan, has a run not ok, or did "
                          "not record 10 threads")
+    pins = pin_problems(plan, REPO / plan["training_campaign"], train_path, REPO / "config/ppo-anchor-pilot.json")
+    if pins:
+        raise SystemExit("the evaluation plan's pins do not hold:\n  " + "\n  ".join(pins))
     planned = {run["id"]: run for run in plan["runs"]}
     named = [run["id"] for run in plan["runs"] if any(name in " ".join(run["command"]) for name in UNREAD_SETS)]
     if named:
@@ -214,7 +288,7 @@ def main() -> int:
     if problems:
         raise SystemExit("record checks failed:\n  " + "\n  ".join(problems))
 
-    resumed, commits = {}, {}
+    resumed, commits, replayed = {}, {}, {}
     for record in train_summary["results"]:
         manifest = load(REPO / record["run_dir"] / "manifest.json")
         sessions = len(manifest["sessions"])
@@ -224,6 +298,11 @@ def main() -> int:
             resumed[record["id"]] = {"sessions": sessions, "runner_attempts": attempts,
                                      "session_commits": commits[record["id"]],
                                      "note": "valid, but not bit-identical to an uninterrupted run"}
+        if (REPO / record["run_dir"] / "anchor.csv").exists():
+            rows = list(csv.DictReader((REPO / record["run_dir"] / "anchor.csv").read_text(encoding="utf-8").splitlines()))
+            count = replayed_anchor_rows(rows, manifest)
+            if count:
+                replayed[record["id"]] = count
 
     retention = load(REPO / "docs/results/retention-pilot.json")
     clone_floor, final_floor = retention["floor"]["clone"]["route_macro"], retention["floor"]["final"]["route_macro"]
@@ -262,8 +341,10 @@ def main() -> int:
               "room2_v1_reference": {"m_k_median": round(statistics.median(m_k), 4), "threshold": round(threshold, 4)},
               "runs": runs, "decisions": decisions, "control": control_row, "reading": read_together(decisions),
               "resumed_runs": resumed or "none",
-              "record_checks": ("passed: plan hashes, attributable results, 10 threads, E0 ent_coef 0, (b), (c) "
-                                "(one anchor.csv row per update, nonzero anchor gradient)")}
+              **({"anchor_rows_replayed_by_a_resume": replayed} if replayed else {}),
+              "record_checks": ("passed: plan hashes and the evaluation plan's pins, attributable results, 10 threads, "
+                                "E0 ent_coef 0, (b), (c) (one anchor.csv row per update, repeats only where a resumed "
+                                "session replays, nonzero anchor gradient)")}
     args.output.write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8", newline="\n")
     for arm, decision in decisions.items():
         print(f"{arm}: {json.dumps(decision)}")

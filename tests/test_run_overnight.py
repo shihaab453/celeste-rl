@@ -109,6 +109,17 @@ class EntryProblemsTests(unittest.TestCase):
         (self.run_dir / "checkpoints" / "latest.zip").write_bytes(b"x")
         self.assertEqual(run_overnight.entry_problems(entry, self.repo), [])
 
+    def test_a_resume_entry_is_refused_for_a_run_that_already_finished_or_whose_manifest_is_unreadable(self) -> None:
+        entry = {**self.entry, "resume": True}
+        self.stopped_run()
+        (self.run_dir / "manifest.json").write_text('{"status": "finished"}', encoding="utf-8")
+        self.assertEqual(run_overnight.entry_problems(entry, self.repo),
+                         ["A1-k0 is marked resume but runs/train/A1-k0 has already finished"])
+        (self.run_dir / "manifest.json").write_text('{"status": "running"}', encoding="utf-8")
+        self.assertEqual(run_overnight.entry_problems(entry, self.repo), [])
+        (self.run_dir / "manifest.json").write_text("{not json", encoding="utf-8")
+        self.assertEqual(len(run_overnight.entry_problems(entry, self.repo)), 1)
+
     def test_a_resume_entry_must_be_a_command_that_can_resume(self) -> None:
         self.stopped_run()
         entry = {**self.entry, "resume": True, "command": ["scripts/evaluate_heldout.py"]}
