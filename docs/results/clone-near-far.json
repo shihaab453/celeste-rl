@@ -1,0 +1,385 @@
+{
+  "label": "post hoc clone near/far baselines; signed decay in success percentage points; aggregates only",
+  "analysis_code_sha256": "9d7f6cf1e89867b2be42cbbed88ad61b845f844c0607ae91b4876e720d30ec92",
+  "inputs_sha256": {
+    "docs/results/ppo-tiebreak-near-far.json": "91aac8cfb313323481436d724fbd6b32f48cfbc77b1fd6dfadca68e9140a3a60",
+    "scripts/describe_tiebreak_near_far.py": "18b13febee4c33a68a0ff2b8e93ec5e05ff8a83f4926ce84130125313c5868a1",
+    "scripts/describe_coverage_ceiling.py": "81edce8e722ecdef9161e1afc901478aebc25bf52ce1fb84b9e96b4b153aa37f",
+    "celeste_rl/cloning.py": "1811845ecd6d5dfcd1ee05b6b6422f6c2574c61b9b61543ea692458bdce9f573",
+    "celeste_rl/schema.py": "32979487269fa143608eba5764fb426b70b74f4e8e0d83b762c12f45ab23a390",
+    "config/heldout_starts.json": "4585c9a542e22a86861c9253f9dd9bcbfbbd188312ddc0d58c36d026668f4584",
+    "config/ppo-anchor-pilot.json": "fe0f9c53cf0025a32d969424791e1445b8ad21b7ff14e0b2c30dc919adf446a3",
+    "docs/results/mixed-self-distillation-clone.json": "5ed82271f9f115f55bc39efd20303a684044f751ab14f6a6a5a768af0c6d122c",
+    "config/campaign-mixed-self-distillation-clone-eval.json": "b269254df0598d2b73abf36a56b5e5bcecd6e4b6fe823697764f5108b68977fc",
+    "runs/campaign/20260928-012535-mixed-self-distillation-clone-eval-v1/summary.json": "a217ec3349edf179a2a97fa52ce2d3ad3fd9d4cc6e5dda0e81cead592a75fa29",
+    "config/campaign-ppo-anchor-train.json": "eaf7ac7959bb3f068b5f57fab69453fa14d8ba2150a967ab0d284e2f8be8f179",
+    "config/campaign-ppo-tiebreak-train.json": "6da1a5d85c821d098ef62b42e71c3d441938cc88bcbc3db5520f444d97ad771f",
+    "runs/policy-play/chapter-1-room-1/20260926-164255/dataset.npz": "b0a723c2411a5d56b1e4a95cc2715cd98128a6587eebba61ea4158c4161be49e",
+    "runs/heldout-evaluation/20260928-012540/results.json": "6fe02516923d540a910f71cb39f2646f2d92fd294cbb70136123649afa578134",
+    "runs/heldout-evaluation/20260928-012540/episodes.jsonl": "077aa328520a672cb6df149b78ba980212ca361f5aab1779669885939cc2b9e4",
+    "runs/policy-play/chapter-1-room-1/20260926-170822/dataset.npz": "8efdcc987cc6becd760a587bae13ff234e084a70351a7fa4dd1de777907cc615",
+    "runs/heldout-evaluation/20260928-012859/results.json": "5be8c88f449e8f03d6f4aeadd934c8717196ff0dd512d8e2e9f44d9f77525b9d",
+    "runs/heldout-evaluation/20260928-012859/episodes.jsonl": "e128aaaf2f1c0cae4bc24e76889e7857ddab6e6510bb18f52259f43f83fb61a3",
+    "runs/policy-play/chapter-1-room-1/20260926-165351/dataset.npz": "1583af09bc8543b5d3a12293ad7677043c47887aeaf29fa04f57ceb3f16793b0",
+    "runs/heldout-evaluation/20260928-013234/results.json": "89b55cdd8cc61c50ead9231df7b25df11a84756a3af2519878c87bea6b75874f",
+    "runs/heldout-evaluation/20260928-013234/episodes.jsonl": "0bafb5bfa31af68814dd5d8d015146fae67c546b7377694b27b674aa5d54bf1c",
+    "runs/policy-play/chapter-1-room-1/20260926-170623/dataset.npz": "6ff673757fa800c477d34a318ea2d82306280d890bde99dfcbe1b083d7358a2c",
+    "runs/heldout-evaluation/20260928-013512/results.json": "2f8e55cbd5e98b0673a458209872a730e946ee0f10e7cbeda733a378d7dea591",
+    "runs/heldout-evaluation/20260928-013512/episodes.jsonl": "f2080b021bd81de7b30a11f00bd7217a5aa5128b6bd96bd577b8dc90f07bf5da"
+  },
+  "groups": {
+    "k0": {
+      "donor": 3,
+      "fitted_frames": 4472,
+      "near_starts": 118,
+      "far_starts": 82,
+      "same_dash_fallbacks": 0
+    },
+    "k1": {
+      "donor": 4,
+      "fitted_frames": 8619,
+      "near_starts": 152,
+      "far_starts": 48,
+      "same_dash_fallbacks": 0
+    },
+    "k2": {
+      "donor": 5,
+      "fitted_frames": 4307,
+      "near_starts": 121,
+      "far_starts": 79,
+      "same_dash_fallbacks": 0
+    },
+    "k3": {
+      "donor": 6,
+      "fitted_frames": 5863,
+      "near_starts": 146,
+      "far_starts": 54,
+      "same_dash_fallbacks": 0
+    }
+  },
+  "clone_baselines": {
+    "k0": {
+      "near": {
+        "successes": 78,
+        "episodes": 118,
+        "success_rate": 0.6610169491525424,
+        "represented_routes": 11,
+        "route_macro": 0.696951666090422
+      },
+      "far": {
+        "successes": 48,
+        "episodes": 82,
+        "success_rate": 0.5853658536585366,
+        "represented_routes": 11,
+        "route_macro": 0.5809327036599764
+      }
+    },
+    "k1": {
+      "near": {
+        "successes": 104,
+        "episodes": 152,
+        "success_rate": 0.6842105263157895,
+        "represented_routes": 11,
+        "route_macro": 0.6811884371666981
+      },
+      "far": {
+        "successes": 24,
+        "episodes": 48,
+        "success_rate": 0.5,
+        "represented_routes": 11,
+        "route_macro": 0.43138528138528137
+      }
+    },
+    "k2": {
+      "near": {
+        "successes": 83,
+        "episodes": 121,
+        "success_rate": 0.6859504132231405,
+        "represented_routes": 11,
+        "route_macro": 0.6982912289730472
+      },
+      "far": {
+        "successes": 43,
+        "episodes": 79,
+        "success_rate": 0.5443037974683544,
+        "represented_routes": 11,
+        "route_macro": 0.5365440115440115
+      }
+    },
+    "k3": {
+      "near": {
+        "successes": 82,
+        "episodes": 146,
+        "success_rate": 0.5616438356164384,
+        "represented_routes": 11,
+        "route_macro": 0.5641636957813428
+      },
+      "far": {
+        "successes": 20,
+        "episodes": 54,
+        "success_rate": 0.37037037037037035,
+        "represented_routes": 11,
+        "route_macro": 0.35353535353535354
+      }
+    }
+  },
+  "signed_losses": {
+    "pilot-A1-k0": {
+      "near": {
+        "success_rate_loss_percentage_points": 5.0847457627118615,
+        "route_macro_loss_percentage_points": 5.610484677470318
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 7.317073170731703,
+        "route_macro_loss_percentage_points": 7.724321133412049
+      }
+    },
+    "pilot-E0-k0": {
+      "near": {
+        "success_rate_loss_percentage_points": 11.016949152542377,
+        "route_macro_loss_percentage_points": 16.04356037370391
+      },
+      "far": {
+        "success_rate_loss_percentage_points": -1.2195121951219523,
+        "route_macro_loss_percentage_points": -2.741702741702745
+      }
+    },
+    "new-A1-k0": {
+      "near": {
+        "success_rate_loss_percentage_points": 1.6949152542372947,
+        "route_macro_loss_percentage_points": 4.581051590620966
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 2.4390243902438935,
+        "route_macro_loss_percentage_points": 2.1687655778564907
+      }
+    },
+    "new-E0-k0": {
+      "near": {
+        "success_rate_loss_percentage_points": 12.711864406779661,
+        "route_macro_loss_percentage_points": 13.255447370279905
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 7.317073170731703,
+        "route_macro_loss_percentage_points": 7.712842712842716
+      }
+    },
+    "pilot-A1-k1": {
+      "near": {
+        "success_rate_loss_percentage_points": 3.289473684210531,
+        "route_macro_loss_percentage_points": 4.907145994102525
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 0.0,
+        "route_macro_loss_percentage_points": -2.474747474747474
+      }
+    },
+    "pilot-E0-k1": {
+      "near": {
+        "success_rate_loss_percentage_points": 23.026315789473685,
+        "route_macro_loss_percentage_points": 22.05635548026853
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 10.416666666666668,
+        "route_macro_loss_percentage_points": 5.62049062049062
+      }
+    },
+    "new-A1-k1": {
+      "near": {
+        "success_rate_loss_percentage_points": 6.578947368421051,
+        "route_macro_loss_percentage_points": 8.083552920509451
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 0.0,
+        "route_macro_loss_percentage_points": 0.5411255411255422
+      }
+    },
+    "new-E0-k1": {
+      "near": {
+        "success_rate_loss_percentage_points": 21.710526315789476,
+        "route_macro_loss_percentage_points": 22.348328000501915
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 8.333333333333332,
+        "route_macro_loss_percentage_points": 8.23232323232323
+      }
+    },
+    "pilot-A1-k2": {
+      "near": {
+        "success_rate_loss_percentage_points": 2.4793388429752095,
+        "route_macro_loss_percentage_points": 5.4059450650359775
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 5.063291139240506,
+        "route_macro_loss_percentage_points": 4.433621933621934
+      }
+    },
+    "pilot-E0-k2": {
+      "near": {
+        "success_rate_loss_percentage_points": 0.8264462809917439,
+        "route_macro_loss_percentage_points": 4.843590752681671
+      },
+      "far": {
+        "success_rate_loss_percentage_points": -2.5316455696202556,
+        "route_macro_loss_percentage_points": -5.555555555555558
+      }
+    },
+    "new-A1-k2": {
+      "near": {
+        "success_rate_loss_percentage_points": 2.4793388429752095,
+        "route_macro_loss_percentage_points": 3.4328297964661636
+      },
+      "far": {
+        "success_rate_loss_percentage_points": -2.5316455696202556,
+        "route_macro_loss_percentage_points": -2.4350649350649345
+      }
+    },
+    "new-E0-k2": {
+      "near": {
+        "success_rate_loss_percentage_points": 4.958677685950419,
+        "route_macro_loss_percentage_points": 7.090182544728007
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 6.329113924050633,
+        "route_macro_loss_percentage_points": 3.257575757575759
+      }
+    },
+    "pilot-A1-k3": {
+      "near": {
+        "success_rate_loss_percentage_points": 3.424657534246578,
+        "route_macro_loss_percentage_points": 4.584076054664288
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 0.0,
+        "route_macro_loss_percentage_points": 3.282828282828282
+      }
+    },
+    "pilot-E0-k3": {
+      "near": {
+        "success_rate_loss_percentage_points": 17.808219178082197,
+        "route_macro_loss_percentage_points": 19.134729649435535
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 16.666666666666664,
+        "route_macro_loss_percentage_points": 13.383838383838384
+      }
+    },
+    "new-A1-k3": {
+      "near": {
+        "success_rate_loss_percentage_points": 5.47945205479452,
+        "route_macro_loss_percentage_points": 7.163547237076651
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 5.555555555555553,
+        "route_macro_loss_percentage_points": 6.0606060606060606
+      }
+    },
+    "new-E0-k3": {
+      "near": {
+        "success_rate_loss_percentage_points": 10.958904109589046,
+        "route_macro_loss_percentage_points": 13.208556149732619
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 0.0,
+        "route_macro_loss_percentage_points": -4.040404040404039
+      }
+    }
+  },
+  "means": {
+    "near": {
+      "baseline_successes_once": 347,
+      "baseline_episodes_once": 537,
+      "baseline_success_rate": 0.6461824953445066,
+      "baseline_mean_clone_route_macro": 0.6601487570028776,
+      "arms": {
+        "A1": {
+          "final_success_rate": 0.6070763500931099,
+          "final_mean_run_route_macro": 0.6054379653329446,
+          "state_weighted_loss_percentage_points": 3.9106145251396662,
+          "mean_route_macro_loss_percentage_points": 5.471079166993298
+        },
+        "E0": {
+          "final_success_rate": 0.5111731843575419,
+          "final_mean_run_route_macro": 0.5126728191012124,
+          "state_weighted_loss_percentage_points": 13.500931098696467,
+          "mean_route_macro_loss_percentage_points": 14.747593790166514
+        }
+      }
+    },
+    "far": {
+      "baseline_successes_once": 135,
+      "baseline_episodes_once": 263,
+      "baseline_success_rate": 0.5133079847908745,
+      "baseline_mean_clone_route_macro": 0.4755993375311557,
+      "arms": {
+        "A1": {
+          "final_success_rate": 0.48859315589353614,
+          "final_mean_run_route_macro": 0.45147251738160826,
+          "state_weighted_loss_percentage_points": 2.4714828897338337,
+          "mean_route_macro_loss_percentage_points": 2.4126820149547425
+        },
+        "E0": {
+          "final_success_rate": 0.46387832699619774,
+          "final_mean_run_route_macro": 0.44326257706939526,
+          "state_weighted_loss_percentage_points": 4.942965779467673,
+          "mean_route_macro_loss_percentage_points": 3.2336760461760425
+        }
+      }
+    }
+  },
+  "mean_losses_by_batch": {
+    "pilot": {
+      "near": {
+        "A1": {
+          "success_rate_loss_percentage_points": 3.569553956036045,
+          "route_macro_loss_percentage_points": 5.126912947818277
+        },
+        "E0": {
+          "success_rate_loss_percentage_points": 13.1694826002725,
+          "route_macro_loss_percentage_points": 15.519559064022411
+        }
+      },
+      "far": {
+        "A1": {
+          "success_rate_loss_percentage_points": 3.095091077493052,
+          "route_macro_loss_percentage_points": 3.241505968778698
+        },
+        "E0": {
+          "success_rate_loss_percentage_points": 5.833043892147781,
+          "route_macro_loss_percentage_points": 2.676767676767675
+        }
+      }
+    },
+    "new": {
+      "near": {
+        "A1": {
+          "success_rate_loss_percentage_points": 4.058163380107019,
+          "route_macro_loss_percentage_points": 5.815245386168308
+        },
+        "E0": {
+          "success_rate_loss_percentage_points": 12.58499312952715,
+          "route_macro_loss_percentage_points": 13.97562851631061
+        }
+      },
+      "far": {
+        "A1": {
+          "success_rate_loss_percentage_points": 1.3657335940447977,
+          "route_macro_loss_percentage_points": 1.5838580611307898
+        },
+        "E0": {
+          "success_rate_loss_percentage_points": 5.4948801070289175,
+          "route_macro_loss_percentage_points": 3.7905844155844166
+        }
+      }
+    }
+  },
+  "record_checks": "passed: prior final input pins, masks, shared initial clone pins, attributable clone evaluations, episode identity, full/split outcome totals",
+  "limits": [
+    "Four baselines measured once, shared across both arms and PPO batches; correlated noise.",
+    "Positive loss means decline; negative means improvement; not normalized donor-margin loss.",
+    "Thin far routes, unequal clone composition and stochastic outcomes remain.",
+    "Historical clone and final evaluations occurred at different times.",
+    "Neither subgroup difficulty nor subsequent trajectory overlap is controlled; no causal or significance claim.",
+    "Donor subgroup baselines not computed; no fresh v2 reads; declared A1 selection unchanged."
+  ]
+}
