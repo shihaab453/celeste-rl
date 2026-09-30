@@ -2,7 +2,7 @@
   "name": "ppo-anchor-tiebreak-train-v1",
   "written": "2026-09-29T20:02:52+01:00",
   "declaration": "config/ppo-anchor-tiebreak.json",
-  "declaration_sha256": "0ac46db540535158c3da6d4ae64663f6cd65a56ebb732caa0b21c30ffd687657",
+  "declaration_sha256": "f6472916143ebaff6aaf2834ca5431ae041fe025c3f7e00db94fff456237a728",
   "pilot_training_plan": "config/campaign-ppo-anchor-train.json",
   "pilot_training_plan_sha256": "eaf7ac7959bb3f068b5f57fab69453fa14d8ba2150a967ab0d284e2f8be8f179",
   "label": "training for the descriptive PPO anchor tie-break (E0 against A1, new PPO seeds); nothing reads a held-out set",
@@ -359,5 +359,6 @@
         "0"
       ]
     }
-  ]
+  ],
+  "stop_time": "2026-09-30T10:00:00"
 }
