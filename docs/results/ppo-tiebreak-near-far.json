@@ -1,0 +1,482 @@
+{
+  "label": "post hoc descriptive near/far check; aggregates only; no causal or confirmatory claim",
+  "analysis_code_sha256": "6fcd485b4bfd54bd5876414bc4f69771ad999e11f72990347727afa520ebbd70",
+  "inputs_sha256": {
+    "config/heldout_starts.json": "9abc35b97460ff15e1d49bf669fd7840c01a5cb3b0e98c51195ed6f01eb1e650",
+    "config/ppo-anchor-pilot.json": "f32386fd0fc752f7396051d6b27b1018ab91f91d437c5024eb789b618e5c593d",
+    "docs/results/ppo-anchor-pilot.json": "fbbf136858b4d6b7f198d705814dee7347c9bed5aa1f20c00a3ab8758c6911ea",
+    "docs/results/ppo-anchor-tiebreak.json": "f905dc89b8807d6ffb138d50a1527f28a2a8b444a25fecb5d431ff13356e8636",
+    "docs/results/coverage-ceiling-descriptive.json": "aff41274c1f7910c0cdb06ed97279d86a7b4f63f8035b8a03710b6fbdaeaaec5",
+    "scripts/describe_coverage_ceiling.py": "071544e0006f890d076c37a4b3ec1adfde9a101395b92d2a61fa1c8aadabe6e2",
+    "celeste_rl/cloning.py": "4e8b0a075994eaeef2f34767ae9e3004cc00bc92f55be495cbe197365e337782",
+    "celeste_rl/schema.py": "32979487269fa143608eba5764fb426b70b74f4e8e0d83b762c12f45ab23a390",
+    "runs/policy-play/chapter-1-room-1/20260926-164255/dataset.npz": "b0a723c2411a5d56b1e4a95cc2715cd98128a6587eebba61ea4158c4161be49e",
+    "runs/policy-play/chapter-1-room-1/20260926-170822/dataset.npz": "8efdcc987cc6becd760a587bae13ff234e084a70351a7fa4dd1de777907cc615",
+    "runs/policy-play/chapter-1-room-1/20260926-165351/dataset.npz": "1583af09bc8543b5d3a12293ad7677043c47887aeaf29fa04f57ceb3f16793b0",
+    "runs/policy-play/chapter-1-room-1/20260926-170623/dataset.npz": "6ff673757fa800c477d34a318ea2d82306280d890bde99dfcbe1b083d7358a2c",
+    "config/campaign-ppo-anchor-eval.json": "2e7becfcd5a80d64e4fe05ce372519acc4c7663046a71877cc95bd8561d07b46",
+    "runs/campaign/20260929-165751-ppo-anchor-pilot-eval-v1/summary.json": "6b7e1bd60d3bc92384ffdbaf9139a62e85bac5a9866bc443b8f661eda438d1f4",
+    "runs/train/ppo-anchor-pilot-A1-k0/manifest.json": "af2c2d8a0716ff0502712ce1ec2958baf0aeb6bb8cee25f1a76b4164f4fa28c5",
+    "runs/heldout-evaluation/20260929-170009/results.json": "2ab501a670c1b071daa03c2672e15a900ee78c9775494cbb2e2b96f703258a14",
+    "runs/heldout-evaluation/20260929-170009/episodes.jsonl": "4eb8959a1ac8598dbc3f7aee1b2063b5f271561c944259cb312c9b70dcf77432",
+    "runs/heldout-evaluation/20260929-172242/results.json": "58fd0d760b7a733b8471960789aaa5433089efb888ca50faacdd3494bffa6628",
+    "runs/heldout-evaluation/20260929-172242/episodes.jsonl": "b0ac08885153bb05e610011747475d3da0e051871bdb5414717ecb78e018a4f0",
+    "runs/train/ppo-anchor-pilot-A1-k1/manifest.json": "2055a44198eddaf0c942c8a0dd5025e54fca57c1def08fc96d89c9b1d01d53d7",
+    "runs/heldout-evaluation/20260929-170519/results.json": "2dd87b35ba935904b53e72d17a299ddfde68303878c072bdda2b867efeca6515",
+    "runs/heldout-evaluation/20260929-170519/episodes.jsonl": "f52261e987c26382dac8b374679faa0a4c982341355a863c442c443acc1e9158",
+    "runs/heldout-evaluation/20260929-172916/results.json": "528553ba36baf9cabc06f733be72de6c145360a30245551516fdc44d29a096ce",
+    "runs/heldout-evaluation/20260929-172916/episodes.jsonl": "3ae62258ef3be9f4f22d467753fd8d5fc2021f306b9d5ae6045bf9f96b40fb6e",
+    "runs/train/ppo-anchor-pilot-A1-k2/manifest.json": "3e641093eed837c19d7dc2d106bc498dc3a2105245237bf87c007d88ae14f2a1",
+    "runs/heldout-evaluation/20260929-171118/results.json": "5bac7c8e42353bfdaaba89762164487288f24c6c88e7c1c480e1ab451c49f3cf",
+    "runs/heldout-evaluation/20260929-171118/episodes.jsonl": "59f9da4b961a155f5dc97cbd52a6a49562661fa114f66fb6041a1202f61a4f8b",
+    "runs/heldout-evaluation/20260929-173522/results.json": "4ff651cd0d34a221b4af134e6e6cd2c37de4bdd4aa62ed697d21f5fda3b91fb5",
+    "runs/heldout-evaluation/20260929-173522/episodes.jsonl": "dbc7a9aef92231457253af214b6f00388abe316df7d2174c432551aaedf9781c",
+    "runs/train/ppo-anchor-pilot-A1-k3/manifest.json": "d5c6627e71bc4eb2c43778e2409849e42425937ee2c515701c1d15b930180808",
+    "runs/heldout-evaluation/20260929-171738/results.json": "a7ec2e32b5fe7cb7841a8d4acf035dd90faeffa36435918643214f58329997f4",
+    "runs/heldout-evaluation/20260929-171738/episodes.jsonl": "d050e5dfa3fb6196ce25176e755f49438a8892e76ca4f2ef9257bb416299f0a2",
+    "runs/heldout-evaluation/20260929-174152/results.json": "526e1e790c7b04f358068d997151715e2a77655a4a6410384ad667a59e1c75bc",
+    "runs/heldout-evaluation/20260929-174152/episodes.jsonl": "719fe6fd0eca74253b467a405d402a69f0e593192dd6f59bbe402a0b273f63b9",
+    "config/campaign-ppo-tiebreak-eval.json": "d31bc9a15814fb6d958348d7346e904b88346de18231b89c32c42adeb4d5869c",
+    "runs/campaign/20260930-054156-ppo-anchor-tiebreak-eval-v1/summary.json": "7e98674daffcf75781bd1c6f2bec82cc5100490583cc552bdcd1807f14d2a981",
+    "runs/train/ppo-tiebreak-A1-k0/manifest.json": "7794ba1b28c92c43833609f5969d76b855f7b67676a4aceef49f6774d52e3b09",
+    "runs/heldout-evaluation/20260930-054411/results.json": "4ba8a7b4f4cbd34d5240d90747e996d70cebb1d7b280eb1297b60521d38fc612",
+    "runs/heldout-evaluation/20260930-054411/episodes.jsonl": "420a251aaaed3446e2b016445cd2f14c5f813114d7159133f4857e906c5392ce",
+    "runs/heldout-evaluation/20260930-054937/results.json": "4701d6fe12fa2b6074673e960f2db83299f995c18b6391cfbd9cccb3b40fd758",
+    "runs/heldout-evaluation/20260930-054937/episodes.jsonl": "d1b8731c53fd6c21d4c922e9e052681cb297d29fd9e94e2b92c250958a573805",
+    "runs/train/ppo-tiebreak-A1-k1/manifest.json": "404cd49de719e15fd3d3542eb391a8382099ac7021a463b23a10abaa78b7594b",
+    "runs/heldout-evaluation/20260930-055432/results.json": "3b18c2242f31f33dc9a9938948e56909a6ec4477a618b8d5027cefee23b46ca6",
+    "runs/heldout-evaluation/20260930-055432/episodes.jsonl": "37253179231c4ae32d50e3171b10532788738180ca8f1a3fffc2fcbc89002660",
+    "runs/heldout-evaluation/20260930-060132/results.json": "0a251021a0b7aa74bb38630240a5032d3a69cad9857c3a8295fba254eccbec03",
+    "runs/heldout-evaluation/20260930-060132/episodes.jsonl": "4dfbfb0df7740dd772d9c810bb21852342fa69293853147a1b86d3ff432340f9",
+    "runs/train/ppo-tiebreak-A1-k2/manifest.json": "51eea8862dc93b1a97c0e43e3611b6b4173198909eda65d24d782388daac5b42",
+    "runs/heldout-evaluation/20260930-060749/results.json": "bb718d3b7c07868d2cdd336f92554ee297577e70d01e705dced1c4b0195fda18",
+    "runs/heldout-evaluation/20260930-060749/episodes.jsonl": "408d1c42e69074394346551709942f6b6ae010a4459108f18830f391f150656e",
+    "runs/heldout-evaluation/20260930-061443/results.json": "75b8e909d842f49e140fe3cce7072dbdb243f38f67ec1f1526351f7c5a0c7df6",
+    "runs/heldout-evaluation/20260930-061443/episodes.jsonl": "4b8717d75beeb87778783fd3ca7d59aa9ff3f54db50a59641776a7be28b5fc9d",
+    "runs/train/ppo-tiebreak-A1-k3/manifest.json": "d1ba77679a9c47e080a7bb7b625345759920b5a39a955dbbf3c4d0b0cf83d3c9",
+    "runs/heldout-evaluation/20260930-061910/results.json": "89505eaf32766eddde0e7097f0939a0bbe9f2f2bd079dcdd209995f221ac524f",
+    "runs/heldout-evaluation/20260930-061910/episodes.jsonl": "cb57011f2826f549c796cd10e11927aa2911b36351cfb36b9db957f810c6be99",
+    "runs/heldout-evaluation/20260930-062621/results.json": "f67b923fd26d65a2e9824eae4905557cd45c8d98bce015990461885d113836d0",
+    "runs/heldout-evaluation/20260930-062621/episodes.jsonl": "098a282a3a870e115eea12a3960d2cc84baa305d26a4e12ad96f30a3a019c8aa"
+  },
+  "method": "near <=4 px Euclidean to fitted donor frame with same dash count; far >4 px; position/dashes only",
+  "groups": {
+    "k0": {
+      "donor": 3,
+      "fitted_frames": 4472,
+      "near_starts": 118,
+      "far_starts": 82,
+      "same_dash_fallbacks": 0
+    },
+    "k1": {
+      "donor": 4,
+      "fitted_frames": 8619,
+      "near_starts": 152,
+      "far_starts": 48,
+      "same_dash_fallbacks": 0
+    },
+    "k2": {
+      "donor": 5,
+      "fitted_frames": 4307,
+      "near_starts": 121,
+      "far_starts": 79,
+      "same_dash_fallbacks": 0
+    },
+    "k3": {
+      "donor": 6,
+      "fitted_frames": 5863,
+      "near_starts": 146,
+      "far_starts": 54,
+      "same_dash_fallbacks": 0
+    }
+  },
+  "runs": {
+    "pilot-A1-k0": {
+      "near": {
+        "successes": 72,
+        "episodes": 118,
+        "success_rate": 0.6101694915254238,
+        "represented_routes": 11,
+        "route_macro": 0.6408468193157189
+      },
+      "far": {
+        "successes": 42,
+        "episodes": 82,
+        "success_rate": 0.5121951219512195,
+        "represented_routes": 11,
+        "route_macro": 0.5036894923258559
+      }
+    },
+    "pilot-E0-k0": {
+      "near": {
+        "successes": 65,
+        "episodes": 118,
+        "success_rate": 0.5508474576271186,
+        "represented_routes": 11,
+        "route_macro": 0.5365160623533829
+      },
+      "far": {
+        "successes": 49,
+        "episodes": 82,
+        "success_rate": 0.5975609756097561,
+        "represented_routes": 11,
+        "route_macro": 0.6083497310770039
+      }
+    },
+    "pilot-A1-k1": {
+      "near": {
+        "successes": 99,
+        "episodes": 152,
+        "success_rate": 0.6513157894736842,
+        "represented_routes": 11,
+        "route_macro": 0.6321169772256728
+      },
+      "far": {
+        "successes": 24,
+        "episodes": 48,
+        "success_rate": 0.5,
+        "represented_routes": 11,
+        "route_macro": 0.4561327561327561
+      }
+    },
+    "pilot-E0-k1": {
+      "near": {
+        "successes": 69,
+        "episodes": 152,
+        "success_rate": 0.45394736842105265,
+        "represented_routes": 11,
+        "route_macro": 0.4606248823640128
+      },
+      "far": {
+        "successes": 19,
+        "episodes": 48,
+        "success_rate": 0.3958333333333333,
+        "represented_routes": 11,
+        "route_macro": 0.37518037518037517
+      }
+    },
+    "pilot-A1-k2": {
+      "near": {
+        "successes": 80,
+        "episodes": 121,
+        "success_rate": 0.6611570247933884,
+        "represented_routes": 11,
+        "route_macro": 0.6442317783226874
+      },
+      "far": {
+        "successes": 39,
+        "episodes": 79,
+        "success_rate": 0.4936708860759494,
+        "represented_routes": 11,
+        "route_macro": 0.4922077922077922
+      }
+    },
+    "pilot-E0-k2": {
+      "near": {
+        "successes": 82,
+        "episodes": 121,
+        "success_rate": 0.6776859504132231,
+        "represented_routes": 11,
+        "route_macro": 0.6498553214462305
+      },
+      "far": {
+        "successes": 45,
+        "episodes": 79,
+        "success_rate": 0.569620253164557,
+        "represented_routes": 11,
+        "route_macro": 0.5920995670995671
+      }
+    },
+    "pilot-A1-k3": {
+      "near": {
+        "successes": 77,
+        "episodes": 146,
+        "success_rate": 0.5273972602739726,
+        "represented_routes": 11,
+        "route_macro": 0.5183229352347
+      },
+      "far": {
+        "successes": 20,
+        "episodes": 54,
+        "success_rate": 0.37037037037037035,
+        "represented_routes": 11,
+        "route_macro": 0.3207070707070707
+      }
+    },
+    "pilot-E0-k3": {
+      "near": {
+        "successes": 56,
+        "episodes": 146,
+        "success_rate": 0.3835616438356164,
+        "represented_routes": 11,
+        "route_macro": 0.3728163992869875
+      },
+      "far": {
+        "successes": 11,
+        "episodes": 54,
+        "success_rate": 0.2037037037037037,
+        "represented_routes": 11,
+        "route_macro": 0.2196969696969697
+      }
+    },
+    "new-A1-k0": {
+      "near": {
+        "successes": 76,
+        "episodes": 118,
+        "success_rate": 0.6440677966101694,
+        "represented_routes": 11,
+        "route_macro": 0.6511411501842124
+      },
+      "far": {
+        "successes": 46,
+        "episodes": 82,
+        "success_rate": 0.5609756097560976,
+        "represented_routes": 11,
+        "route_macro": 0.5592450478814115
+      }
+    },
+    "new-E0-k0": {
+      "near": {
+        "successes": 63,
+        "episodes": 118,
+        "success_rate": 0.5338983050847458,
+        "represented_routes": 11,
+        "route_macro": 0.564397192387623
+      },
+      "far": {
+        "successes": 42,
+        "episodes": 82,
+        "success_rate": 0.5121951219512195,
+        "represented_routes": 11,
+        "route_macro": 0.5038042765315492
+      }
+    },
+    "new-A1-k1": {
+      "near": {
+        "successes": 94,
+        "episodes": 152,
+        "success_rate": 0.618421052631579,
+        "represented_routes": 11,
+        "route_macro": 0.6003529079616036
+      },
+      "far": {
+        "successes": 24,
+        "episodes": 48,
+        "success_rate": 0.5,
+        "represented_routes": 11,
+        "route_macro": 0.42597402597402595
+      }
+    },
+    "new-E0-k1": {
+      "near": {
+        "successes": 71,
+        "episodes": 152,
+        "success_rate": 0.46710526315789475,
+        "represented_routes": 11,
+        "route_macro": 0.4577051571616789
+      },
+      "far": {
+        "successes": 20,
+        "episodes": 48,
+        "success_rate": 0.4166666666666667,
+        "represented_routes": 11,
+        "route_macro": 0.3490620490620491
+      }
+    },
+    "new-A1-k2": {
+      "near": {
+        "successes": 80,
+        "episodes": 121,
+        "success_rate": 0.6611570247933884,
+        "represented_routes": 11,
+        "route_macro": 0.6639629310083855
+      },
+      "far": {
+        "successes": 45,
+        "episodes": 79,
+        "success_rate": 0.569620253164557,
+        "represented_routes": 11,
+        "route_macro": 0.5608946608946609
+      }
+    },
+    "new-E0-k2": {
+      "near": {
+        "successes": 77,
+        "episodes": 121,
+        "success_rate": 0.6363636363636364,
+        "represented_routes": 11,
+        "route_macro": 0.6273894035257671
+      },
+      "far": {
+        "successes": 38,
+        "episodes": 79,
+        "success_rate": 0.4810126582278481,
+        "represented_routes": 11,
+        "route_macro": 0.503968253968254
+      }
+    },
+    "new-A1-k3": {
+      "near": {
+        "successes": 74,
+        "episodes": 146,
+        "success_rate": 0.5068493150684932,
+        "represented_routes": 11,
+        "route_macro": 0.49252822341057634
+      },
+      "far": {
+        "successes": 17,
+        "episodes": 54,
+        "success_rate": 0.3148148148148148,
+        "represented_routes": 11,
+        "route_macro": 0.29292929292929293
+      }
+    },
+    "new-E0-k3": {
+      "near": {
+        "successes": 66,
+        "episodes": 146,
+        "success_rate": 0.4520547945205479,
+        "represented_routes": 11,
+        "route_macro": 0.43207813428401665
+      },
+      "far": {
+        "successes": 20,
+        "episodes": 54,
+        "success_rate": 0.37037037037037035,
+        "represented_routes": 11,
+        "route_macro": 0.3939393939393939
+      }
+    }
+  },
+  "pooled": {
+    "near": {
+      "A1": {
+        "successes": 652,
+        "episodes": 1074,
+        "success_rate": 0.6070763500931099,
+        "mean_run_route_macro": 0.6054379653329446
+      },
+      "E0": {
+        "successes": 549,
+        "episodes": 1074,
+        "success_rate": 0.5111731843575419,
+        "mean_run_route_macro": 0.5126728191012124
+      }
+    },
+    "far": {
+      "A1": {
+        "successes": 257,
+        "episodes": 526,
+        "success_rate": 0.48859315589353614,
+        "mean_run_route_macro": 0.45147251738160826
+      },
+      "E0": {
+        "successes": 244,
+        "episodes": 526,
+        "success_rate": 0.46387832699619774,
+        "mean_run_route_macro": 0.44326257706939526
+      }
+    }
+  },
+  "by_batch": {
+    "pilot": {
+      "near": {
+        "A1": {
+          "successes": 328,
+          "episodes": 537,
+          "success_rate": 0.6108007448789572,
+          "mean_run_route_macro": 0.6088796275246948
+        },
+        "E0": {
+          "successes": 272,
+          "episodes": 537,
+          "success_rate": 0.5065176908752328,
+          "mean_run_route_macro": 0.5049531663626534
+        }
+      },
+      "far": {
+        "A1": {
+          "successes": 125,
+          "episodes": 263,
+          "success_rate": 0.4752851711026616,
+          "mean_run_route_macro": 0.4431842778433687
+        },
+        "E0": {
+          "successes": 124,
+          "episodes": 263,
+          "success_rate": 0.4714828897338403,
+          "mean_run_route_macro": 0.44883166076347897
+        }
+      }
+    },
+    "new": {
+      "near": {
+        "A1": {
+          "successes": 324,
+          "episodes": 537,
+          "success_rate": 0.6033519553072626,
+          "mean_run_route_macro": 0.6019963031411945
+        },
+        "E0": {
+          "successes": 277,
+          "episodes": 537,
+          "success_rate": 0.515828677839851,
+          "mean_run_route_macro": 0.5203924718397714
+        }
+      },
+      "far": {
+        "A1": {
+          "successes": 132,
+          "episodes": 263,
+          "success_rate": 0.5019011406844106,
+          "mean_run_route_macro": 0.4597607569198478
+        },
+        "E0": {
+          "successes": 120,
+          "episodes": 263,
+          "success_rate": 0.45627376425855515,
+          "mean_run_route_macro": 0.43769349337531155
+        }
+      }
+    }
+  },
+  "paired": {
+    "near": {
+      "mean_route_macro_difference_a1_minus_e0": 0.0927651462317322,
+      "a1_higher_of_8": 7,
+      "by_batch_and_clone": {
+        "pilot-k0": 0.10433075696233596,
+        "pilot-k1": 0.17149209486166006,
+        "pilot-k2": -0.005623543123543073,
+        "pilot-k3": 0.14550653594771246,
+        "new-k0": 0.08674395779658939,
+        "new-k1": 0.14264775079992464,
+        "new-k2": 0.03657352748261844,
+        "new-k3": 0.06045008912655969
+      }
+    },
+    "far": {
+      "mean_route_macro_difference_a1_minus_e0": 0.008209940312213022,
+      "a1_higher_of_8": 5,
+      "by_batch_and_clone": {
+        "pilot-k0": -0.10466023875114794,
+        "pilot-k1": 0.08095238095238094,
+        "pilot-k2": -0.09989177489177492,
+        "pilot-k3": 0.10101010101010102,
+        "new-k0": 0.05544077134986225,
+        "new-k1": 0.07691197691197688,
+        "new-k2": 0.056926406926406936,
+        "new-k3": -0.101010101010101
+      }
+    }
+  },
+  "record_checks": "passed: pins, fitted splits, prior coverage, episode identity/metadata and full/split totals",
+  "limits": [
+    "Post hoc, no threshold sweep.",
+    "Four shared clones, two PPO seeds per arm per clone; correlated repeats.",
+    "Within-group route macro averages represented routes only, then runs equally.",
+    "Start distance omits speed, timers and later trajectory.",
+    "Near/far groups differ in composition and difficulty; cannot separate retention from rehearsal causally.",
+    "Neither fresh v2 set read; declared selection unchanged."
+  ]
+}
