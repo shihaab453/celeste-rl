@@ -235,3 +235,138 @@ and [`docs/results/mixed-self-distillation-ppo.json`](results/mixed-self-distill
 confident-choice, output-size and ending figures are in
 [`docs/results/mixed-self-distillation-descriptive.json`](results/mixed-self-distillation-descriptive.json), written
 by `scripts/describe_mixed_self_distillation.py`.
+
+## Fifth pilot: keeping Room 1 with an anchor, or without the entropy bonus
+
+Also descriptive, four runs per arm, one recipe, declared before training
+(`config/ppo-anchor-pilot.json`). The Room 1 and Room 2 v1 sets are development sets;
+only aggregates are reported. Neither fresh v2 set was used.
+
+The fourth pilot kept the Room 1 skill through mixed copying, then lost most of it
+while learning Room 2. Its growing randomness suggested two remedies:
+
+- **E0:** turn off PPO's entropy bonus, the small reward for keeping button choices
+  random. Everything else in the Room 2 fine-tuning stays the same.
+- **A1 and A10:** keep that bonus, but add an anchor that penalizes departures from
+  the frozen original donor's Room 1 button probabilities, with weights of 1 and
+  10 respectively. It uses the donor's recorded Room 1 play: the same nineteen
+  episodes the mixed copy was fitted on, with six held back for descriptive
+  measurements.
+
+All three arms start from the same four mixed copies as the fourth pilot and learn
+Room 2 for 500,000 steps. The fourth pilot's unchanged fine-tuning runs serve as the
+control, with entropy coefficient 0.01 and no anchor. They were run earlier and
+sequentially; the remedy runs ran three at a time, with ten torch threads per job.
+
+The loss measure is the drop from the mixed copy to the final checkpoint, divided
+by the original donor's margin over the Room 1 floor of 14.2%. A loss of 0.25 means
+losing a quarter of that original margin, not 25 percentage points of success.
+The two floors remain those measured in the first pilot: 14.2% for a clone and
+20.46% for a final checkpoint. The same Room 1 test and route-macro measure are
+used throughout.
+
+| Arm | Median loss of the original Room 1 margin | Room 2 v1 median | Room 2 finals at least 45 of 50 | Declared branch |
+|---|---:|---:|---:|---|
+| Control: bonus, no anchor | 0.871 | 80.6% | 1 of 4 | Reference |
+| E0: no bonus, no anchor | 0.210 | 85.7% | 4 of 4 | Holds |
+| A1: bonus, anchor weight 1 | 0.072 | 85.3% | 3 of 4 | Holds |
+| A10: bonus, anchor weight 10 | 0.024 | 84.3% | 2 of 4 | Holds with a Room 2 cost |
+
+The branch labels follow the declared screen. The Room 2 v1 threshold is 76.76%,
+five points below the earlier mixed-imitation recipe's median of 81.76%.
+Holds requires median loss at most 0.25, that Room 2 v1 threshold, and at least
+three of four canonical finals clearing 45 of 50 episodes. Holds with a Room 2
+cost meets the loss threshold but fails a Room 2 condition. Partial means median
+loss above 0.25 and at most 0.6; Does not hold means loss above 0.6.
+The canonical Room 2 measure uses 50 episodes from its normal start and is on the
+training side. Room 2 v1 is a reused development set, so neither measure supports
+a fresh generalization claim.
+
+**All twelve remedy runs lost less Room 1 skill than any control run.** The largest
+remedy loss was 0.362, against the smallest control loss of 0.586. Turning off the
+entropy bonus alone prevented most of the decay seen in the control. The anchor
+also held the skill under this screen, while keeping Room 1 randomness close to
+the donor's level. The anchor frames are near the Room 1 test paths: the earlier
+coverage measurement found 59% to 76% of test starts within four pixels of a fitted
+frame, comparing position only. E0 has no such rehearsal term.
+
+| Donor seed | Room 1 after mixed copying | Control final | E0 final | A1 final | A10 final |
+|---|---:|---:|---:|---:|---:|
+| 3 | 64% | 8% | 57% | 58% | 61% |
+| 4 | 63% | 26% | 44% | 61% | 63% |
+| 5 | 64% | 7% | 63% | 58% | 57% |
+| 6 | 52% | 7% | 33% | 49% | 59% |
+
+**The declared reading is a tie between E0 and A1.** Their median losses differ by
+0.138 and their Room 2 v1 medians by 0.004, inside the declared tie bands of 0.15
+and 0.05. E0's per-run losses were 0.116, 0.305, 0.010 and 0.362; A1's were 0.106,
+0.021, 0.086 and 0.058, in donor order. E0 therefore has two runs above 0.25 and
+A1 none, but four runs per arm do not establish an advantage between the arms
+(the exact two-sided test on those counts gives about 0.43). On donor 5's copy,
+E0 scored above A1 at every measured checkpoint. A1's smaller observed losses
+must also be read beside the anchor's rehearsal near the test paths, described
+above. This pilot does not show that either arm retains better than the other.
+
+The Room 2 screen also needs care. A1's run from donor 3 cleared 40 of 50 episodes,
+so there is no basis to claim no Room 2 cost for A1. A10's two finals below the
+45-clear cut scored 44 and 43; its branch label records that screen, rather than
+establishing a Room 2 cost from differences of one or two clears.
+
+The descriptive frame measurements support the randomness explanation without
+settling it. On the six held-back Room 1 episodes, seed 3's donor had 5.325 bits
+of button-choice randomness per frame, its mixed copy 4.840, and its control
+final 9.630. The remedy finals were E0 4.987, A1 5.261 and A10 5.103. Across the
+four donors, A1's final Room 1 randomness was within 0.25 bits of the donor's;
+E0 was less consistent. Of the choices the donor made confidently, A1 still
+made 92% to 99% confidently the same way, A10 93% to 99%, E0 86% to 96%, and
+the control 54% to 83%. These control shares are remeasured on this pilot's
+held-back frames, rather than the frame set used for section 4. Room 2 randomness
+rose from the mixed copy in every arm and every run, including E0. Removing the
+bonus does not remove all randomness drift.
+
+The owner provisionally chose E0 to carry forward, following the declared tie
+choice by simplicity and cost. That is a choice, not a result establishing E0
+as better. A small E0 versus A1 tie-break was then declared using new PPO seeds
+and the same four copies, before any confirmation on fresh donors and the fresh
+Room 1 v2 set. Its thresholds were chosen after seeing this pilot. That tie-break
+has since finished and selected A1 under its declared rule; see the
+[tie-break result](results/ppo-anchor-tiebreak.json). This section reports the
+pilot only.
+
+Sampling noise, the copied value estimate and the reused development sets remain
+limits, as in the earlier pilots. In addition:
+
+- Four donors from one recipe cannot establish generalization to new donors.
+- Each copy's Room 1 starting score is one shared 200-start evaluation. Its
+  measurement error moves every arm's loss on that copy together. As a rough
+  scale, binomial approximations put one evaluation's standard error at about
+  0.06 to 0.08 loss units per run. This is not a route-macro uncertainty estimate
+  or an uncertainty interval for the arm comparison.
+- Anchor rehearsal near test paths limits comparisons with E0, and the control
+  and remedy campaigns ran at different times and with different concurrency.
+- The critic is not anchored and shares features with the actor, so its updates
+  can also change the Room 1 policy.
+- A1-k0, A1-k1 and A1-k2 were stopped on purpose at 401,408 steps and resumed in
+  a second process. Weights, optimizer state, counters and the anchor batch
+  schedule carried over exactly. The resumed process restarted its random
+  streams from the run seed and began from a fresh episode; A1-k2 also
+  recollected one rollout, having been killed during the update after its saved
+  checkpoint. The 100k through 400k checkpoints are unaffected. Only these A1
+  runs were resumed, so interruption is a confound in the final-arm comparison.
+- The resume amendment was committed as `9a3ee81`, with the training code
+  identical to `54c9556`. The pilot declaration was already hash-pinned and
+  therefore could not record that amendment in place. Analyzer record checks
+  were tightened in `8add862` after all twelve training records existed,
+  including the anchor's per-update held-back Room 1 agreement, and before
+  evaluation results were read. They were refined in `90b9b47` to accept
+  replayed anchor rows explained by a resume, check additional pins and refuse
+  blank values. These changes are recorded separately in the tie-break
+  declaration and did not change the pilot's numerical results or reading.
+
+The numbers and input hashes are in
+[`docs/results/ppo-anchor-pilot.json`](results/ppo-anchor-pilot.json), written by
+`scripts/analyze_ppo_anchor_pilot.py`. The randomness and confident-choice
+measurements are in
+[`docs/results/ppo-anchor-pilot-descriptive.json`](results/ppo-anchor-pilot-descriptive.json),
+written by `scripts/describe_anchor_pilot.py`. The tie choice and subsequent
+tie-break declaration are in `config/ppo-anchor-tiebreak.json`.
