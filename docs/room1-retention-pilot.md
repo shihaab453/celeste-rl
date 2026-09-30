@@ -443,9 +443,9 @@ The anchor rehearses donor behavior on frames near many Room 1 test paths:
 59% to 76% of test starts are within four pixels of a fitted frame (fifth pilot).
 Nothing here separates retained skill from that rehearsal. The reused
 development sets, common clones, common anchor seeds, and resumed pilot A1
-runs also limit interpretation. A post hoc near/far descriptive split of the
-existing Room 1 evaluations has been proposed but has not been performed. Even
-that split would not establish a causal explanation.
+runs also limit interpretation. A post hoc near/far descriptive split of the existing Room 1 evaluations is
+reported in the next section. Even that split does not establish a causal
+explanation.
 
 Two procedural disclosures accompany the pinned result. The owner cutoff was
 added by hand to both generated plans before their campaigns. The training plan
@@ -471,3 +471,70 @@ written by `scripts/analyze_ppo_tiebreak.py`. Confirmation has not started. Its
 plan needs to declare outcomes for generalization to fresh donors, Room 2 cost,
 and the distinction between retention and rehearsal, before using the fresh
 Room 1 v2 set.
+
+## Post hoc check: near and far from the anchor frames
+
+After the tie-break selected A1, the existing Room 1 development-set
+evaluations at 501,760 steps were split by distance from fitted donor frames. This was
+post hoc and cannot change the declared selection. No new play or training
+was run, and neither fresh v2 set was read.
+
+Near means within four pixels, inclusive, of a fitted frame with the same dash
+count; far means more than four pixels. This reuses the earlier coverage
+definition and the same nineteen fitted episodes for each clone. The distance
+and four-pixel threshold are the earlier published coverage definition; they
+were written into a private protocol before the final per-episode outcomes
+were read, and no other threshold was tried. It considers starting position and dashes, not velocity, timers or the
+rest of the trajectory. The split is identical for both arms and batches on
+each clone. Donors 3 to 6 have 118, 152, 121 and 146 near starts out of 200.
+
+| Group, both batches pooled | A1 successes | E0 successes | A1 rate | E0 rate | Difference |
+|---|---:|---:|---:|---:|---:|
+| Near | 652 / 1,074 | 549 / 1,074 | 60.7% | 51.1% | +9.6 points |
+| Far | 257 / 526 | 244 / 526 | 48.9% | 46.4% | +2.5 points |
+
+These denominators repeat starts across four clones and two PPO batches; they
+are not independent observations. They should not be used as independent
+binomial sample sizes. Pooled rates also mix clones: donors 4 and 6 contribute
+55% of near starts but 39% of far starts. The same-clone comparisons below
+avoid this mixture.
+
+Route weighting matters. Averaging success equally over represented routes
+within each subgroup, then averaging the eight runs equally, gives:
+
+| Batch | Near A1 | Near E0 | Near difference | Far A1 | Far E0 | Far difference |
+|---|---:|---:|---:|---:|---:|---:|
+| Pilot | 60.9% | 50.5% | +10.4 points | 44.3% | 44.9% | -0.6 points |
+| New | 60.2% | 52.0% | +8.2 points | 46.0% | 43.8% | +2.2 points |
+| Both | 60.5% | 51.3% | +9.3 points | 45.1% | 44.3% | +0.8 points |
+
+Every subgroup represents all eleven routes, but its number of starts per
+route differs. A1 has the higher route-balanced score in seven of eight
+same-clone comparisons on near starts and five of eight on far starts.
+On donors 4 and 6, some routes have a single far start, so one episode moves
+a run's route-balanced far score by about nine points.
+Near/far macro rates do not combine into the original full-set macro by
+weighting only their episode totals; their within-route weights differ.
+
+In both pooled measures A1's lead is larger on starts near the fitted frames
+than on far starts. The far comparison is much noisier: far groups are smaller,
+some routes have a single far start, and per-run far differences range from
+about -10 to +10 points. On donor 4's copy A1 led on far starts in both batches.
+Without each clone's own near/far starting success, this split cannot
+distinguish rehearsal from decay that is itself concentrated near the fitted
+frames. It neither shows that the lead extends to far starts nor rules it out.
+Near and far groups are not randomized or matched for difficulty, and a start
+far from a recorded frame can later reach recorded parts of a trajectory.
+The check cannot establish generalization with four shared clones and reused
+sets. No statistical significance or causal claim follows.
+
+The declared choice remains A1. Confirmation planning should address rehearsal
+explicitly, alongside fresh-donor generalization and Room 2 cost, before any
+fresh Room 1 v2 evaluation.
+
+The result is in
+[`docs/results/ppo-tiebreak-near-far.json`](results/ppo-tiebreak-near-far.json),
+written by `scripts/describe_tiebreak_near_far.py`. Input pins, episode identities,
+full-set and split totals, fitted-frame counts and earlier coverage fractions
+were checked. A separately written check script rebuilt grouping using squared
+integer distances and recomputed the subgroup totals and route weights.
