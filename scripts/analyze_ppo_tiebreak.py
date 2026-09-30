@@ -216,8 +216,8 @@ def main() -> int:
     decision["room2_check_of_the_named_arm"] = {
         "arm": carried, **room2_check(room2_by_arm[carried]["v1_median"], room2_by_arm[carried]["finals"],
                                       reference["threshold"]),
-        "note": ("the pilot's Room 2 conditions applied to whichever arm the rule names; a failure goes to the owner and "
-                 "the orchestrator as a recorded choice before the confirmation and does not change the rule's answer")}
+        "note": ("the pilot's Room 2 conditions applied to whichever arm the rule names; a failure requires review and "
+                 "a recorded choice by the owner before the confirmation and does not change the rule's answer")}
 
     descriptive = {
         "runs_with_a_drop_above_0.25_at_any_checkpoint_of_8": {
