@@ -57,3 +57,6 @@ mod/**/obj/
 
 # Private handoff notes
 handoff.md
+
+# Website preview video, its scripts and captured frames (local only)
+media/
