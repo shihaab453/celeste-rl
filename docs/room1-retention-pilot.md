@@ -370,3 +370,104 @@ measurements are in
 [`docs/results/ppo-anchor-pilot-descriptive.json`](results/ppo-anchor-pilot-descriptive.json),
 written by `scripts/describe_anchor_pilot.py`. The tie choice and subsequent
 tie-break declaration are in `config/ppo-anchor-tiebreak.json`.
+
+## Tie-break: choosing A1 for confirmation
+
+This is descriptive selection on development sets, using the same four mixed
+copies and original donors as the fifth pilot. It is not confirmation on fresh
+donors. The rule was declared after seeing the pilot, before the new runs.
+Neither fresh v2 set was read.
+
+E0 and A1 were each rerun with the same four new PPO seeds, 50 to 53, for
+500,000 steps on Room 2. Every new run completed uninterrupted at 501,760 accepted steps. The
+eight training runs and all 56 evaluations succeeded, with no retries. A1 used
+the same donor recordings, fitted episodes and anchor seeds as in the pilot.
+The two batches therefore give two PPO runs per arm on each of four clones,
+not eight independent donors.
+
+The declared rule switches the provisional choice from E0 to A1 when both
+conditions hold across the pooled pilot and new runs: at least three more of
+E0's pooled final losses than A1's are strictly above 0.25, and E0's median loss exceeds A1's by strictly
+more than 0.10. A separate screen checks whichever arm the rule names: Room 2
+v1 median at least 0.7676 and at least six of eight canonical finals at 45 or
+more of 50 (the pilot's three of four, over eight runs). Failure requires review and a recorded owner choice before
+confirmation planning; it does not change the rule's answer.
+
+| Pooled measure | E0 | A1 |
+|---|---:|---:|
+| Final losses strictly above 0.25 | 3 of 8 | 0 of 8 |
+| Median final loss | 0.1771 | 0.0617 |
+| Room 2 v1 median | 0.8622 | 0.8471 |
+| Canonical Room 2 finals at least 45 of 50 | 8 of 8 | 7 of 8 |
+| Median canonical Room 2 clears | 49 | 48 |
+
+**The declared rule selected A1.** The count gap is exactly three, the median
+gap is 0.1154, and A1 passes the Room 2 screen. This names the arm to take into
+confirmation. It does not establish that A1 is generally better.
+
+The decision is sensitive to small measurement changes. The third E0 loss above
+0.25 comes from the new run on donor 4's copy: loss 0.2712, with 91 of 200 Room 1
+successes and route-macro success 0.4564. A route-macro score around 0.4697,
+roughly three additional successes depending on their routes, would put it at
+the 0.25 line and reduce the count gap to two. The rule would then retain E0.
+The median gap is only 0.0154 above its threshold. The copy's shared starting
+measurement and the run's own final evaluation each carry roughly 0.055 loss
+units of standard error under a binomial approximation, about 0.08 combined,
+against this run's margin of 0.021 above the 0.25 line. That is a noise-scale illustration, not an uncertainty
+interval for the selection or a route-macro uncertainty calculation.
+
+The direction of the observed difference is more consistent than that narrow
+decision margin: A1 lost less Room 1 skill in seven of eight comparisons on the
+same clone and batch, including all four new comparisons. Both arms' final
+losses remained below the smallest control loss, 0.586. These are descriptive
+comparisons with only four clones; the pairs sharing a clone are correlated.
+There is no statistical significance claim.
+
+Only one of four new E0 runs crossed 0.25. The declaration's informal illustration
+said the switch would repeat the pilot's pattern of about half the E0 runs
+crossing that line. That illustration does not describe this outcome. The actual
+new E0 losses were 0.1803, 0.2712, 0.0838 and 0.1740, versus A1's 0.0529, 0.0651,
+0.0266 and 0.1104 (donors 3 to 6). Every new E0 run lost more than its A1
+counterpart, with new-batch medians of 0.177 against 0.059. The mechanical rule
+governs the selection; the pilot's pattern
+did not replicate in the sense described by the illustration.
+
+Room 2 favors E0 slightly in these pooled observations. A1's screen pass does
+not establish absence of a Room 2 cost: its new run on donor 6's copy cleared
+exactly 45, the new run on donor 4's copy scored 0.7622 on v1, and its pilot run
+on donor 3's copy cleared 40. The v1 screen applies to the arm median, not to
+each run individually. The evidence here is lower Room 1 loss for A1 on this
+development set, beside slightly higher Room 2 scores for E0.
+
+The anchor rehearses donor behavior on frames near many Room 1 test paths:
+59% to 76% of test starts are within four pixels of a fitted frame (fifth pilot).
+Nothing here separates retained skill from that rehearsal. The reused
+development sets, common clones, common anchor seeds, and resumed pilot A1
+runs also limit interpretation. A post hoc near/far descriptive split of the
+existing Room 1 evaluations has been proposed but has not been performed. Even
+that split would not establish a causal explanation.
+
+Two procedural disclosures accompany the pinned result. The owner cutoff was
+added by hand to both generated plans before their campaigns. The training plan
+retains its original generation timestamp; its change is covered by the
+declaration's pre-run amendment. The evaluation plan, generated from the training
+summary with the cutoff then added by hand, was committed alone as `d34ea6b`
+before any evaluation, and this edit is not listed in the declaration's
+amendments. No declaration or plan has changed since the data were seen; the
+only later code change is the analyzer note described below.
+
+The result was produced by the analyzer at `27a1d6d`, after an earlier analysis
+output had been seen. It differs from the predeclared version at `949e648`
+(code hash prefix `413a0b0d`) only in the wording of one note. The revised code
+hash prefix is `b6608a88`; the original analyzer gives identical numbers and
+selection. The wording edit changed no calculation or record check. A separate
+read-only review reproduced the result exactly and checked the training and
+evaluation records, checkpoint hashes and declaration pins.
+
+The rule and amendments are in `config/ppo-anchor-tiebreak.json`; the numbers
+and input hashes are in
+[`docs/results/ppo-anchor-tiebreak.json`](results/ppo-anchor-tiebreak.json),
+written by `scripts/analyze_ppo_tiebreak.py`. Confirmation has not started. Its
+plan needs to declare outcomes for generalization to fresh donors, Room 2 cost,
+and the distinction between retention and rehearsal, before using the fresh
+Room 1 v2 set.
