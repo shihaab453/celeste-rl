@@ -2,15 +2,32 @@
 import copy
 import sys
 import unittest
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from describe_tiebreak_near_far import aggregate, distances, safe_path, validate_episodes
+import describe_tiebreak_near_far as analyzer
 
 
 class NearFarTests(unittest.TestCase):
+    def test_tracked_text_hash_survives_checkout_but_artifact_hash_detects_change(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(analyzer, 'REPO', Path(directory)):
+            root = Path(directory)
+            (root / 'config').mkdir()
+            (root / 'runs').mkdir()
+            tracked, artifact = root / 'config/plan.json', root / 'runs/episodes.jsonl'
+            for path in (tracked, artifact):
+                path.write_bytes(b'{}\n')
+            original_text, original_artifact = analyzer.input_sha(tracked), analyzer.input_sha(artifact)
+            for path in (tracked, artifact):
+                path.write_bytes(b'{}\r\n')
+            self.assertEqual(original_text, analyzer.input_sha(tracked))
+            self.assertNotEqual(original_artifact, analyzer.input_sha(artifact))
+
     def test_route_macro_does_not_weight_by_episode_count(self):
         rows = [{'route': 'a', 'ending': 'success'}] * 3 + [{'route': 'b', 'ending': 'death'}]
         result = aggregate(rows)

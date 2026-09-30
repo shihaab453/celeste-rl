@@ -44,6 +44,11 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def input_sha(path):
+    """Tracked text uses canonical LF hashes; run artifacts retain raw-byte hashes."""
+    return sha(path) if path.relative_to(REPO).parts[0] == 'runs' else text_sha256(path)
+
+
 def aggregate(episodes):
     by_route = {}
     for e in episodes:
@@ -84,7 +89,7 @@ def main():
         path = safe_path(name)
         digest = sha(path)
         require(expected is None or digest == expected, f'Changed input: {name}')
-        inputs[path.relative_to(REPO).as_posix()] = digest
+        inputs[path.relative_to(REPO).as_posix()] = input_sha(path)
         return json.loads(path.read_text(encoding='utf-8'))
 
     held = read(STARTS)
@@ -95,7 +100,7 @@ def main():
     published = {'pilot': read('docs/results/ppo-anchor-pilot.json'), 'new': read('docs/results/ppo-anchor-tiebreak.json')}
     coverage = read('docs/results/coverage-ceiling-descriptive.json')['coverage']
     for name in ('scripts/describe_coverage_ceiling.py', 'celeste_rl/cloning.py', 'celeste_rl/schema.py'):
-        inputs[name] = sha(safe_path(name))
+        inputs[name] = input_sha(safe_path(name))
     masks, groups, records = {}, {}, {}
     for k in range(4):
         recording = pilot['anchor_data']['recordings'][str(3+k)]
@@ -143,7 +148,7 @@ def main():
                 pin = spec['checkpoint_sha256']
                 require(sha(safe_path(spec['checkpoint'])) == pin, 'Checkpoint changed')
                 require(result['attributable'] and result['checkpoint_sha256'] == pin and result['heldout_sha256'] == held['sha256']
-                        and result['heldout_file_sha256'] == inputs[STARTS] and result['repeats'] == 1, 'Result provenance mismatch')
+                        and matches_text_hash(safe_path(STARTS), result['heldout_file_sha256']) and result['repeats'] == 1, 'Result provenance mismatch')
                 ep_path = safe_path(artifact['episodes_file'])
                 require(sha(ep_path) == artifact['episodes_sha256'], 'Episodes changed')
                 inputs[ep_path.relative_to(REPO).as_posix()] = sha(ep_path)
