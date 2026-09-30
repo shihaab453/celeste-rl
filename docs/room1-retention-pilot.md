@@ -520,9 +520,10 @@ In both pooled measures A1's lead is larger on starts near the fitted frames
 than on far starts. The far comparison is much noisier: far groups are smaller,
 some routes have a single far start, and per-run far differences range from
 about -10 to +10 points. On donor 4's copy A1 led on far starts in both batches.
-Without each clone's own near/far starting success, this split cannot
-distinguish rehearsal from decay that is itself concentrated near the fitted
-frames. It neither shows that the lead extends to far starts nor rules it out.
+This final-score split alone cannot distinguish rehearsal from decay that
+is itself concentrated near the fitted frames. The next section adds the
+clones' starting scores. The noisy far comparison neither establishes a lead
+nor rules one out.
 Near and far groups are not randomized or matched for difficulty, and a start
 far from a recorded frame can later reach recorded parts of a trajectory.
 The check cannot establish generalization with four shared clones and reused
@@ -538,3 +539,92 @@ written by `scripts/describe_tiebreak_near_far.py`. Input pins, episode identiti
 full-set and split totals, fitted-frame counts and earlier coverage fractions
 were checked. A separately written check script rebuilt grouping using squared
 integer distances and recomputed the subgroup totals and route weights.
+
+## Post hoc extension: near/far scores before fine-tuning
+
+The previous check compared final A1 and E0 scores without each group's
+starting score. This extension uses the four existing mixed-copy Room 1
+evaluations, with the identical near/far masks. It adds no game runs or fresh
+set evaluations. The extension is post hoc; A1 remains the declared choice.
+
+The clones scored 347 of 537 near evaluations (64.6%) and 135 of 263 far
+evaluations (51.3%). These are four evaluations on the same 200-start
+development set, one per clone. Each starting measurement is reused for both
+arms and both PPO batches. It is not a new independent baseline for each final.
+
+| Group, pooled state-weighted rates | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 64.6% | 60.7% | 3.9 points | 51.1% | 13.5 points |
+| Far | 51.3% | 48.9% | 2.5 points | 46.4% | 4.9 points |
+
+Route-balanced means weight each route equally within a subgroup and each
+clone/run equally. They differ from the pooled state-weighted rates:
+
+| Group, route-balanced means | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 66.0% | 60.5% | 5.5 points | 51.3% | 14.7 points |
+| Far | 47.6% | 45.1% | 2.4 points | 44.3% | 3.2 points |
+
+Loss is starting success minus final success in percentage points, computed
+before rounding. These are not the pilot's donor-margin loss units. No subgroup
+donor baseline or floor has been measured. A negative loss is an improvement
+in the observed score, not a claim that fine-tuning improved the underlying skill.
+
+The individual clones differ. This table uses route-balanced scores, with the
+two final PPO batches averaged for each clone and arm:
+
+| Donor | Group | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---|---:|---:|---:|---:|---:|
+| 3 | Near | 69.7% | 64.6% | +5.1 | 55.0% | +14.6 |
+| 3 | Far | 58.1% | 53.1% | +4.9 | 55.6% | +2.5 |
+| 4 | Near | 68.1% | 61.6% | +6.5 | 45.9% | +22.2 |
+| 4 | Far | 43.1% | 44.1% | -1.0 | 36.2% | +6.9 |
+| 5 | Near | 69.8% | 65.4% | +4.4 | 63.9% | +6.0 |
+| 5 | Far | 53.7% | 52.7% | +1.0 | 54.8% | -1.1 |
+| 6 | Near | 56.4% | 50.5% | +5.9 | 40.2% | +16.2 |
+| 6 | Far | 35.4% | 30.7% | +4.7 | 30.7% | +4.7 |
+
+The loss columns in this table are percentage points. The nearly equal donor 6
+far means average opposing batch differences; they do not show both batches
+performed alike.
+
+**The smaller far-start gap sits beside smaller average far-start decay for
+both arms.** Most of E0's observed decay was on near starts, close to the frames
+the mixed copy was fitted on. On far starts E0 itself lost little on average,
+so there was little decay there for the anchor to prevent. This split cannot
+show whether the anchor's benefit extends beyond the fitted frames.
+It cannot simply be read as A1 losing as much far-start skill as
+E0 while preserving near-start skill. In particular, donor 4's far baseline
+was already lower than its near baseline: A1's far mean is slightly above that
+starting observation, while E0's is below it. Donors 3 and 5 show lower far
+loss for E0, and donor 6's far averages are nearly equal.
+
+This adds starting levels but does not resolve the rehearsal question. Far
+groups remain sparse and noisy, including routes with a single start. Their
+starting scores also differ in difficulty and available room for decline.
+Each baseline is a single stochastic measurement; its error moves all losses
+for that clone/group together. The baseline cancels in A1-versus-E0 loss
+differences, so the earlier final-score comparisons are numerically unchanged.
+Under a binomial approximation, the pooled far starting rate (263 evaluations)
+carries roughly three percentage points of standard error, and each clone's
+far starting rate about five to seven points. The observed far-loss averages
+of 2.4 to 4.9 points are of a similar scale. The pooled near starting rate
+carries about two points. This is a noise-scale illustration, not an interval
+or a route-macro uncertainty estimate; it omits clustering within routes and
+dependence between reused starts.
+Historical baseline and final evaluations occurred at different times, and
+distance omits velocity, timers and later trajectory overlap. Four shared
+clones and reused development starts do not establish generalization, causality
+or statistical significance.
+
+Confirmation still needs declared starting measurements and a clear claim:
+A1 versus control alone cannot settle whether rehearsal explains an advantage
+over a comparator without an anchor. The arm choice remains A1; no confirmation
+has been started and neither fresh v2 set has been read.
+
+Numbers and input pins are in
+[`docs/results/clone-near-far.json`](results/clone-near-far.json), written by
+`scripts/describe_clone_near_far.py`. Eight focused tests pass (two for this
+extension, six for the preceding split). A separately written check script
+rebuilt integer-distance masks and verified
+46 subgroup, loss, pooling and baseline-cancellation checks.
