@@ -1,0 +1,194 @@
+{
+  "name": "room1-retention-confirmation-v1",
+  "written": "2026-10-01T12:07:55+01:00",
+  "status": "declared BEFORE any confirmation run, plan or stage 0 code; designed after the anchor pilot, the tie-break and the near/far checks were read (all development data); the fresh Room 1 v2 and Room 2 v2 sets have never been evaluated and are evaluated only in the single evaluation campaign declared here",
+  "label": "confirmation on fresh donors and fresh test sets: A1 against the control as the one primary comparison; S1 to S4 secondary with fixed readings; a declared carry-forward rule",
+  "question": "On fresh donors from the Phase 3B arm B recipe, does A1 (PPO with the entropy bonus kept and an anchor of weight 1 to the frozen donor's Room 1 button probabilities) lose less Room 1 skill than the control (the same Room 2 fine-tuning without the anchor) while learning Room 2, measured on the fresh Room 1 v2 set?",
+  "claims": {
+    "primary_supports": "On N fresh donors, A1 lost less Room 1 skill than the control during Room 2 fine-tuning, measured on fresh Room 1 test starts (exact two-sided paired sign-flip test across donors).",
+    "cannot_support": [
+      "That the anchor is the main reason Room 1 skill is kept: in the pilots, removing the entropy bonus alone (E0) did most of that; S4 compares A1 with E0 but has low power.",
+      "That A1's advantage over the control is retained skill rather than rehearsal near the anchor frames; S2 shows only whether A1 lost less than the control on far starts.",
+      "That A1 beats E0 for reasons beyond rehearsal: the anchor frames are the copy's own fitted frames, so a near/far split cannot separate 'near the anchor' from 'near the copy's training data'; that needs a separate declared experiment that decouples them (for example anchoring on different recorded episodes), not part of this one.",
+      "Generalization beyond this recipe (Phase 3B arm B), this room pair (Room 1 then Room 2) or 500,000 steps; absence of a Room 2 cost beyond the declared S3 readings."
+    ]
+  },
+  "changes_from_the_declared_direction": {
+    "declared_in": "config/ppo-anchor-pilot.json, confirmation: the chosen arm against the control only as one pre-declared primary comparison; the fresh Room 1 v2 set with floors, donor before values and the control re-measured on it; donors Phase 3B arm B seeds 7 and 8 with new fine-tuning seeds as needed; size from a power estimate",
+    "kept": "the primary comparison, the test set and the re-measurement",
+    "donors": "seeds 7 and 8 plus six new arm B donors (seeds 9 to 14). The test's unit is the donor: the smallest exact two-sided sign-flip p is 2/2^N (0.5 for N = 2); more fine-tuning seeds on donors 7 and 8 would not raise N. Arm B has no other unused seed (3 to 6 were used by the pilots), so new donors are trained.",
+    "e0_added": "E0 is a declared secondary comparator (owner decision on review finding B1), because this experiment spends the Room 1 v2 set and A1 against E0 could otherwise never be tested on it",
+    "when": "before any confirmation data exists"
+  },
+  "owner_decisions": {
+    "date": "2026-10-01",
+    "donors": "8",
+    "e0": "declared now and run within this experiment; nothing from training or evaluation is analyzed until every run and evaluation has finished (B1 option 2)",
+    "room2_v2": "spent on the Room 2 cost (S3)",
+    "repeats": "three repeats on donor, copy, floor and final Room 1 v2 evaluations",
+    "carry_forward": "the mechanical rule in carry_forward_rule"
+  },
+  "power": {
+    "source": "runs/scratch/overnight-20260930/confirmation_power.py and confirmation-power.json (development data; the eight A1-against-E0 differences were computed separately and checked by an independent simulation)",
+    "primary": "eight paired differences (each control run with each single A1 run on the same clone): mean 0.743, SD 0.129. P(p <= 0.05) at N = 6 / 8: 100% / 100% if new donors resemble the pilot's; 62% / 92% with the effect halved and the spread doubled; 20% / 40% with the effect a quarter and the spread doubled",
+    "tolerance": "with N = 8 one negative difference still passes (p = 4/256) whenever it is smaller in size than every positive one; with N = 6 any single negative gives at least 0.0625; with N = 5 the smallest p is 0.0625",
+    "s4": "E0 loss minus A1 loss, same clone and batch: 0.010, 0.284, -0.076, 0.304, 0.127, 0.206, 0.057, 0.064 (mean 0.122, SD 0.134, 7 of 8 positive; exact test on these eight p = 14/256 = 0.055). P(p <= 0.05) at N = 8: 57% if new donors resemble this, 19% if the effect halves, 11% if it also spreads 1.5 times wider. A1 was selected over E0 on these data, so the gap is likely an overestimate.",
+    "s1": "A1 median loss at most 0.25: 100% at N = 8 if donors resemble the pilot's; 90% if A1's mean loss and spread both triple"
+  },
+  "donors": {
+    "existing": {
+      "7": {"checkpoint": "runs/train/overnight-B-seed7/checkpoints/latest.zip", "sha256": "ab33ab3e68d7cc9cb24eb98c4646719b1756781f1c345a4c21e79dbb110ea262"},
+      "8": {"checkpoint": "runs/train/overnight-B-seed8/checkpoints/latest.zip", "sha256": "868cec75bac07f160f9dc55d1d35491555aab2078196f8c31fe8dcc7841b1776"},
+      "provenance": "trained 2026-09-19 at 8423081 in campaign finetune-variance with the command below; both hashes equal the pins in config/campaign-heldout-ab-200.json; never used in a retention pilot"
+    },
+    "new_seeds": [9, 10, 11, 12, 13, 14],
+    "replacement_seeds": [15, 16],
+    "command": "scripts/train_room1.py --reward-version rew-v2 --shaping-scale 2.0 --init-from runs/clone/20260918-183508/cloned.zip --total-timesteps 500000 --eval-every 500000 --eval-episodes 50 --seed <s> --varied-starts --start-sampling success --run-dir runs/train/confirm-donor-B-seed<s>",
+    "command_note": "the seed 7 command of config/campaign-finetune-variance.json with only --seed and --run-dir changed; new donors are trained 3 side by side at 10 threads",
+    "recipe_check": {
+      "when": "before any new donor is trained",
+      "what": "rerun the seed 7 command at the confirmation commit to the full 500,000 steps, alone, with no thread variables set (the original used the machine default; record the count), into runs/train/confirm-recipe-check-B-seed7; compare every checkpoint, every progress.csv row and the 500k evaluation records (evaluations.jsonl) with runs/train/overnight-B-seed7",
+      "identical": "the current code reproduces the arm B recipe; new donors may be trained",
+      "different": "rerun the same command at 8423081 (a separate worktree) under the same conditions: if that also differs, the conditions changed; if it matches, the code changed behaviour. Either way stop for review and an owner choice before any new donor is trained",
+      "scope": "new donors trained side by side at 10 threads follow the same recipe in code but are not bit-comparable to seeds 7 and 8"
+    },
+    "inclusion": {
+      "stage1_v1": "a donor is included if its Room 1 v1 route-macro minus the v1 clone floor 0.142 is at least 0.20, measured for all eight donors in one stage 1 session with scripts/evaluate_heldout.py --checkpoint <donor> --starts config/heldout_starts.json --repeats 1 --seed 20260920 (the pilots' command; v1 is a development set, aggregates only); a donor below the line is replaced by seed 15, then 16, at most two replacements, before any arm is trained",
+      "analysis_v2": "a donor whose v2 margin (donor v2 route-macro minus v2 clone floor) is below 0.20 is excluded mechanically at analysis, without replacement, and reported by name",
+      "end_state": "if fewer than 6 donors remain for the primary, it is declared not testable and everything is reported descriptively; if replacements run out in stage 1, the experiment proceeds only with at least 6 donors, otherwise it stops for review"
+    }
+  },
+  "pipeline": {
+    "index": "j = 0 to 7 in donor order 7, 8, 9, ..., 14 (a replacement takes the replaced donor's j)",
+    "record": "scripts/record_policy_play.py --checkpoint <donor> --checkpoint-sha256 <sha> --episodes 25 --seed 20260926 [--game-dir <copy>]; canonical starts only (the pilots' recording seed)",
+    "copy": "scripts/clone_room1.py --task-definition config/room2.json --dataset runs/clone/chapter-1-room-2/20260924-014351/dataset.npz --demonstrations config/demonstrations-room2-v2.json --heldout config/heldout_starts-room2-v2.json --mix-play default <recording> --mix-targets donor --room-weighting equal --routes-only --holdout 0.25 --epochs 300 --batch-size 64 --learning-rate 0.001 --no-play --seed <10+j> --init-from <donor> --init-from-sha256 <sha> (the SD-k command of config/mixed-self-distillation-pilot.json; the clone seed fixes the 5 held-back Room 2 routes and the 6 held-back recorded episodes)",
+    "copy_reads_room2_v2_for_its_overlap_guard": "as in every pilot's copy step, clone_room1.py reads config/heldout_starts-room2-v2.json only for its existing guard that no demonstration overlaps a held-out state; no policy is evaluated on it and no outcome is produced",
+    "arms": {
+      "control": "scripts/train_room1.py --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from <copy> --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed <60+j> --run-dir runs/train/confirm-control-j<j> (entropy coefficient 0.01, no anchor)",
+      "A1": "scripts/train_anchored.py --anchor-play <recording> --anchor-donor <donor> --anchor-donor-sha256 <sha> --anchor-coef 1.0 --anchor-split-seed <10+j> --anchor-seed <10+j> --task-definition config/room2.json --reward-version rew-v2 --shaping-scale 2.0 --init-from <copy> --total-timesteps 500000 --checkpoint-every 100000 --eval-every 0 --stall-frames 296 --seed <60+j> --run-dir runs/train/confirm-A1-j<j> (the anchor split seed equals the clone seed, so the anchor uses the copy's 19 fitted episodes, as in the pilots)",
+      "E0": "the control command with --ent-coef 0 and --run-dir runs/train/confirm-E0-j<j>",
+      "seeds": "all three arms of donor j use PPO seed 60 + j"
+    }
+  },
+  "measurements": {
+    "one_campaign": "every evaluation on either v2 set (donors, copies, floors, all checkpoints, Room 2 reference) runs in one evaluation campaign at one commit after both training nights; nothing on either v2 set is evaluated earlier",
+    "room1_v2": {
+      "command": "scripts/evaluate_heldout.py --checkpoint <zip> --starts config/heldout_starts-room1-v2.json --repeats <R> --seed 20261001",
+      "pins": "path; manifest sha256 computed by the generator at plan time; git blob 40fc0eb573b51d702932598d8c994e4056012a16 (added in 422686f; 200 states, 11 routes, seeds 128 to 138)",
+      "repeats_3": "each donor (latest.zip), each copy (cloned.zip), each final (step_000501760.zip) and the eight floor policies: 600 episodes each",
+      "repeats_1": "the 100k to 400k checkpoints (descriptive curves)"
+    },
+    "floors": {
+      "clone_floor": {
+        "runs/clone/chapter-1-room-2/20260924-014351/cloned.zip": "3ec554413ee05b2824d1b85fee95909d1602234bb7f5f987ccb4974caaee5192",
+        "runs/clone/chapter-1-room-2/20260924-110841/cloned.zip": "41f68590ef10ad28d4308a8a2dcef8f1f7e7e551fb36ea35f7eb9d31b75ff0ba",
+        "runs/clone/chapter-1-room-2/20260924-112753/cloned.zip": "6506cbe539f2ec3c60d6b5516ce0d831322c3f03861bc521a8c2514b9c4b356b",
+        "runs/clone/chapter-1-room-2/20260924-114615/cloned.zip": "cab2041d0fa0836aefa2aac99b88195ef24dd101eaf037585eb215b5b3bdc6d3"
+      },
+      "final_floor": {
+        "runs/train/room2-demos-stall-B-k0/checkpoints/latest.zip": "ed6f2738af1c3e2a1fb6d155e86c1085fa056af6384abc8971e68168c10f413a",
+        "runs/train/room2-demos-stall-B-k1/checkpoints/latest.zip": "51164e89f3c690db15563e29f192cd57de75ba1e629371cf35da179f49405625",
+        "runs/train/room2-demos-stall-B-k2/checkpoints/latest.zip": "4ff73bb6066d54bdfe2503cfa7f56bf3aee0937db530b897041037ac410a2025",
+        "runs/train/room2-demos-stall-B-k3/checkpoints/latest.zip": "971fa414ad82c9aee38f71798091ae651d7cfcef8c7e5bf11656f189c0b0eab5"
+      },
+      "statistic": "each floor is the MEAN of its four policies' route-macro (and, separately, state-weighted) success, as in the retention pilot (its 0.142 is the mean of 0.1488, 0.1411, 0.1042 and 0.1738; the median would be 0.145)",
+      "source": "the retention pilot's eight floor policies (config/campaign-retention-pilot-eval.json pins identical hashes): H2 B-k0 to B-k3 finals and their 21-route clones, none of which saw Room 1"
+    },
+    "room2_v2": {
+      "command": "scripts/evaluate_heldout.py --task-definition config/room2.json --checkpoint <zip> --starts config/heldout_starts-room2-v2.json --repeats 1 --seed 20261001 --reward-version rew-v2 --shaping-scale 2.0",
+      "pins": "manifest sha256 51ea319af3b65f50f516da33f09cf6b02aca89ef0c10778ca0080c4f895909eb; git blob 5386bb86d25b39c1a8cc45a04e42c6c939265a0f",
+      "on": "every final and the Room 2 reference",
+      "reference": {
+        "runs/train/mixed-imitation-pilot-M-k0/checkpoints/step_000501760.zip": "599bbd26f1a7a091c8ea7ee69609809ac301e14ef50bb6579443e7d33d5668d8",
+        "runs/train/mixed-imitation-pilot-M-k1/checkpoints/step_000501760.zip": "c91129e8132009c27cd01ecca3063b46e833aafdfef385248cf942a6ddfb1f3c",
+        "runs/train/mixed-imitation-pilot-M-k2/checkpoints/step_000501760.zip": "38a8f7edd282dccd4316c9f48c65344ee86e6edaee30da5e44aa3d5d05cfc964",
+        "runs/train/mixed-imitation-pilot-M-k3/checkpoints/step_000501760.zip": "5c883b68a86bab5b49b41eb4699ea336adb6b798be8b6ac5a81dec9b3aae1c27"
+      },
+      "reference_why": "the second pilot's mixed-imitation finals: trained with the control's exact Room 2 settings (only init_from and seed differ), the same pipeline shape, and the source of the pilots' Room 2 threshold (v1 median 0.8176); the H2 B finals already serve as the final floor"
+    },
+    "room2_canonical": "scripts/evaluate_checkpoint.py --task-definition config/room2.json --checkpoint <final> --episodes 50 --seed 20260924 --reward-version rew-v2 --shaping-scale 2.0",
+    "room2_v1_descriptive": "scripts/evaluate_heldout.py --task-definition config/room2.json --checkpoint <zip> --starts config/heldout_starts-room2.json --repeats 1 --seed 20260922 --reward-version rew-v2 --shaping-scale 2.0, on every final and the reference, for continuity with the pilots",
+    "every_result_used": "no best checkpoint, no dropped evaluation"
+  },
+  "outcomes": {
+    "loss_unit": "loss = (copy score - final score) / (donor score - clone floor), Room 1 v2 route-macro, every term measured in the one evaluation campaign",
+    "primary": {
+      "difference": "d_j = control loss - A1 loss",
+      "test": "exact two-sided paired sign-flip test on the mean of d_j over the included donors",
+      "reading": "confirmed if the mean of d_j is positive and p <= 0.05; otherwise not confirmed; nothing else changes this reading",
+      "expected": "confirmed: on the pilots every control run lost 0.59 to 0.91 and every A1 run 0.02 to 0.11"
+    },
+    "secondary_note": "each secondary has a fixed reading, is reported whatever the primary says, and carries no family-wise claim",
+    "S1": "A1 holds on fresh donors: median A1 loss <= 0.25, with the count of A1 donors above 0.25",
+    "S2": {
+      "masks": "per donor, a v2 start is near if within 4 pixels, inclusive, of a fitted frame of that donor's recording with the same dash count, far otherwise (the published coverage definition; no other threshold), computed by the analyzer from the copy's 19 fitted episodes",
+      "measure": "signed loss in success percentage points per donor and group, copy minus final, pooling all episodes over the three repeats (pooled episodes as the primary weighting); route-balanced values descriptive",
+      "minimum": "a donor with fewer than 30 far starts is reported but left out of the S2 test; fewer than 6 qualifying donors makes S2 descriptive",
+      "reading": "'A1 lost less than the control on starts far from the anchor frames' if the mean of (control far loss - A1 far loss) is positive with exact sign-flip p <= 0.05 AND the control's median far loss is at least 10 points; below 10 points the contrast is uninformative (no decay to prevent)",
+      "expected": "A1 lost less (development data: 2.4 points far against the control's 40.2, route-balanced); this does not show how, and a far start can reach rehearsed parts of the room later"
+    },
+    "S3": {
+      "measure": "route-macro success on Room 2 v2",
+      "against_reference": "for each arm: 'no Room 2 cost against the reference' if the arm's median is at least the reference median (M-k0 to M-k3, same campaign) minus 0.05, otherwise 'Room 2 cost against the reference'",
+      "against_control": "A1 minus control, paired: 'a Room 2 cost relative to the control' if the median paired difference is below -0.05, otherwise 'no cost relative to the control was flagged'; weak in both senses: the control is itself damaged in Room 2, and with N = 8 a true 5-point cost would be flagged only about half the time and a 10-point cost usually (review estimate)",
+      "canonical": "canonical clears reported beside both; near ceiling, they cannot show a cost alone"
+    },
+    "S4": {
+      "full_set": "e_j = E0 loss - A1 loss, exact two-sided sign-flip: 'A1 lost less than E0 on fresh donors' if the mean is positive and p <= 0.05; otherwise 'no difference detected, in a test with about 19% to 57% power', never 'no difference'",
+      "near_far": "E0 minus A1 loss in points per group as in S2; informative only if E0's median far loss is at least 10 points (E0 lost only 3 to 5 points far on the development data, so expected uninformative); if informative, an advantage of at least 5 points near but within plus or minus 5 points far is 'consistent with rehearsal', which cannot establish rehearsal as the cause",
+      "expected": "a small advantage for A1, probably not significant"
+    },
+    "descriptive_only": "learning curves (100k to 400k); donors', copies' and floors' scores, overall and near/far; Room 1 randomness and the donors' confident-choice shares on the held-back recorded episodes (as in the anchor pilot); anchor agreement records; Room 2 v1 and canonical tables"
+  },
+  "carry_forward_rule": {
+    "purpose": "the one method the project carries forward to later rooms, fixed before any data (owner decision 2026-10-01); applied once by the analyzer to the included donors",
+    "a1_holds": "S1 holds (A1 median loss <= 0.25) and A1 passes the S3 reference screen (A1 Room 2 v2 median >= reference median - 0.05)",
+    "e0_holds": "the same two conditions with E0's losses and E0's Room 2 v2 median",
+    "a1_clearly_ahead": "S4 confirms A1 over E0 (mean e_j positive, p <= 0.05), OR both: mean e_j above 0.05 and at least three quarters of the included donors (6 of 8) with e_j above 0. The 0.05 is a fifth of the pilots' 0.25 holds line; the development data (mean 0.122, 7 of 8 positive) would meet it.",
+    "table": [
+      {"a1_holds": true, "e0_holds": true, "a1_clearly_ahead": true, "carry": "A1", "recorded_as": "chosen by the declared rule; the claim follows S4 (confirmed only if S4 p <= 0.05)"},
+      {"a1_holds": true, "e0_holds": true, "a1_clearly_ahead": false, "carry": "E0", "recorded_as": "the declared tie choice (simplicity and cost: one flag, no donor recordings or anchor), not evidence that E0 is better"},
+      {"a1_holds": true, "e0_holds": false, "a1_clearly_ahead": "either", "carry": "A1", "recorded_as": "E0 failed a hold condition on fresh donors"},
+      {"a1_holds": false, "e0_holds": true, "a1_clearly_ahead": "either", "carry": "E0", "recorded_as": "A1 failed a hold condition on fresh donors"},
+      {"a1_holds": false, "e0_holds": false, "a1_clearly_ahead": "either", "carry": "neither", "recorded_as": "Room 1 retention is reopened: review and an owner choice before any later-room work"}
+    ],
+    "notes": [
+      "The primary does not enter this rule; it is reported as declared, and if it is not confirmed the write-up says so first.",
+      "Donors excluded at analysis are excluded from this rule too; with fewer than 6 donors the rule still applies, descriptively, and the choice goes to review before it is acted on.",
+      "No other result (randomness, near/far, curves, Room 2 v1 or canonical) can change the carried-forward method."
+    ]
+  },
+  "running": {
+    "stage1": "daytime, about 5 to 6 hours: recipe check (about 30 minutes alone); six new donors (two waves of three, about 55 minutes each side by side); eight recordings (about 20 minutes each, spread over the three copies); eight copies (about 20 minutes each on CPU); v1 inclusion evaluations",
+    "nights": "two training nights: night A trains donors j = 0 to 3, night B j = 4 to 7; each night runs all three arms for its donors (12 runs) on the three game copies at 10 threads, memory floor 2.5 GB",
+    "queue": "per night, donor by donor with the arm order rotated: (A1, control, E0), (control, E0, A1), (E0, A1, control), (A1, control, E0); A1 sits at positions 1, 6, 8 and 10 of 12, so at most two A1 runs are likely side by side (three anchored runs side by side took 177 minutes each in the pilot); the generator refuses a queue with two adjacent A1 entries",
+    "timing": "from the tie-break's side-by-side times (A1 86 to 119 minutes, mean 104.7; E0 63 to 92, mean 75.3, also used for the control, the same command apart from one flag): about 5.7 hours of ideal packing per night",
+    "limits_and_cutoff": "per-run limit 240 minutes, as in the tie-break; the runner refuses to start a run whose limit would pass the cutoff (run_overnight.py), so with a 10:00 cutoff nothing starts after 06:00; start each night by about 23:00; the owner sets each cutoff when authorizing the session",
+    "evaluation_session": "after night B, separate, about 4 hours with 3 side by side: Room 1 v2 (24 finals and 24 donor, copy and floor evaluations at R = 3; 96 intermediate checkpoints at R = 1); Room 2 v2, v1 and canonical on the 24 finals and the 4 reference policies; its cutoff is set with its 30-minute limits in mind",
+    "what_is_seen_when": "stage 1 results (recipe check, donors' v1 scores, recordings, copies' fit records) are seen before training; they do not depend on any arm and cannot change arms, seeds, commands or rules, except the inclusion rule's mechanical outcome. Training records are checked for faults during the nights, but no training or evaluation result is analyzed until the evaluation campaign has finished, and only with the committed analyzer.",
+    "failure_policy": "as the tie-break: a run that ends not ok after the runner's one resume, or is stopped by hand, is rerun from scratch with the same seed in a new folder (runs/train/confirm-<arm>-j<j>-rerun<n>) via a committed plan amendment and reported with the failed attempt; a resumed run that finishes ok counts and is reported by name with its replayed anchor.csv rows; a rerun may land on a later night or session, separating that donor's arms in time, which is harmless for its numbers because training was shown bit-identical side by side and alone (b81362c, 2026-09-28: the first 100,000 steps of three runs, every tensor, optimizer state and episode row); such a run is reported by name with its date",
+    "v2_guard": "every generator and the analyzer refuse any command or result naming either v2 set except the exact evaluation commands declared here, with the pinned hashes"
+  },
+  "declared_confounds": [
+    "The anchor rehearses the donor's own Room 1 play, and its frames are the copy's fitted frames. On v1, 59% to 76% of starts were within 4 pixels of a fitted frame; the v2 share is reported.",
+    "One recipe (Phase 3B arm B); six donors trained at a newer commit, side by side (recipe check scope).",
+    "One PPO run per arm per donor; run-to-run noise is inside each difference.",
+    "Shared baselines: d_j = (A1 final - control final) / (donor - clone floor), so the copy score cancels exactly and the positive shared denominator cannot change a sign (it affects p only through the size of each d_j when signs are mixed); the same holds for the between-arm differences of S2 and S4. The baselines still matter for S1 and every per-arm loss.",
+    "Donors are confounded with training night (j = 0 to 3 on night A). Every comparison is within a donor, and training was shown bit-identical whatever runs beside it (b81362c), so a night can matter only through faults, relaunches or timeouts, which are reported by name.",
+    "The critic is not anchored and shares features with the actor.",
+    "E0 removes exploration pressure in Room 2.",
+    "The Room 2 reference is four development-donor policies, each measured once, so its median carries a few points of noise.",
+    "After this experiment no Room 1 set and no Room 2 set is fresh; Room 1 has a procedure for a v3 set (20 minutes to 2 hours to generate), Room 2 would need a new procedure file first.",
+    "The Room 2 v2 set was first earmarked for the Room 2 more-demonstrations question (Objective 6): config/campaign-room2-demos-ab.json (3cabed1, 2026-09-24) pinned its manifest hash for an evaluation that never ran. Spending it here means that question, if reopened, also needs a new Room 2 set."
+  ],
+  "plans_and_generators": "stage 0, each committed and reviewed before its session: the v2 guard change (reviewed on its own); a stage 1 plan generator (recipe check, new donors, recordings, copies, v1 inclusion evaluations); night A and night B training plan generators pinning every donor, recording and copy hash and checking every command against this declaration; an evaluation plan generator pinning every checkpoint; scripts/analyze_confirmation.py with tests (primary, S1 to S4, the carry-forward rule with a test for every row of its table, inclusion and exclusion, repeat-aware near/far helpers because describe_tiebreak_near_far.py refuses repeats, pinned inputs and record checks), committed before the evaluation campaign; a dry run of every plan",
+  "code_checks": {
+    "evaluation": "before every evaluation session: scripts/check_evaluation_code.py --baseline f26914d --approved 44ffab5 must PASS (as in the pilot and tie-break; PASS at f7ff9e2 and b9323b9 on 2026-10-01), and the runtime pins must match",
+    "control_and_E0_and_donors": "before every training session: scripts/check_evaluation_code.py --entry scripts/train_room1.py --baseline 331e6c9 --approved 44ffab5 must PASS (PASS on 2026-10-01)",
+    "anchored_recording_copying": "before every session that uses them: scripts/check_evaluation_code.py --entry <script> --baseline 54c9556 must PASS for scripts/train_anchored.py, scripts/record_policy_play.py and scripts/clone_room1.py (PASS on 2026-10-01: unchanged since the pilot's training commit; the 331e6c9 baseline predates train_anchored.py and cannot be used for it)",
+    "unreviewed_change": "any code change that makes a check fail stops the experiment until it is reviewed, proven result-neutral or followed by a declared re-measure"
+  },
+  "cost": "stage 0: about a working day of code and review, in pieces; stage 1: about 5 to 6 hours; two training nights of about 5.7 hours each; one evaluation session of about 4 hours",
+  "reviews": "design reviewed read-only on 2026-10-01 in three passes (findings B1, R1 to R11; control near/far design requirements 1 to 7; final check Q1 to Q5, no blockers); the private drafts, verdicts and a 43-check verification of the draft's numbers are in runs/scratch (gitignored)",
+  "amendments": []
+}
