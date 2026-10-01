@@ -154,10 +154,22 @@ class RecordsTest(Temp):
         self.assertTrue(rc.evaluation_problems(run, [{**good, "checkpoint": "missing.zip"}], "new"))
         swapped = {**good, "checkpoint": "step_000051200.zip", "checkpoint_sha256": rc._sha256(other)}
         self.assertEqual(rc.evaluation_problems(run, [swapped], "new"), [])  # truthful on its own...
-        self.assertTrue(rc.compare_rows(rc.normalized_evaluations([good]), rc.normalized_evaluations([swapped]), (),
-                                        "e"))  # ...but not the same checkpoint as the original's row
-        prefixed = {**good, "checkpoint": "runs/train/x/checkpoints/step_000501760.zip"}
-        self.assertEqual(rc.normalized_evaluations([prefixed])[0]["checkpoint"], "step_000501760.zip")
+        self.assertTrue(rc.compare_rows(rc.normalized_evaluations(run, [good]),
+                                        rc.normalized_evaluations(run, [swapped]), (), "e"))  # ...but not the same
+        own = {**good, "checkpoint": str(run / "checkpoints" / "step_000501760.zip")}
+        self.assertEqual(rc.evaluation_problems(run, [own], "new"), [])
+        self.assertEqual(rc.normalized_evaluations(run, [own])[0]["checkpoint"], "step_000501760.zip")
+
+    def test_reference_into_another_run_is_reported_not_substituted(self):
+        """Review round 2, blocker 1: a prefix naming another run's folder is never mapped onto this run's file."""
+        run = self.dir / "run"
+        target = checkpoint(run / "checkpoints" / "step_000501760.zip")
+        elsewhere = {"checkpoint": "runs/train/elsewhere/checkpoints/step_000501760.zip",
+                     "checkpoint_sha256": rc._sha256(target)}
+        self.assertTrue(rc.evaluation_problems(run, [elsewhere], "new"))
+        self.assertEqual(rc.normalized_evaluations(run, [elsewhere])[0]["checkpoint"], elsewhere["checkpoint"])
+        self.assertIsNone(rc.own_checkpoint_name(run, str(self.dir / "other" / "checkpoints" / "x.zip")))
+        self.assertIsNone(rc.own_checkpoint_name(run, None))
 
     def test_config_allows_only_documented_defaults(self):
         original = {"seed": 7, "ent_coef": 0.01}
@@ -199,13 +211,44 @@ class AcceptanceTest(Temp):
         (records / "run-20261001-000001.json").write_text(json.dumps({**record, "exit_code": 1}), encoding="utf-8")
         self.assertEqual(rc.acceptance(original, original, DECLARATION, records, GAME)["verdict"], "IDENTICAL")
 
-    def test_seed_8_is_different_not_invalid(self):
+    def test_seed_8_content_differs_and_its_acceptance_is_invalid(self):
         original, other = REPO / rc.ORIGINAL, REPO / "runs/train/overnight-B-seed8"
         if not other.exists():
             self.skipTest("seed 8 run not present")
-        report = rc.compare_runs(original, other)
+        report = rc.compare_runs(original, other)  # the content comparator alone
         self.assertTrue(report["primary"])
         self.assertFalse([d for v in report["primary"].values() for d in v if "abort_checkpoint_path" in d])
+        gate = rc.acceptance(original, other, DECLARATION, self.dir, GAME)  # the gate: seed 8 is not the replay
+        self.assertEqual(gate["verdict"], "INVALID")
+        self.assertIn("config", gate["reason"])
+
+    def test_malformed_evidence_is_invalid_not_a_crash(self):
+        """Review round 2, required change 1."""
+        a = checkpoint(self.dir / "a.zip")
+        bad = {"empty tensor member": {"policy.optimizer.pth": b""},
+               "unsupported pickle": {"policy.pth": pickle.dumps(len)},
+               "data not a record": {"data": b"[]"}}
+        for name, replacement in bad.items():
+            with self.subTest(name=name):
+                with zipfile.ZipFile(a) as archive:
+                    members = {n: archive.read(n) for n in archive.namelist()}
+                members.update(replacement)
+                b = self.dir / f"bad-{name}.zip"
+                with zipfile.ZipFile(b, "w") as archive:
+                    for member, raw in members.items():
+                        archive.writestr(member, raw)
+                with self.assertRaises(rc.Invalid):
+                    rc.compare_checkpoint(a, b)
+        run = self.dir / "run-null-session"
+        run.mkdir()
+        (run / "manifest.json").write_text(json.dumps({"status": "finished", "accepted_steps": 501760,
+                                                       "config": {}, "sessions": [None]}), encoding="utf-8")
+        with self.assertRaises(rc.Invalid):
+            rc._manifest(run, "new")
+        for error in (AttributeError("x"), EOFError(), pickle.UnpicklingError("x"), TypeError("x")):
+            with self.subTest(error=type(error).__name__), \
+                    unittest.mock.patch.object(rc, "validate_run", side_effect=error):
+                self.assertEqual(rc.acceptance(self.dir, self.dir, DECLARATION, self.dir, GAME)["verdict"], "INVALID")
 
 
 class LaunchTest(Temp):
@@ -254,10 +297,71 @@ class LaunchTest(Temp):
         self.assertEqual(self.run_with(patches, dry_run=False), 1)
         record = self.record("run")
         self.assertTrue(record["timed_out"])
-        self.assertEqual([c["pid"] for c in record["game_cleanup"]], [4242])
-        self.assertEqual(record["game_still_running"], [])
-        stdout = sorted(self.dir.glob("run-*.stdout.txt"))[-1].read_text(encoding="utf-8")
+        self.assertEqual([c["pid"] for c in record["game_cleanup"]["stopped"]], [4242])
+        self.assertEqual(record["game_cleanup"]["still_running"], [])
+        stdout = Path(record["log_files"]["stdout.txt"]).read_text(encoding="utf-8")
         self.assertEqual(stdout.count("partial out"), 50)  # complete, not a tail
+
+    def test_cleanup_failure_still_saves_record_and_logs(self):
+        """Review round 2, R2: a taskkill that itself times out, and an unknown survivor state."""
+        def fake_run(args, **kwargs):
+            if args[1:2] == ["scripts/train_room1.py"]:
+                raise subprocess.TimeoutExpired(args, 5400, output="kept output", stderr="kept error")
+            if args[:1] == ["taskkill"]:
+                raise subprocess.TimeoutExpired(args, 30)
+            return subprocess.CompletedProcess(args, 0, stdout="PASS", stderr="")
+
+        patches = self.patch_launch()[:-1] + [
+            unittest.mock.patch.object(rc.subprocess, "run", side_effect=fake_run),
+            unittest.mock.patch.object(rc.game_process, "running_game_pids", side_effect=[[4242], OSError("gone")])]
+        self.assertEqual(self.run_with(patches, dry_run=False), 1)
+        record = self.record("run")
+        self.assertTrue(record["game_cleanup"]["errors"])
+        self.assertTrue(str(record["game_cleanup"]["still_running"]).startswith("unknown"))
+        self.assertEqual(Path(record["log_files"]["stderr.txt"]).read_text(encoding="utf-8"), "kept error")
+
+    def test_failed_process_queries_refuse(self):
+        """Review round 2, blocker 2: a failed query is not an empty answer."""
+        def unavailable():
+            raise rc.ProcessEvidenceUnavailable("query exited 1")
+
+        for name in ("all_game_processes", "other_experiments"):
+            with self.subTest(query=name):
+                patches = [p for p in self.patch_launch() if getattr(p, "attribute", None) != name]
+                patches.append(unittest.mock.patch.object(rc, name, side_effect=lambda *a: unavailable()))
+                self.assertEqual(self.run_with(patches), 1)
+                self.assertTrue(any("cannot establish" in p for p in self.record("dry-run")["problems"]))
+
+
+class ProcessQueryTest(Temp):
+    def test_query_failures_raise_and_successful_empty_answers_do_not(self):
+        failed = subprocess.CompletedProcess([], 1, stdout="", stderr="access denied")
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=failed):
+            with self.assertRaises(rc.ProcessEvidenceUnavailable):
+                rc.all_game_processes()
+            with self.assertRaises(rc.ProcessEvidenceUnavailable):
+                rc.other_experiments(1)
+        with unittest.mock.patch.object(rc.subprocess, "run", side_effect=subprocess.TimeoutExpired([], 60)):
+            with self.assertRaises(rc.ProcessEvidenceUnavailable):
+                rc.all_game_processes()
+        truncated = subprocess.CompletedProcess([], 0, stdout="12\tpython x.py\n", stderr="")  # no completion marker
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=truncated):
+            with self.assertRaises(rc.ProcessEvidenceUnavailable):
+                rc.other_experiments(1)
+        none = subprocess.CompletedProcess([], 0, stdout="INFO: No tasks are running which match the criteria.\n")
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=none):
+            self.assertEqual(rc.all_game_processes(), [])
+        found = subprocess.CompletedProcess([], 0, stdout='"Celeste.exe","4242","Console","1","500,000 K"\n')
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=found):
+            self.assertEqual(len(rc.all_game_processes()), 1)  # found by name, whatever its path
+
+    def test_every_repository_script_counts(self):
+        for name in ("run_campaign.py", "record_env_fixture.py", "run_overnight.py", "train_room1.py"):
+            self.assertIn(name, rc.EXPERIMENT_SCRIPTS)
+        self.assertNotIn("confirmation_recipe_check.py", rc.EXPERIMENT_SCRIPTS)
+        listing = subprocess.CompletedProcess([], 0, stdout="7\tpython scripts/run_campaign.py --x\n__QUERY_OK__\n")
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=listing):
+            self.assertEqual(len(rc.other_experiments(1)), 1)
 
     def test_records_are_never_overwritten(self):
         with unittest.mock.patch.object(rc, "RECORDS", self.dir), \
@@ -266,7 +370,9 @@ class LaunchTest(Temp):
             first = rc._write({"a": 1}, "x", {"stdout.txt": "one"})
             second = rc._write({"a": 2}, "x", {"stdout.txt": "two"})
         self.assertNotEqual(first, second)
-        self.assertEqual(json.loads(first.read_text(encoding="utf-8")), {"a": 1})
+        saved = json.loads(first.read_text(encoding="utf-8"))
+        self.assertEqual(saved["a"], 1)
+        self.assertEqual(Path(saved["log_files"]["stdout.txt"]).name, "x-20261001-000000.stdout.txt")  # exact paths
         self.assertEqual((self.dir / "x-20261001-000000.stdout.txt").read_text(encoding="utf-8"), "one")
         self.assertEqual((self.dir / "x-20261001-000000-2.stdout.txt").read_text(encoding="utf-8"), "two")
 

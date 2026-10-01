@@ -60,8 +60,14 @@ RECORDS = REPO / "runs" / "confirmation" / "recipe-check"
 THREAD_PREFIXES = ("OMP_", "KMP_", "MKL_", "OPENBLAS_", "GOTO_", "BLIS_", "NUMEXPR_", "VECLIB_", "TORCH_NUM")
 CODE_CHECK = ["scripts/check_evaluation_code.py", "--entry", "scripts/train_room1.py", "--baseline", "331e6c9",
               "--approved", "44ffab5"]
-EXPERIMENT_SCRIPTS = ("run_overnight.py", "train_room1.py", "train_anchored.py", "evaluate_heldout.py",
-                      "evaluate_checkpoint.py", "record_policy_play.py", "clone_room1.py")
+# Every script of this repository counts as another experiment (campaigns, training, evaluation, recording, copying,
+# fixtures), so the list cannot go stale as scripts are added.
+EXPERIMENT_SCRIPTS = tuple(sorted(p.name for p in (REPO / "scripts").glob("*.py") if p.name != Path(__file__).name))
+QUERY_SECONDS = 60
+
+
+class ProcessEvidenceUnavailable(Exception):
+    """A process query failed, so the alone condition cannot be established."""
 LIMIT_MINUTES = 90  # the original campaign's limit for this run
 FINAL_STEPS = 501760
 FINAL_EPISODES = 50
@@ -101,13 +107,27 @@ def declared_command(declaration: dict, game_dir: Path) -> list[str]:
     return [*template, "--game-dir", str(game_dir)]
 
 
+def _query(args: list[str], what: str) -> str:
+    """A bounded process query; a failure or timeout raises ProcessEvidenceUnavailable (never an empty answer)."""
+    try:
+        done = subprocess.run(args, capture_output=True, text=True, timeout=QUERY_SECONDS)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ProcessEvidenceUnavailable(f"{what}: {type(error).__name__}: {error}") from error
+    if done.returncode != 0:
+        raise ProcessEvidenceUnavailable(f"{what} exited {done.returncode}: {(done.stderr or '').strip()[:300]}")
+    return done.stdout
+
+
 def other_experiments(own_pid: int) -> list[str]:
-    """Command lines of other running experiment scripts (Windows process list)."""
-    query = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" | "
-             "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }")
-    listed = subprocess.run(["powershell", "-NoProfile", "-Command", query], capture_output=True, text=True)
+    """Command lines of other running python processes that run any script of this repository."""
+    marker = "__QUERY_OK__"  # proves the query ran to the end, so an empty list really means none
+    query = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" -ErrorAction Stop | "
+             "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }; '" + marker + "'")
+    output = _query(["powershell", "-NoProfile", "-Command", query], "python process query")
+    if marker not in output:
+        raise ProcessEvidenceUnavailable("python process query did not complete")
     found = []
-    for line in listed.stdout.splitlines():
+    for line in output.splitlines():
         pid, _, command = line.partition("\t")
         if pid.strip().isdigit() and int(pid) != own_pid and any(name in command for name in EXPERIMENT_SCRIPTS):
             found.append(command.strip()[:300])
@@ -115,7 +135,9 @@ def other_experiments(own_pid: int) -> list[str]:
 
 
 def all_game_processes() -> list[str]:
-    return [f"{pid} {exe}" for pid, exe in game_process._running_celeste_processes()]
+    """Every running Celeste process in any folder, found by image name (an unreadable path cannot hide one)."""
+    output = _query(["tasklist", "/FI", "IMAGENAME eq Celeste.exe", "/FO", "CSV", "/NH"], "Celeste process query")
+    return [line.strip() for line in output.splitlines() if line.strip().lower().startswith('"celeste.exe"')]
 
 
 # ------------------------------------------------------------------------------------------------ structural equality
@@ -167,10 +189,14 @@ def stored_path_parts(field) -> tuple[str, ...] | None:
 
 # ----------------------------------------------------------------------------------------------------- checkpoints
 
-def _load_tensors(raw: bytes):
+def _load_tensors(raw: bytes, what: str):
+    """A saved torch object, loaded in torch's restricted weights-only mode; a load failure is INVALID evidence."""
     import torch
 
-    return torch.load(io.BytesIO(raw), map_location="cpu", weights_only=True)
+    try:
+        return torch.load(io.BytesIO(raw), map_location="cpu", weights_only=True)
+    except (EOFError, pickle.UnpicklingError, RuntimeError, ValueError, AttributeError, TypeError) as error:
+        raise Invalid(f"{what} cannot be loaded: {type(error).__name__}: {str(error)[:200]}") from error
 
 
 def compare_checkpoint(original: Path, new: Path, run_original: Path | None = None, run_new: Path | None = None) -> list[str]:
@@ -192,6 +218,8 @@ def compare_checkpoint(original: Path, new: Path, run_original: Path | None = No
             if name == "data":
                 data_a, data_b = json.loads(raw_a), json.loads(raw_b)
                 for data, label in ((data_a, "original"), (data_b, "new")):
+                    if not isinstance(data, dict):
+                        raise Invalid(f"{label} checkpoint data is not a record")
                     if not isinstance(data.get("start_time"), int):
                         raise Invalid(f"{label} checkpoint data has no integer start_time")
                 skipped = set(VOLATILE_DATA)
@@ -207,7 +235,9 @@ def compare_checkpoint(original: Path, new: Path, run_original: Path | None = No
                 kept_b = {k: v for k, v in data_b.items() if k not in skipped}
                 differences += [f"data {d}" for d in structural_differences(kept_a, kept_b)]
             elif name in TENSOR_MEMBERS:
-                differences += [f"{name} {d}" for d in structural_differences(_load_tensors(raw_a), _load_tensors(raw_b))]
+                differences += [f"{name} {d}" for d in structural_differences(
+                    _load_tensors(raw_a, f"original {Path(original).name}:{name}"),
+                    _load_tensors(raw_b, f"new {Path(new).name}:{name}"))]
             elif raw_a != raw_b:
                 differences.append(f"member {name} differs")
     return differences
@@ -243,24 +273,51 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def own_checkpoint_name(run: Path, reference) -> str | None:
+    """The file name an evaluation reference names in this run's own checkpoints folder: a bare file name, or a path
+    whose folder is this run's checkpoints folder (relative to the repository or absolute). None for anything else,
+    which is never followed or read."""
+    if not isinstance(reference, str) or not reference:
+        return None
+    path = Path(reference)
+    if len(path.parts) == 1:
+        return path.name
+    folder = (path if path.is_absolute() else REPO / path).parent
+    try:
+        same = os.path.normcase(os.path.abspath(folder)) == os.path.normcase(os.path.abspath(Path(run) / "checkpoints"))
+    except (OSError, ValueError):
+        return None
+    return path.name if same else None
+
+
 def evaluation_problems(run: Path, rows: list[dict], label: str) -> list[str]:
     """Each evaluation must name a checkpoint file of this run whose sha256 it records truthfully."""
     problems = []
     for index, row in enumerate(rows):
-        name = Path(str(row.get("checkpoint", ""))).name
+        if not isinstance(row, dict):
+            problems.append(f"{label} evaluation {index} is not a record")
+            continue
+        name = own_checkpoint_name(run, row.get("checkpoint"))
+        if name is None:
+            problems.append(f"{label} evaluation {index} names {row.get('checkpoint')!r}, not this run's checkpoints")
+            continue
         target = run / "checkpoints" / name
-        if not name or not target.is_file():
-            problems.append(f"{label} evaluation {index} names {row.get('checkpoint')!r}, not a file of this run")
+        if not target.is_file():
+            problems.append(f"{label} evaluation {index} names {name}, which this run does not have")
         elif _sha256(target) != row.get("checkpoint_sha256"):
-            problems.append(f"{label} evaluation {index}: recorded checkpoint_sha256 is not that of {target.name}")
+            problems.append(f"{label} evaluation {index}: recorded checkpoint_sha256 is not that of {name}")
     return problems
 
 
-def normalized_evaluations(rows: list[dict]) -> list[dict]:
-    """Evaluation rows with the checkpoint reference reduced to its file name and the per-run file hash removed
-    (each hash is verified against its own run's file separately)."""
-    return [{**{k: v for k, v in row.items() if k != "checkpoint_sha256"},
-             "checkpoint": Path(str(row.get("checkpoint", ""))).name} for row in rows]
+def normalized_evaluations(run: Path, rows: list[dict]) -> list[dict]:
+    """Evaluation rows with an own-run checkpoint reference reduced to its file name (any other reference is kept as
+    it is, so it differs) and the per-run file hash removed (each is verified against its own file separately)."""
+    normalized = []
+    for row in rows:
+        name = own_checkpoint_name(run, row.get("checkpoint"))
+        normalized.append({**{k: v for k, v in row.items() if k != "checkpoint_sha256"},
+                           "checkpoint": name if name is not None else row.get("checkpoint")})
+    return normalized
 
 
 # --------------------------------------------------------------------------------------------------- validation
@@ -270,6 +327,12 @@ def _manifest(run: Path, label: str) -> dict:
     if not path.is_file():
         raise Invalid(f"{label} run has no manifest.json")
     manifest = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("config"), dict):
+        raise Invalid(f"{label} manifest is not a record with a config")
+    sessions = manifest.get("sessions")
+    if not isinstance(sessions, list) or not all(isinstance(s, dict) and isinstance(s.get("provenance"), dict)
+                                                 for s in sessions):
+        raise Invalid(f"{label} manifest sessions are not records with provenance")
     if manifest.get("status") != "finished" or manifest.get("accepted_steps") != FINAL_STEPS:
         raise Invalid(f"{label} run is not finished at {FINAL_STEPS} accepted steps "
                       f"({manifest.get('status')}, {manifest.get('accepted_steps')})")
@@ -289,7 +352,8 @@ def validate_run(run: Path, label: str) -> dict:
         if not (run / name).is_file() or (run / name).stat().st_size == 0:
             raise Invalid(f"{label} run lacks a nonempty {name}")
     final = _rows_jsonl(run / "evaluations.jsonl")[-1]
-    if final.get("accepted_steps") != FINAL_STEPS or final.get("stochastic_episodes") != FINAL_EPISODES:
+    if not isinstance(final, dict) or final.get("accepted_steps") != FINAL_STEPS \
+            or final.get("stochastic_episodes") != FINAL_EPISODES:
         raise Invalid(f"{label} run's last evaluation is not the {FINAL_STEPS}-step one with {FINAL_EPISODES} episodes")
     return manifest
 
@@ -310,7 +374,12 @@ def latest_successful_run(records: Path, command: list[str], declaration_sha: st
     """The newest run record that succeeded with the declared command, declaration and commit."""
     candidates = sorted(records.glob("run-*.json"), reverse=True)
     for path in candidates:
-        record = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue  # an unreadable record cannot be the successful one
+        if not isinstance(record, dict) or not isinstance(record.get("git"), dict):
+            continue
         if (record.get("exit_code") == 0 and record.get("command") == command
                 and record.get("declaration_text_sha256") == declaration_sha
                 and record.get("git", {}).get("commit") == commit and not record.get("problems")):
@@ -332,8 +401,8 @@ def compare_runs(original: Path, new: Path) -> dict:
     rows_a, rows_b = _rows_jsonl(original / "evaluations.jsonl"), _rows_jsonl(new / "evaluations.jsonl")
     primary["evaluations.jsonl"] = (evaluation_problems(original, rows_a, "original")
                                     + evaluation_problems(new, rows_b, "new")
-                                    + compare_rows(normalized_evaluations(rows_a), normalized_evaluations(rows_b), (),
-                                                   "evaluations.jsonl"))
+                                    + compare_rows(normalized_evaluations(original, rows_a),
+                                                   normalized_evaluations(new, rows_b), (), "evaluations.jsonl"))
     supplementary = {
         "episodes.jsonl": compare_rows(_rows_jsonl(original / "episodes.jsonl"), _rows_jsonl(new / "episodes.jsonl"),
                                        (), "episodes.jsonl"),
@@ -365,8 +434,10 @@ def acceptance(original: Path, new: Path, declaration: dict, records: Path, game
         report["run_record"] = latest_successful_run(
             records, declared_command(declaration, game_dir), fresh_sets.text_sha256(DECLARATION), commit)
         report.update(compare_runs(original, new))
-    except (Invalid, OSError, ValueError, KeyError, IndexError, zipfile.BadZipFile, json.JSONDecodeError) as error:
-        report.update(verdict="INVALID", reason=f"{type(error).__name__}: {error}")
+    except (Invalid, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, EOFError,
+            pickle.UnpicklingError, RuntimeError, zipfile.BadZipFile) as error:
+        # Malformed or unreadable evidence of any expected kind: recorded as INVALID, never a crash or a pass.
+        report.update(verdict="INVALID", reason=f"{type(error).__name__}: {str(error)[:500]}")
         return report
     report["verdict"] = ("DIFFERENT" if report["primary"] else "DIAGNOSE" if report["supplementary"] else "IDENTICAL")
     return report
@@ -393,8 +464,9 @@ def _write(record: dict, stem: str, extra: dict[str, str] | None = None) -> Path
             handle = open(path, "x", encoding="utf-8")
         except FileExistsError:
             continue
+        sides = {suffix: (RECORDS / f"{base}.{suffix}").as_posix() for suffix in (extra or {})}
         with handle:
-            handle.write(json.dumps(record, indent=2, default=str) + "\n")
+            handle.write(json.dumps({**record, "log_files": sides} if sides else record, indent=2, default=str) + "\n")
         for suffix, text in (extra or {}).items():
             with open(RECORDS / f"{base}.{suffix}", "x", encoding="utf-8") as side:
                 side.write(text)
@@ -428,14 +500,17 @@ def launch_problems(command: list[str], game_dir: Path) -> tuple[list[str], dict
         problems.append(str(error))
     if (REPO / CHECK_RUN).exists():
         problems.append(f"{CHECK_RUN} already exists")
-    games = all_game_processes()
-    others = other_experiments(os.getpid())
-    conditions.update(game_processes=games, other_experiments=others,
-                      alone="no Celeste process in any folder and no other experiment script, at launch")
-    if games:
-        problems.append(f"Celeste is running ({games}); the check must run alone")
-    if others:
-        problems.append(f"other experiment scripts are running ({others}); the check must run alone")
+    for key, query in (("game_processes", all_game_processes), ("other_experiments", lambda: other_experiments(os.getpid()))):
+        try:
+            found = query()
+        except ProcessEvidenceUnavailable as error:
+            conditions[key] = f"unavailable: {error}"
+            problems.append(f"cannot establish that the check runs alone: {error}")
+            continue
+        conditions[key] = found
+        if found:
+            problems.append(f"{key.replace('_', ' ')} found ({found}); the check must run alone")
+    conditions["alone"] = "no Celeste process in any folder and no other script of this repository, at launch"
     return problems, conditions
 
 
@@ -454,25 +529,47 @@ def run(game_dir: Path, dry_run: bool) -> int:
         print(f"Record: {_write(record, 'dry-run' if dry_run else 'refused')}")
         return 1 if problems else 0
     started = time.time()
-    stdout = stderr = ""
+    output = {"stdout": "", "stderr": ""}
     try:
         finished = subprocess.run([sys.executable, *command], cwd=REPO, env=env, capture_output=True, text=True,
                                   timeout=LIMIT_MINUTES * 60)
-        stdout, stderr = finished.stdout or "", finished.stderr or ""
+        output.update(stdout=finished.stdout or "", stderr=finished.stderr or "")
         record.update(exit_code=finished.returncode)
     except subprocess.TimeoutExpired as error:
-        stdout = error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else (error.stdout or "")
-        stderr = error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else (error.stderr or "")
-        stopped = []
-        for pid in game_process.running_game_pids(game_dir):  # only this check's game folder
-            done = subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, timeout=30)
-            stopped.append({"pid": pid, "exit_code": done.returncode})
-        record.update(exit_code=None, timed_out=True, game_cleanup=stopped,
-                      game_still_running=game_process.running_game_pids(game_dir))
-    record.update(seconds=round(time.time() - started), stdout_tail=stdout.strip().splitlines()[-5:],
-                  stderr_tail=stderr.strip().splitlines()[-8:], logs="stdout.txt and stderr.txt beside this record")
-    print(f"Record: {_write(record, 'run', {'stdout.txt': stdout, 'stderr.txt': stderr})}")
+        for key, value in (("stdout", error.stdout), ("stderr", error.stderr)):
+            output[key] = value.decode(errors="replace") if isinstance(value, bytes) else (value or "")
+        record.update(exit_code=None, timed_out=True)
+        record["game_cleanup"] = cleanup_own_game(game_dir)
+    except BaseException as error:  # anything else: still keep whatever was captured
+        record.update(exit_code=None, launch_error=f"{type(error).__name__}: {error}")
+        raise
+    finally:
+        record.update(seconds=round(time.time() - started), stdout_tail=output["stdout"].strip().splitlines()[-5:],
+                      stderr_tail=output["stderr"].strip().splitlines()[-8:])
+        print(f"Record: {_write(record, 'run', {'stdout.txt': output['stdout'], 'stderr.txt': output['stderr']})}")
     return 0 if record.get("exit_code") == 0 else 1
+
+
+def cleanup_own_game(game_dir: Path) -> dict:
+    """Stop the game processes in this check's own folder after a timeout (never another folder). Every failure is
+    recorded, never raised, so the run's record and logs are always saved."""
+    result: dict = {"stopped": [], "errors": []}
+    try:
+        pids = game_process.running_game_pids(game_dir)
+    except Exception as error:  # the record must still be written
+        result["errors"].append(f"listing: {type(error).__name__}: {error}")
+        pids = []
+    for pid in pids:
+        try:
+            done = subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True, timeout=30)
+            result["stopped"].append({"pid": pid, "exit_code": done.returncode})
+        except (OSError, subprocess.SubprocessError) as error:
+            result["errors"].append(f"pid {pid}: {type(error).__name__}: {error}")
+    try:
+        result["still_running"] = game_process.running_game_pids(game_dir)
+    except Exception as error:
+        result["still_running"] = f"unknown: {type(error).__name__}: {error}"
+    return result
 
 
 NEXT_IF_DIFFERENT = ("DIFFERENT: stop. Declared next step (donors.recipe_check.different): rerun the same command at "
