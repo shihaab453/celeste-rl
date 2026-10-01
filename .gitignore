@@ -12,12 +12,9 @@ __pycache__/
 .env
 .env.*
 
-# IDEs: keep shared project config, ignore per-user state
-.idea/workspace.xml
-.idea/usage.statistics.xml
-.idea/shelf/
-.idea/dataSources*
-.idea/httpRequests/
+# Editor settings (PyCharm, VS Code): kept locally, not in the repo
+.idea/
+.vscode/
 
 # Training artifacts: large, belong in Drive backups, not git
 runs/
