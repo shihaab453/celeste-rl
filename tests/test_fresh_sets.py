@@ -9,6 +9,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from celeste_rl.fresh_sets import (EVAL_SEED, FRESH, FreshSet, FreshSetRefused, classify, plan_problems,
@@ -267,13 +268,180 @@ class StageTest(unittest.TestCase):
                 self.assertEqual(plan_problems(plan, commands) == [], ok)
 
     def test_runner_checks_commands_as_built(self):
+        games = [Path("C:/games/celeste")]
         evaluation = {"fresh_set_stage": "evaluation",
                       "runs": [{"id": "e", "run_dir": "runs/evaluation/x", "command": room1("3")}]}
-        self.assertEqual(run_overnight.fresh_set_problems(evaluation, Path("C:/games/celeste")), [])
+        self.assertEqual(run_overnight.fresh_set_problems(evaluation, games), [])
         unstaged = {"runs": evaluation["runs"]}
-        self.assertTrue(run_overnight.fresh_set_problems(unstaged, Path("C:/games/celeste")))
+        self.assertTrue(run_overnight.fresh_set_problems(unstaged, games))
         night = {"fresh_set_stage": "night", "runs": [{"id": "c", "run_dir": "runs/clone/x", "command": copy()}]}
-        self.assertTrue(run_overnight.fresh_set_problems(night, Path("C:/games/celeste")))
+        self.assertTrue(run_overnight.fresh_set_problems(night, games))
+
+
+class BuiltCommandTest(unittest.TestCase):
+    """Fresh paths that appear only when the runner builds a command (review B4)."""
+
+    TRAIN = {"id": "t", "run_dir": "runs/train/confirm-control-j0",
+             "command": ["scripts/train_room1.py", "--seed", "60", "--run-dir", "runs/train/confirm-control-j0"]}
+
+    def test_every_game_copy_is_checked(self):
+        plan = {"fresh_set_stage": "night", "runs": [self.TRAIN]}
+        self.assertEqual(run_overnight.fresh_set_problems(plan, [Path("C:/games/a")]), [])
+        self.assertTrue(run_overnight.fresh_set_problems(plan, [Path("C:/games/a"),
+                                                                Path("C:/games/heldout_starts-room1-v2")]))
+
+    def test_automatic_resume_form_is_checked(self):
+        entry = {**self.TRAIN, "run_dir": "runs/train/heldout_starts-room2-v2"}  # only the resume form uses run_dir
+        self.assertNotIn("heldout_starts-room2-v2", " ".join(entry["command"]))
+        self.assertTrue(run_overnight.fresh_set_problems({"fresh_set_stage": "night", "runs": [entry]},
+                                                         [Path("C:/games/a")]))
+
+    def test_launch_rechecks_the_built_command(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "campaign.log"
+            with unittest.mock.patch.object(run_overnight.subprocess, "run", side_effect=AssertionError("launched")):
+                result = run_overnight.execute(self.TRAIN, log, Path("C:/games/heldout_starts-room1-v2"),
+                                               fresh_set_stage="night")
+        self.assertEqual(result["status"], "refused_fresh_set")
+
+    def test_main_refuses_before_any_entry_check_reads_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            plan = Path(tmp) / "plan.json"
+            plan.write_text(json.dumps({"name": "x", "runs": [{"id": "e", "run_dir": "runs/evaluation/x",
+                                                               "command": room1("3")}]}), encoding="utf-8")
+            with unittest.mock.patch.object(run_overnight, "entry_problems", side_effect=AssertionError("read")), \
+                    unittest.mock.patch("sys.argv", ["run_overnight.py", "--plan", str(plan)]):
+                self.assertEqual(run_overnight.main(), 2)
+
+
+class SlotTest(unittest.TestCase):
+    """A fresh set is allowed only in its shape's designated slot (review B1)."""
+
+    def test_protected_data_in_a_fixed_slot_is_refused(self):
+        dataset = "runs/clone/chapter-1-room-2/20260924-014351/dataset.npz"
+        if not (REPO / dataset).exists():
+            self.skipTest("declared dataset not present")
+        spec = {"room1": FreshSet(dataset, "f" * 40, None, None), "room2": FRESH["room2"]}  # dataset as protected
+        with self.assertRaises(FreshSetRefused):
+            classify(copy(), spec)
+
+    def test_designated_slot_must_hold_its_own_room(self):
+        with self.assertRaises(FreshSetRefused):  # Room 2 shape with the Room 1 set in --starts
+            classify(room2()[:5] + ["--starts", R1] + room2()[7:])
+
+
+class IndirectTest(unittest.TestCase):
+    """Inputs a command makes its child read (review B2), with V1 as the injected fresh set."""
+
+    def setUp(self):
+        self.spec = {"room1": FreshSet(V1, committed_blob(V1), None, None)}
+        self.tmp = tempfile.TemporaryDirectory(dir=REPO / "runs")  # inside the repo, where indirect inputs live
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def lf_copy(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((REPO / V1).read_bytes().replace(b"\r\n", b"\n"))
+
+    def test_recording_folder_holding_a_fresh_set(self):
+        self.lf_copy(self.dir / "play.json")
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/train_anchored.py", "--anchor-play", str(self.dir)], self.spec)
+
+    def test_task_definition_naming_a_fresh_source(self):
+        definition = self.dir / "task.json"
+        definition.write_text(json.dumps({"source_route": V1}), encoding="utf-8")
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/train_room1.py", "--task-definition", str(definition)], self.spec)
+
+    def test_resume_folder_holding_a_fresh_manifest(self):
+        self.lf_copy(self.dir / "manifest.json")
+        entry = {"id": "t", "run_dir": str(self.dir), "command": ["scripts/train_room1.py", "--seed", "60"]}
+        commands = [run_overnight.build_command(entry, Path("C:/g"), resume=True)[1:]]  # --resume <run folder>
+        with self.assertRaises(FreshSetRefused):
+            refuse_unless_declared(commands, (), self.spec)
+
+    def test_checkpoint_provenance_beside_it(self):
+        (self.dir / "checkpoints").mkdir()
+        (self.dir / "checkpoints" / "latest.zip").write_bytes(b"not a fresh set")
+        self.lf_copy(self.dir / "manifest.json")
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/evaluate_heldout.py", "--checkpoint", str(self.dir / "checkpoints" / "latest.zip")],
+                     self.spec)
+
+    def test_declared_commands_stay_allowed(self):
+        self.assertEqual(classify(copy()), "copy_overlap_guard")
+        self.assertEqual(classify(room1("3")), "room1_eval")
+
+
+class MetadataFirstTest(unittest.TestCase):
+    """A file that IS a fresh set is recognised without reading it (review B3), and no answer outlives its check."""
+
+    def setUp(self):
+        self.spec = {"room1": FreshSet(V1, committed_blob(V1), None, None)}
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    @staticmethod
+    def no_reading(path):
+        """Content reader that fails if asked for the protected file's contents (other files read normally)."""
+        if os.path.samefile(path, REPO / V1):
+            raise AssertionError(f"read the protected file's contents through {path}")
+        return Path(path).read_bytes()
+
+    def recognised_without_reading(self, token):
+        command = ["scripts/evaluate_heldout.py", "--checkpoint", CKPT, "--starts", token, "--repeats", "3",
+                   "--seed", EVAL_SEED]
+        with self.assertRaises(FreshSetRefused):
+            classify(command, self.spec, read_content=self.no_reading)
+
+    def test_short_name_without_reading(self):
+        buffer = ctypes.create_unicode_buffer(1024)
+        if not ctypes.windll.kernel32.GetShortPathNameW(str(REPO / V1), buffer, 1024) or \
+                "heldout_starts" in buffer.value.lower():
+            self.skipTest("no 8.3 name")
+        self.recognised_without_reading(buffer.value)
+        self.recognised_without_reading(f"--starts={buffer.value}")
+
+    def test_hard_link_without_reading(self):
+        link = self.dir / "innocent.json"
+        try:
+            os.link(REPO / V1, link)
+        except OSError:
+            self.skipTest("hard links unavailable here")
+        self.recognised_without_reading(str(link))
+
+    def test_junction_whose_real_path_names_the_set(self):
+        """Only the real-path step can catch this: a folder alias (identity compares against the fresh files)."""
+        target = self.dir / "heldout_starts_folder"  # its real name carries the injected set's marker
+        target.mkdir()
+        link = self.dir / "innocent"
+        made = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, text=True)
+        if made.returncode != 0:
+            self.skipTest("junctions unavailable here")
+        self.assertNotIn("heldout_starts", str(link).lower())
+        self.assertTrue(refers_to_fresh(str(link), self.spec))
+
+    def test_equals_form_renamed_copy(self):
+        copy_path = self.dir / "renamed.txt"
+        copy_path.write_bytes((REPO / V1).read_bytes().replace(b"\r\n", b"\n"))
+        self.assertTrue(refers_to_fresh(f"--starts={copy_path}", self.spec))
+
+    def test_no_answer_survives_between_checks(self):
+        target = self.dir / "same.txt"
+        data = (REPO / V1).read_bytes().replace(b"\r\n", b"\n")
+        target.write_bytes(b"x" * len(data))
+        stamp = (1_700_000_000, 1_700_000_000)
+        os.utime(target, stamp)
+        self.assertFalse(refers_to_fresh(str(target), self.spec))
+        target.write_bytes(data)  # same size, same mtime, now a copy of the protected set
+        os.utime(target, stamp)
+        self.assertTrue(refers_to_fresh(str(target), self.spec))
 
 
 if __name__ == "__main__":

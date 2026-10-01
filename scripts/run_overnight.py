@@ -282,18 +282,27 @@ def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
     return problems
 
 
-def fresh_set_problems(plan: dict, game_dir: Path) -> list[str]:
-    """The retention confirmation's fresh-set guard on every command, as declared and exactly as it will run
-    (`--game-dir` included). A plan's `fresh_set_stage` names the uses it may make; a plan without one may make none
+def fresh_set_problems(plan: dict, game_dirs: list[Path]) -> list[str]:
+    """The retention confirmation's fresh-set guard on every command that can run: as declared, and as built for
+    every game copy, both fresh and in the resume form run_entry can switch an entry to. Runs before any other check
+    reads an entry's inputs. A plan's `fresh_set_stage` names the uses it may make; a plan without one may make none
     (celeste_rl/fresh_sets.py)."""
     commands = []
     for entry in plan["runs"]:
         commands.append(list(entry.get("command", [])))
-        try:
-            commands.append(build_command(entry, game_dir, resume=bool(entry.get("resume")))[1:])
-        except ValueError:
-            pass  # entry_problems reports it
+        for game_dir in game_dirs:
+            for resume in (False, True):
+                try:
+                    commands.append(build_command(entry, game_dir, resume=resume)[1:])
+                except ValueError:
+                    pass  # no resume form for this script (a marked resume is reported by entry_problems)
     return fresh_sets.plan_problems(plan, commands)
+
+
+def launch_refusal(command: list[str], fresh_set_stage: str | None) -> list[str]:
+    """The fresh-set guard on one built command, immediately before it launches (or is retried)."""
+    plan = {"fresh_set_stage": fresh_set_stage} if fresh_set_stage else {}
+    return fresh_sets.plan_problems(plan, [command[1:]])
 
 
 def _sha256(path: Path) -> str:
@@ -360,9 +369,15 @@ def result_artifact(stdout: str, repo: Path = REPO) -> dict | None:
     return artifact
 
 
-def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, env: dict | None = None) -> dict:
-    """One run, bounded in time. Returns its outcome. `env` is the child's environment (None: inherit)."""
+def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, env: dict | None = None,
+            fresh_set_stage: str | None = None) -> dict:
+    """One run, bounded in time. Returns its outcome. `env` is the child's environment (None: inherit).
+    The built command passes the fresh-set guard first, for the plan's stage (None: no fresh-set use allowed)."""
     command = build_command(entry, game_dir, resume=resume)
+    refusal = launch_refusal(command, fresh_set_stage)
+    if refusal:
+        log(logfile, f"refused {entry['id']}: " + "; ".join(refusal))
+        return {"status": "refused_fresh_set", "seconds": 0, "command": command[1:], "problems": refusal}
     limit = entry.get("limit_minutes", 75) * 60
     started = time.time()
     wait_for_start_slot()
@@ -530,6 +545,11 @@ def main() -> int:
                  "memory_floor_gb": args.memory_floor_gb} if args.copy else None)
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
+    # The fresh-set guard comes first: later checks read entries' run folders, which must not hold a fresh set.
+    fresh_problems = fresh_set_problems(plan, [copy.game_dir for copy in copies])
+    if fresh_problems:
+        print("Not starting:\n  " + "\n  ".join(fresh_problems))
+        return 2
     # Line-ending safe (celeste_rl/texthash.py): the same whether the plan is checked out with LF or CRLF.
     plan_hash = text_sha256(args.plan)
     output_dir = REPO / "runs" / "campaign" / f"{datetime.now():%Y%m%d-%H%M%S}-{plan['name']}"
@@ -546,7 +566,6 @@ def main() -> int:
         problems.extend(copy_problems(copies))
     for entry in plan["runs"]:
         problems.extend(entry_problems(entry))
-    problems.extend(fresh_set_problems(plan, copies[0].game_dir))
     if problems:
         print("Not starting:\n  " + "\n  ".join(problems))
         return 2
@@ -568,9 +587,14 @@ def main() -> int:
         log(logfile, "dry run: nothing executed")
         return 0
 
+    stage = plan.get("fresh_set_stage")
+
+    def guarded(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, env: dict | None = None) -> dict:
+        return execute(entry, logfile, game_dir, resume=resume, env=env, fresh_set_stage=stage)
+
     def one(entry: dict, copy: GameCopy) -> dict:
         return run_entry(entry, copy, logfile, args.threads_per_job, stop_at, side=len(copies) > 1,
-                         memory_floor_gb=args.memory_floor_gb)
+                         memory_floor_gb=args.memory_floor_gb, run=guarded)
 
     def publish(done: list[dict]) -> None:
         write_summary(output_dir / "summary.json", plan, plan_hash, git["commit"], done, parallel, args.threads_per_job)
