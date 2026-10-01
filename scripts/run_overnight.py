@@ -265,6 +265,10 @@ def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
     run_dir = repo / entry["run_dir"]
     if not entry.get("resume"):
         return [f"{entry['run_dir']} already holds a run"] if (run_dir / "manifest.json").exists() else []
+    try:  # an entry that cannot resume is refused before any of its files is opened
+        build_command(entry, Path("."), resume=True)
+    except ValueError as error:
+        return [str(error)]
     problems = [f"{entry['id']} is marked resume but {entry['run_dir']}/{name} does not exist"
                 for name in ("manifest.json", "checkpoints/latest.zip") if not (run_dir / name).exists()]
     if (run_dir / "manifest.json").exists():
@@ -275,18 +279,19 @@ def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
             problems.append(f"{entry['id']} is marked resume but {entry['run_dir']}/manifest.json cannot be read")
         if status == "finished":
             problems.append(f"{entry['id']} is marked resume but {entry['run_dir']} has already finished")
-    try:
-        build_command(entry, Path("."), resume=True)
-    except ValueError as error:
-        problems.append(str(error))
     return problems
 
 
-def fresh_set_problems(plan: dict, game_dirs: list[Path]) -> list[str]:
+def fresh_set_problems(plan: dict, game_dirs: list[Path], fresh: dict | None = None) -> list[str]:
     """The retention confirmation's fresh-set guard on every command that can run: as declared, and as built for
-    every game copy, both fresh and in the resume form run_entry can switch an entry to. Runs before any other check
-    reads an entry's inputs. A plan's `fresh_set_stage` names the uses it may make; a plan without one may make none
+    every game copy, both fresh and in the resume form run_entry can switch an entry to; and on the inputs the runner
+    reads itself (each entry's run folder), whatever command can be built. Runs before any other check reads an
+    entry's inputs. A plan's `fresh_set_stage` names the uses it may make; a plan without one may make none
     (celeste_rl/fresh_sets.py)."""
+    fresh = fresh or fresh_sets.FRESH
+    owned = fresh_sets.paths_problems([str(entry["run_dir"]) for entry in plan["runs"] if entry.get("run_dir")], fresh)
+    if owned:
+        return owned
     commands = []
     for entry in plan["runs"]:
         commands.append(list(entry.get("command", [])))
@@ -296,7 +301,7 @@ def fresh_set_problems(plan: dict, game_dirs: list[Path]) -> list[str]:
                     commands.append(build_command(entry, game_dir, resume=resume)[1:])
                 except ValueError:
                     pass  # no resume form for this script (a marked resume is reported by entry_problems)
-    return fresh_sets.plan_problems(plan, commands)
+    return fresh_sets.plan_problems(plan, commands, fresh)
 
 
 def launch_refusal(command: list[str], fresh_set_stage: str | None) -> list[str]:
@@ -475,6 +480,15 @@ def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at:
     env = copy.env(threads)
     clear_game(copy.game_dir, logfile)
     result = run(entry, logfile, copy.game_dir, resume=bool(entry.get("resume")), env=env)
+
+    def refused(outcome: dict) -> dict:
+        # A fresh-set refusal is final: no retry, and nothing of the entry's run folder is read.
+        log(logfile, f"done {entry['id']}: refused by the fresh-set guard")
+        return {**entry, **outcome, "manifest": None, "threads_per_job": threads,
+                "available_memory_gb_at_start": free}
+
+    if result.get("status") == "refused_fresh_set":
+        return refused(result)
     has_manifest = (REPO / entry["run_dir"] / "manifest.json").exists()
     if (result.get("folder_collision") or result.get("launch_failure")) and not has_manifest:
         # Crashed before doing anything: another child took the same per-second folder name, or the game did not
@@ -488,6 +502,8 @@ def run_entry(entry: dict, copy: GameCopy, logfile: Path, threads: int, stop_at:
         log(logfile, f"  {entry['id']} ended {result['status']}, retrying once with --resume")
         clear_game(copy.game_dir, logfile)
         result = merge_attempts(result, run(entry, logfile, copy.game_dir, resume=True, env=env))
+    if result.get("status") == "refused_fresh_set":  # a retry refused at launch
+        return refused(result)
     record = {**entry, **result, **outcome_of(REPO / entry["run_dir"]), "threads_per_job": threads,
               "available_memory_gb_at_start": free}
     if side or copy.debug_port is not None:

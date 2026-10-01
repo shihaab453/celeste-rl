@@ -14,12 +14,17 @@ How a fresh set is recognised, cheapest first, so a file that IS a fresh set is 
    the protection against those is trusted, pinned input provenance, not this guard.
 No answer is cached between checks.
 
-Inputs a command makes its child read are checked too, before anything reads them (known formats only; this is a
-guard for the confirmation's own commands, not a sandbox for arbitrary scripts): the files inside a folder passed in
-(a recording, a run folder, and its checkpoints/), the provenance files tools read beside a file (manifest.json,
-results.json and play.json in its folder and the folder above, and a `<name>.manifest.json` sidecar such as
-dataset.manifest.json), and the paths named inside a JSON input (for example
-a task definition's source route). A token that refers to a fresh set is never listed or parsed.
+Inputs a command makes its child read are checked too, before anything reads them, inside or outside the repository
+(known formats only; this is a guard for the confirmation's own commands, not a sandbox for arbitrary scripts). A
+bounded walk with cycle detection follows: the files inside a folder passed in (a recording, a run folder, and its
+checkpoints/); the provenance files tools read beside a file (manifest.json, results.json and play.json in its folder
+and the folder above, and a `<name>.manifest.json` sidecar such as dataset.manifest.json), checked by identity only;
+the known path fields of parsed JSON (a training manifest's config.task_definition and config.init_from, a task
+definition's source_route), in any spelling, recursively; and, for a JSON given directly, any string naming an
+existing file. JSON is parsed only for direct inputs, manifest.json files and files reached through a known field;
+provenance files such as a clone's results.json are never parsed. A game installation folder (`--game-dir`) is
+checked itself but never listed. Limits (files per folder, total inputs, depth) refuse the command; they never skip
+an input. A token or dependency that refers to a fresh set is never listed or parsed.
 
 A fresh set may appear only in its shape's designated slot, for its own room; every other input of an allowed
 command, fixed or free, direct or indirect, must not refer to either set.
@@ -51,7 +56,10 @@ from celeste_rl.texthash import text_sha256
 REPO = Path(__file__).resolve().parents[1]
 EVAL_SEED = "20261001"
 PROVENANCE_FILES = ("manifest.json", "results.json", "play.json")
+KNOWN_PATH_KEYS = ("task_definition", "init_from", "source_route")
 MAX_FOLDER_FILES = 2000
+MAX_VISITS = 20000
+MAX_DEPTH = 8
 MAX_JSON_BYTES = 64 * 1024 * 1024
 
 
@@ -117,14 +125,6 @@ def _blob(data: bytes) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
 
 
-def _inside(path: Path, root: Path) -> bool:
-    try:
-        Path(os.path.realpath(path)).relative_to(Path(os.path.realpath(root)))
-        return True
-    except ValueError:
-        return False
-
-
 class _Scan:
     """One check. Its memo lives only as long as the check, so no answer survives into a later check."""
 
@@ -137,6 +137,7 @@ class _Scan:
         self.hash_limit = 4 * max(sizes) if sizes else 8 * 1024 * 1024
         self.read_content = read_content or (lambda path: path.read_bytes())
         self.memo: dict[str, frozenset] = {}
+        self.walks: dict[str, list[str]] = {}
 
     def _path(self, text: str) -> Path:
         return Path(text) if Path(text).is_absolute() else self.repo / text
@@ -176,33 +177,63 @@ class _Scan:
             return set()
         return set()
 
-    def indirect(self, token: str) -> list[str]:
-        """Inputs the child would read because of this token (never for a token that refers to a fresh set)."""
-        if self.names(token):
+    def indirect(self, token: str, listable: bool = True) -> list[str]:
+        """Every input the child would read because of this token, following the supported formats' dependencies
+        (never for a token that refers to a fresh set; a dependency that refers to one is returned, never expanded).
+        `listable=False` (a game installation folder) checks the token itself only. Limits refuse; they never skip."""
+        if self.names(token) or not listable:
             return []
+        if token not in self.walks:  # within this check only, like the name memo
+            self.walks[token] = self._walk(token)
+        return self.walks[token]
+
+    def _walk(self, token: str) -> list[str]:
         text = token.split("=", 1)[1] if token.startswith("--") and "=" in token else token
-        path = self._path(text)
-        try:
-            if not path.exists() or not _inside(path, self.repo):
-                return []
-            found: list[Path] = []
-            if path.is_dir():
-                for pattern in ("*", "checkpoints/*"):
-                    found += sorted(p for p in path.glob(pattern) if p.is_file())
-                if len(found) > MAX_FOLDER_FILES:
-                    raise FreshSetRefused(f"{text}: more than {MAX_FOLDER_FILES} files to check")
-                return [str(p) for p in found]
-            for folder in (path.parent, path.parent.parent):
-                found += [folder / name for name in PROVENANCE_FILES if (folder / name).is_file()]
-            sidecar = path.with_name(f"{path.stem}.manifest.json")  # e.g. dataset.npz -> dataset.manifest.json
-            if sidecar.is_file() and sidecar != path:
-                found.append(sidecar)
-            if path.suffix.lower() == ".json" and path.stat().st_size <= MAX_JSON_BYTES:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                found += [self._path(s) for s in _strings(data) if _looks_like_path(s) and self._path(s).exists()]
-            return [str(p) for p in found]
-        except (OSError, ValueError, json.JSONDecodeError):
-            return []
+        start = self._path(text)
+        found: list[str] = []
+        queue: list[tuple[Path, int, str]] = [(start, 0, "direct")]
+        seen: set[str] = set()
+        while queue:
+            path, depth, how = queue.pop()
+            try:
+                if not path.exists():
+                    continue
+                key = os.path.realpath(path).lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                if len(seen) > MAX_VISITS or depth > MAX_DEPTH:
+                    raise FreshSetRefused(f"{text}: inputs too many or too deep to check (limit {MAX_VISITS} / {MAX_DEPTH})")
+                if path != start:
+                    found.append(str(path))
+                    if self.names(str(path)):
+                        continue  # a fresh dependency: reported, never listed or parsed
+                if path.is_dir():
+                    files = sorted(p for pattern in ("*", "checkpoints/*") for p in path.glob(pattern) if p.is_file())
+                    if len(files) > MAX_FOLDER_FILES:
+                        raise FreshSetRefused(f"{path}: more than {MAX_FOLDER_FILES} files to check")
+                    queue += [(p, depth + 1, "listed") for p in files]
+                    continue
+                if how != "provenance":
+                    for folder in (path.parent, path.parent.parent):
+                        queue += [(folder / n, depth + 1, "provenance") for n in PROVENANCE_FILES if (folder / n).is_file()]
+                    sidecar = path.with_name(f"{path.stem}.manifest.json")  # dataset.npz -> dataset.manifest.json
+                    if sidecar.is_file():
+                        queue.append((sidecar, depth + 1, "provenance"))
+                parse = how in ("direct", "key") or path.name.lower() == "manifest.json"
+                if parse and path.suffix.lower() == ".json" and path.stat().st_size <= MAX_JSON_BYTES:
+                    try:
+                        data = json.loads(path.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        continue  # not a supported JSON input; the child will refuse it itself
+                    queue += [(self._path(v), depth + 1, "key") for v in _known_path_values(data)]
+                    if how == "direct":  # a JSON given directly: any string naming an existing file, any spelling
+                        queue += [(self._path(s), depth + 1, "leaf") for s in _strings(data) if _is_file(self._path(s))]
+            except FreshSetRefused:
+                raise
+            except (OSError, ValueError):
+                continue
+        return found
 
 
 def _strings(value):
@@ -216,8 +247,25 @@ def _strings(value):
             yield from _strings(item)
 
 
-def _looks_like_path(text: str) -> bool:
-    return 0 < len(text) < 400 and ("/" in text or "\\" in text or text.endswith((".json", ".npz", ".zip", ".tas")))
+def _known_path_values(value):
+    """Values of the path fields the supported formats open: a training manifest's config.task_definition and
+    config.init_from, a task definition's source_route (at any depth, any spelling)."""
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in KNOWN_PATH_KEYS and isinstance(item, str) and item:
+                yield item
+            else:
+                yield from _known_path_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _known_path_values(item)
+
+
+def _is_file(path: Path) -> bool:
+    try:
+        return 0 < len(str(path)) < 1000 and path.is_file()
+    except (OSError, ValueError):
+        return False
 
 
 def refers_to_fresh(token: str, fresh: dict = FRESH, repo: Path = REPO) -> bool:
@@ -295,7 +343,9 @@ def classify(command: list[str], fresh: dict = FRESH, repo: Path = REPO, read_co
     `scan` lets one check (a whole plan) share its memo; a new check always starts a new scan."""
     scan = scan or _Scan(fresh, repo, read_content)
     direct = any(scan.names(token) for token in command)
-    indirect = [(token, child) for token in command for child in scan.indirect(token) if scan.names(child)]
+    game_dirs = _game_dir_values(command)  # a game installation: checked itself, never listed
+    indirect = [(token, child) for token in command
+                for child in scan.indirect(token, listable=token not in game_dirs) if scan.names(child)]
     if indirect:
         raise FreshSetRefused(f"command makes its child read a fresh set through another input: {indirect}")
     if not direct:
@@ -307,6 +357,25 @@ def classify(command: list[str], fresh: dict = FRESH, repo: Path = REPO, read_co
             return name
         reasons[name] = reason
     raise FreshSetRefused(f"command refers to a fresh held-out set outside the declared uses: {command}; {reasons}")
+
+
+def _game_dir_values(command: list[str]) -> set[str]:
+    values = {command[i + 1] for i, token in enumerate(command[:-1]) if token == "--game-dir"}
+    return values | {token for token in command if token.startswith("--game-dir=")}
+
+
+def paths_problems(paths: list[str], fresh: dict = FRESH, repo: Path = REPO) -> list[str]:
+    """Inputs the runner itself reads (each entry's run folder), checked with their dependencies whatever command
+    can or cannot be built from the entry."""
+    scan = _Scan(fresh, repo)
+    problems = []
+    for path in paths:
+        try:
+            if scan.names(path) or any(scan.names(child) for child in scan.indirect(path)):
+                problems.append(f"fresh-set guard: runner input {path} refers to a fresh set")
+        except FreshSetRefused as error:
+            problems.append(f"fresh-set guard: {error}")
+    return problems
 
 
 def refuse_unless_declared(commands: list[list[str]], allowed: tuple[str, ...], fresh: dict = FRESH,

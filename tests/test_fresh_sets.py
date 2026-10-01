@@ -376,6 +376,126 @@ class IndirectTest(unittest.TestCase):
         self.assertEqual(classify(room1("3")), "room1_eval")
 
 
+class RoundThreeTest(unittest.TestCase):
+    """Review round 3: limits refuse (R1), known dependencies are followed anywhere (R2), the runner reads nothing
+    of a refused or invalid entry (R3). V1 stands in for a fresh set."""
+
+    def setUp(self):
+        self.v1 = {"room1": FreshSet(V1, committed_blob(V1), None, None)}
+        self.both = {**self.v1, "room2": FRESH["room2"]}
+        self.tmp = tempfile.TemporaryDirectory()  # outside the repository on purpose
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def protected_copy(self, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes((REPO / V1).read_bytes().replace(b"\r\n", b"\n"))
+        return path
+
+    def standin_repo(self):
+        """A fake repository whose stand-in protected set has a name no real path contains, so a copy command's real
+        Room 2 v2 slot cannot be mistaken for it (V1's name, heldout_starts, is inside every held-out file name)."""
+        repo = self.dir / "repo"
+        self.protected_copy(repo / "protected" / "standin.json")
+        spec = {"room1": FreshSet("protected/standin.json", committed_blob(V1), None, None), "room2": FRESH["room2"]}
+        self.assertEqual(classify(copy(), spec, repo=repo), "copy_overlap_guard")  # the plain copy stays allowed
+        return repo, spec
+
+    def test_folder_limit_refuses_instead_of_skipping(self):
+        repo, spec = self.standin_repo()
+        folder = self.dir / "recording"
+        folder.mkdir()
+        for i in range(2001):
+            (folder / f"filler{i:04d}.txt").write_text("x", encoding="utf-8")
+        self.protected_copy(folder / "play.json")
+        for command in (copy(mix=("default", str(folder))), ["scripts/train_anchored.py", "--anchor-play", str(folder)]):
+            with self.subTest(command=command[0]):
+                with self.assertRaises(FreshSetRefused):
+                    classify(command, spec, repo=repo)
+        (folder / "play.json").unlink()  # even with nothing protected, an unchecked folder is refused
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/train_anchored.py", "--anchor-play", str(folder)], spec, repo=repo)
+
+    def test_external_recording_folder_is_scanned(self):
+        repo, spec = self.standin_repo()
+        folder = self.dir / "external-recording"
+        self.protected_copy(folder / "play.json")
+        with self.assertRaises(FreshSetRefused):
+            classify(copy(mix=("default", str(folder))), spec, repo=repo)
+
+    def test_resume_manifest_chain_to_a_source_route(self):
+        source = self.protected_copy(self.dir / "source.JSO")
+        task = self.dir / "task.json"
+        task.write_text(json.dumps({"source_route": str(source)}), encoding="utf-8")
+        run = self.dir / "run"
+        run.mkdir()
+        (run / "manifest.json").write_text(json.dumps({"config": {"task_definition": str(task),
+                                                                  "disabled_inputs": []}}), encoding="utf-8")
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/train_room1.py", "--resume", str(run)], self.v1)
+
+    def test_bare_spelling_in_a_known_field(self):
+        repo = self.dir / "repo"
+        canonical = self.protected_copy(repo / V1)
+        try:
+            os.link(canonical, repo / "ALIAS-1.JSO")  # no slash, upper-case extension
+        except OSError:
+            self.skipTest("hard links unavailable here")
+        (repo / "task.json").write_text(json.dumps({"source_route": "ALIAS-1.JSO"}), encoding="utf-8")
+        with self.assertRaises(FreshSetRefused):
+            classify(["scripts/train_room1.py", "--task-definition", "task.json"], self.v1, repo=repo)
+
+    def test_declared_commands_still_pass_the_walk(self):
+        self.assertEqual(classify(copy()), "copy_overlap_guard")
+        self.assertEqual(classify(room1("3")), "room1_eval")
+        self.assertEqual(classify(room2()), "room2_eval")
+
+    def test_runner_checks_run_folders_and_refuses_invalid_resume_before_reading(self):
+        run = self.dir / "eval-run"
+        run.mkdir()
+        manifest = self.protected_copy(run / "manifest.json")
+        entry = {"id": "e", "run_dir": str(run), "resume": True, "command": room1("3")}  # evaluations cannot resume
+        self.assertTrue(run_overnight.fresh_set_problems({"runs": [entry]}, [Path("C:/g")], fresh=self.v1))
+        real_read = Path.read_text
+
+        def guarded_read(path, *args, **kwargs):
+            if Path(path) == manifest:
+                raise AssertionError("entry_problems read the manifest of an entry that cannot resume")
+            return real_read(path, *args, **kwargs)
+
+        with unittest.mock.patch.object(Path, "read_text", guarded_read):
+            problems = run_overnight.entry_problems(entry)
+        self.assertTrue(any("does not support --resume" in p for p in problems))
+
+    def run_entry_with(self, outcomes):
+        calls = []
+
+        def fake_run(entry, logfile, game_dir, resume=False, env=None):
+            calls.append(resume)
+            return outcomes[len(calls) - 1]
+
+        run = self.dir / "trained"
+        run.mkdir(exist_ok=True)
+        (run / "manifest.json").write_text("{}", encoding="utf-8")  # would tempt a resume retry
+        entry = {"id": "t", "run_dir": str(run), "command": ["scripts/train_room1.py", "--seed", "60"]}
+        with unittest.mock.patch.object(run_overnight, "clear_game"), \
+                unittest.mock.patch.object(run_overnight, "outcome_of", side_effect=AssertionError("read outcome")):
+            record = run_overnight.run_entry(entry, run_overnight.GameCopy(Path("C:/g")), self.dir / "log.txt", 10,
+                                             run=fake_run, free_memory=lambda: 16.0)
+        return record, calls
+
+    def test_refused_launch_is_final(self):
+        record, calls = self.run_entry_with([{"status": "refused_fresh_set", "seconds": 0}])
+        self.assertEqual((record["status"], calls), ("refused_fresh_set", [False]))
+
+    def test_refused_retry_reads_nothing_after(self):
+        record, calls = self.run_entry_with([{"status": "aborted", "seconds": 5},
+                                             {"status": "refused_fresh_set", "seconds": 0}])
+        self.assertEqual((record["status"], calls), ("refused_fresh_set", [False, True]))
+
+
 class MetadataFirstTest(unittest.TestCase):
     """A file that IS a fresh set is recognised without reading it (review B3), and no answer outlives its check."""
 
