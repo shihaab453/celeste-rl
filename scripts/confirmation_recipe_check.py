@@ -16,7 +16,7 @@ removed and torch's default thread counts in that environment, then trains for u
 stderr are saved beside the JSON record, also after a timeout, when this check's own game (in the chosen folder) is
 stopped and the result recorded.
 
-compare: three verdicts. INVALID: the evidence is incomplete (no successful run record matching the declared
+compare: four verdicts. INVALID: the evidence is incomplete (no successful run record matching the declared
 command, declaration and commit; either run unfinished, unattributable, with a different config, missing any of the
 original's 13 checkpoints or a required member, or without the final 500k evaluation of 50 episodes; the original's
 latest.zip not the declared pin; anything unreadable). DIFFERENT: a declared comparison differs. IDENTICAL: every
