@@ -55,7 +55,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from celeste_rl import game_process, runtime  # noqa: E402
+from celeste_rl import fresh_sets, game_process, runtime  # noqa: E402
 from celeste_rl.texthash import text_sha256  # noqa: E402
 
 
@@ -280,6 +280,20 @@ def entry_problems(entry: dict, repo: Path = REPO) -> list[str]:
     except ValueError as error:
         problems.append(str(error))
     return problems
+
+
+def fresh_set_problems(plan: dict, game_dir: Path) -> list[str]:
+    """The retention confirmation's fresh-set guard on every command, as declared and exactly as it will run
+    (`--game-dir` included). A plan's `fresh_set_stage` names the uses it may make; a plan without one may make none
+    (celeste_rl/fresh_sets.py)."""
+    commands = []
+    for entry in plan["runs"]:
+        commands.append(list(entry.get("command", [])))
+        try:
+            commands.append(build_command(entry, game_dir, resume=bool(entry.get("resume")))[1:])
+        except ValueError:
+            pass  # entry_problems reports it
+    return fresh_sets.plan_problems(plan, commands)
 
 
 def _sha256(path: Path) -> str:
@@ -532,6 +546,7 @@ def main() -> int:
         problems.extend(copy_problems(copies))
     for entry in plan["runs"]:
         problems.extend(entry_problems(entry))
+    problems.extend(fresh_set_problems(plan, copies[0].game_dir))
     if problems:
         print("Not starting:\n  " + "\n  ".join(problems))
         return 2

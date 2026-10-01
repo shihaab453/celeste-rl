@@ -1,16 +1,20 @@
-"""The fresh-set guard of the retention confirmation (celeste_rl/fresh_sets.py).
+"""The fresh-set guard of the retention confirmation (celeste_rl/fresh_sets.py) and its runner hook.
 
-No test reads either fresh set: shapes are checked on command lists, and the identity check runs on the reused v1
-development sets and on altered pins.
+No test reads either fresh set: shapes are checked on command lists; aliases (short names, links, copies) and the
+identity check run on the reused v1 development sets through injected specs and altered pins.
 """
+import ctypes
 import json
+import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
-from celeste_rl.fresh_sets import (EVAL_SEED, FRESH, FreshSet, FreshSetRefused, classify, refuse_unless_declared,
-                                   verify_identity)
+from celeste_rl.fresh_sets import (EVAL_SEED, FRESH, FreshSet, FreshSetRefused, classify, plan_problems,
+                                   refers_to_fresh, refuse_unless_declared, verify_identity)
 from celeste_rl.heldout import HeldoutManifestError
+from scripts import run_overnight
 
 REPO = Path(__file__).resolve().parents[1]
 DECLARATION = json.loads((REPO / "config" / "retention-confirmation.json").read_text(encoding="utf-8"))
@@ -79,6 +83,23 @@ class ShapeTest(unittest.TestCase):
             ["scripts/train_room1.py", "--run-dir", "runs/train/heldout_starts-room1-v2"],  # name elsewhere
         ]
         for command in refused:
+            with self.subTest(command=command):
+                with self.assertRaises(FreshSetRefused):
+                    classify(command)
+
+    def test_runner_built_commands_keep_their_shapes(self):
+        self.assertEqual(classify(copy(extra=("--game-dir", "C:/Projects/celeste-research-scratch/game-copy-2"))),
+                         "copy_overlap_guard")
+        entry = {"id": "x", "run_dir": "runs/clone/x", "command": copy()}
+        self.assertEqual(classify(run_overnight.build_command(entry, Path("C:/games/celeste"))[1:]),
+                         "copy_overlap_guard")
+
+    def test_option_spellings_argparse_would_accept_are_refused(self):
+        flagged = copy()
+        flagged.insert(flagged.index("--no-play") + 1, "yes")              # a flag given a value
+        for command in (room1()[:3] + [f"--starts={R1}"] + room1()[5:],     # equals form
+                        room1()[:3] + ["--start", R1] + room1()[5:],        # abbreviation
+                        flagged):
             with self.subTest(command=command):
                 with self.assertRaises(FreshSetRefused):
                     classify(command)
@@ -161,6 +182,98 @@ class IdentityTest(unittest.TestCase):
         spec = {"room1": FreshSet(path, self.committed_blob(path), None, None)}
         with self.assertRaises(HeldoutManifestError):
             verify_identity("room1", fresh=spec)
+
+
+V1 = "config/heldout_starts.json"  # a reused development set standing in for a fresh one
+
+
+def committed_blob(path):
+    return subprocess.run(["git", "-C", str(REPO), "ls-tree", "HEAD", path], capture_output=True, text=True,
+                          check=True).stdout.split()[2]
+
+
+class AliasTest(unittest.TestCase):
+    """A fresh set reached by another name is still recognised (review G1), shown with V1 as the injected set."""
+
+    def setUp(self):
+        self.spec = {"room1": FreshSet(V1, committed_blob(V1), None, None)}
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def assert_recognised(self, token):
+        self.assertTrue(refers_to_fresh(token, self.spec))
+        with self.assertRaises(FreshSetRefused):  # and an undeclared use of it is refused
+            classify(["scripts/evaluate_heldout.py", "--checkpoint", CKPT, "--starts", token, "--repeats", "3",
+                      "--seed", EVAL_SEED], self.spec)
+
+    def test_windows_short_name(self):
+        buffer = ctypes.create_unicode_buffer(1024)
+        if not ctypes.windll.kernel32.GetShortPathNameW(str(REPO / V1), buffer, 1024):
+            self.skipTest("short names unavailable")
+        short = buffer.value
+        if "heldout_starts" in short.lower():
+            self.skipTest("this volume has no 8.3 names")
+        self.assert_recognised(short)
+
+    def test_hard_link(self):
+        link = self.dir / "innocent.json"
+        try:
+            os.link(REPO / V1, link)
+        except OSError:
+            self.skipTest("hard links unavailable here")
+        self.assert_recognised(str(link))
+
+    def test_renamed_copies_in_either_line_ending(self):
+        lf = (REPO / V1).read_bytes().replace(b"\r\n", b"\n")
+        for name, data in (("lf.txt", lf), ("crlf.dat", lf.replace(b"\n", b"\r\n"))):
+            (self.dir / name).write_bytes(data)
+            with self.subTest(name=name):
+                self.assert_recognised(str(self.dir / name))
+
+    def test_symlink(self):
+        link = self.dir / "pointer.json"
+        try:
+            os.symlink(REPO / V1, link)
+        except OSError:
+            self.skipTest("symlinks need privileges here")
+        self.assert_recognised(str(link))
+
+    def test_unrelated_files_are_ordinary(self):
+        (self.dir / "other.json").write_text('{"x": 1}', encoding="utf-8")
+        self.assertFalse(refers_to_fresh(str(self.dir / "other.json"), self.spec))
+        self.assertFalse(refers_to_fresh("config/room2.json", self.spec))
+
+
+class StageTest(unittest.TestCase):
+    """What each plan may do with the fresh sets, checked on the commands as they will run (review: biggest gap)."""
+
+    def test_stage_rules(self):
+        cases = [
+            ({"fresh_set_stage": "evaluation"}, [room1("3"), room2()], True),
+            ({"fresh_set_stage": "stage1"}, [copy(extra=("--game-dir", "C:/g"))], True),
+            ({"fresh_set_stage": "night"}, [["scripts/train_room1.py", "--seed", "60"]], True),
+            ({}, [["scripts/train_room1.py", "--seed", "60"]], True),
+            ({"fresh_set_stage": "stage1"}, [room1("3")], False),
+            ({"fresh_set_stage": "night"}, [copy()], False),
+            ({}, [room1("3")], False),                                   # no stage: no fresh-set use at all
+            ({"fresh_set_stage": "evaluations"}, [], False),             # unknown stage
+            ({"fresh_set_stage": "evaluation"}, [room1(seed="1")], False),
+        ]
+        for plan, commands, ok in cases:
+            with self.subTest(plan=plan, commands=commands):
+                self.assertEqual(plan_problems(plan, commands) == [], ok)
+
+    def test_runner_checks_commands_as_built(self):
+        evaluation = {"fresh_set_stage": "evaluation",
+                      "runs": [{"id": "e", "run_dir": "runs/evaluation/x", "command": room1("3")}]}
+        self.assertEqual(run_overnight.fresh_set_problems(evaluation, Path("C:/games/celeste")), [])
+        unstaged = {"runs": evaluation["runs"]}
+        self.assertTrue(run_overnight.fresh_set_problems(unstaged, Path("C:/games/celeste")))
+        night = {"fresh_set_stage": "night", "runs": [{"id": "c", "run_dir": "runs/clone/x", "command": copy()}]}
+        self.assertTrue(run_overnight.fresh_set_problems(night, Path("C:/games/celeste")))
 
 
 if __name__ == "__main__":
