@@ -21,10 +21,17 @@ checkpoints/); the provenance files tools read beside a file (manifest.json, res
 and the folder above, and a `<name>.manifest.json` sidecar such as dataset.manifest.json), checked by identity only;
 the known path fields of parsed JSON (a training manifest's config.task_definition and config.init_from, a task
 definition's source_route), in any spelling, recursively; and, for a JSON given directly, any string naming an
-existing file. JSON is parsed only for direct inputs, manifest.json files and files reached through a known field;
-provenance files such as a clone's results.json are never parsed. A game installation folder (`--game-dir`) is
-checked itself but never listed. Limits (files per folder, total inputs, depth) refuse the command; they never skip
-an input. A token or dependency that refers to a fresh set is never listed or parsed.
+existing file (this is how a demonstrations manifest's entry sources are checked). Whether a file is parsed depends
+on how its reader uses it, not on its name: a JSON option (--task-definition, --demonstrations, --starts,
+--heldout), a task_definition or source_route field, and any run folder's manifest.json are required JSON, and one
+that is too large or cannot be parsed refuses the command; another file given directly is parsed only if it looks
+like JSON (a zip checkpoint does not); provenance files such as a clone's results.json are identity-checked only,
+never parsed, because their readers do not open the paths recorded in them. Each file keeps a record of the checks
+already done, so a file first seen as a listed or provenance file still gets parsed when a later reference needs it.
+Only the token at a `--game-dir` position is a game installation, checked itself but never listed; the same path in
+another argument is an ordinary input. Limits (files per folder, total inputs, depth, JSON size) refuse the command;
+they never skip an input. A token or dependency that refers to a fresh set is never listed or parsed. The runner also
+checks the files it reads itself (the plan, each game copy's Everest settings) by identity before reading them.
 
 A fresh set may appear only in its shape's designated slot, for its own room; every other input of an allowed
 command, fixed or free, direct or indirect, must not refer to either set.
@@ -57,6 +64,8 @@ REPO = Path(__file__).resolve().parents[1]
 EVAL_SEED = "20261001"
 PROVENANCE_FILES = ("manifest.json", "results.json", "play.json")
 KNOWN_PATH_KEYS = ("task_definition", "init_from", "source_route")
+JSON_FIELDS = ("task_definition", "source_route")  # read as JSON by their loaders, whatever the file is called
+JSON_OPTIONS = ("--task-definition", "--demonstrations", "--starts", "--heldout")  # options whose file is JSON
 MAX_FOLDER_FILES = 2000
 MAX_VISITS = 20000
 MAX_DEPTH = 8
@@ -137,7 +146,7 @@ class _Scan:
         self.hash_limit = 4 * max(sizes) if sizes else 8 * 1024 * 1024
         self.read_content = read_content or (lambda path: path.read_bytes())
         self.memo: dict[str, frozenset] = {}
-        self.walks: dict[str, list[str]] = {}
+        self.walks: dict[tuple[str, bool], list[str]] = {}
 
     def _path(self, text: str) -> Path:
         return Path(text) if Path(text).is_absolute() else self.repo / text
@@ -177,58 +186,89 @@ class _Scan:
             return set()
         return set()
 
-    def indirect(self, token: str, listable: bool = True) -> list[str]:
+    def indirect(self, token: str, listable: bool = True, json_required: bool = False) -> list[str]:
         """Every input the child would read because of this token, following the supported formats' dependencies
         (never for a token that refers to a fresh set; a dependency that refers to one is returned, never expanded).
-        `listable=False` (a game installation folder) checks the token itself only. Limits refuse; they never skip."""
+        `listable=False` (this occurrence is a game installation folder) checks the token itself only.
+        `json_required`: the token's option is read as JSON whatever its file name. Limits refuse; they never skip."""
         if self.names(token) or not listable:
             return []
-        if token not in self.walks:  # within this check only, like the name memo
-            self.walks[token] = self._walk(token)
-        return self.walks[token]
+        key = (token, json_required)
+        if key not in self.walks:  # within this check only, like the name memo
+            self.walks[key] = self._walk(token, json_required)
+        return self.walks[key]
 
-    def _walk(self, token: str) -> list[str]:
+    def _json(self, path: Path, required: bool):
+        """A file's JSON when its role reads it as JSON (required, whatever its name), or when it is given directly
+        and looks like JSON; None for a non-JSON input such as a zip checkpoint. A required JSON that is too large or
+        cannot be parsed refuses: its reader would read it, and this check cannot."""
+        with path.open("rb") as handle:
+            looks = handle.read(64).lstrip().startswith((b"{", b"["))
+        if not required and not looks:
+            return None
+        if path.stat().st_size > MAX_JSON_BYTES:
+            raise FreshSetRefused(f"{path}: a JSON input larger than {MAX_JSON_BYTES} bytes cannot be checked")
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            if required:
+                raise FreshSetRefused(f"{path}: a required JSON input cannot be parsed ({error})") from error
+            return None
+
+    def _walk(self, token: str, json_required: bool) -> list[str]:
         text = token.split("=", 1)[1] if token.startswith("--") and "=" in token else token
         start = self._path(text)
         found: list[str] = []
-        queue: list[tuple[Path, int, str]] = [(start, 0, "direct")]
-        seen: set[str] = set()
+        # Roles: direct (the token), listed (in a listed folder), provenance and leaf (identity only), key (a known
+        # path field). Each file records the checks already done, so a later, stronger role still does its own work.
+        queue: list[tuple[Path, int, str, bool]] = [(start, 0, "direct", json_required)]
+        done: dict[str, set[str]] = {}
+        visits = 0
         while queue:
-            path, depth, how = queue.pop()
+            path, depth, role, need_json = queue.pop()
             try:
                 if not path.exists():
                     continue
-                key = os.path.realpath(path).lower()
-                if key in seen:
-                    continue
-                seen.add(key)
-                if len(seen) > MAX_VISITS or depth > MAX_DEPTH:
+                visits += 1
+                if visits > MAX_VISITS or depth > MAX_DEPTH:
                     raise FreshSetRefused(f"{text}: inputs too many or too deep to check (limit {MAX_VISITS} / {MAX_DEPTH})")
-                if path != start:
-                    found.append(str(path))
-                    if self.names(str(path)):
-                        continue  # a fresh dependency: reported, never listed or parsed
+                ops = done.setdefault(os.path.realpath(path).lower(), set())
+                if "identity" not in ops:
+                    ops.add("identity")
+                    if path != start:
+                        found.append(str(path))
+                    if path != start and self.names(str(path)):
+                        ops.add("fresh")
+                if "fresh" in ops:
+                    continue  # a fresh dependency: reported, never listed or parsed
                 if path.is_dir():
-                    files = sorted(p for pattern in ("*", "checkpoints/*") for p in path.glob(pattern) if p.is_file())
-                    if len(files) > MAX_FOLDER_FILES:
-                        raise FreshSetRefused(f"{path}: more than {MAX_FOLDER_FILES} files to check")
-                    queue += [(p, depth + 1, "listed") for p in files]
+                    if role in ("direct", "listed", "key") and "list" not in ops:
+                        ops.add("list")
+                        files = sorted(p for pattern in ("*", "checkpoints/*") for p in path.glob(pattern) if p.is_file())
+                        if len(files) > MAX_FOLDER_FILES:
+                            raise FreshSetRefused(f"{path}: more than {MAX_FOLDER_FILES} files to check")
+                        queue += [(p, depth + 1, "listed", False) for p in files]
                     continue
-                if how != "provenance":
+                if role in ("direct", "listed", "key") and "siblings" not in ops:
+                    ops.add("siblings")
                     for folder in (path.parent, path.parent.parent):
-                        queue += [(folder / n, depth + 1, "provenance") for n in PROVENANCE_FILES if (folder / n).is_file()]
+                        queue += [(folder / n, depth + 1, "provenance", False)
+                                  for n in PROVENANCE_FILES if (folder / n).is_file()]
                     sidecar = path.with_name(f"{path.stem}.manifest.json")  # dataset.npz -> dataset.manifest.json
                     if sidecar.is_file():
-                        queue.append((sidecar, depth + 1, "provenance"))
-                parse = how in ("direct", "key") or path.name.lower() == "manifest.json"
-                if parse and path.suffix.lower() == ".json" and path.stat().st_size <= MAX_JSON_BYTES:
-                    try:
-                        data = json.loads(path.read_text(encoding="utf-8"))
-                    except (json.JSONDecodeError, UnicodeDecodeError):
-                        continue  # not a supported JSON input; the child will refuse it itself
-                    queue += [(self._path(v), depth + 1, "key") for v in _known_path_values(data)]
-                    if how == "direct":  # a JSON given directly: any string naming an existing file, any spelling
-                        queue += [(self._path(s), depth + 1, "leaf") for s in _strings(data) if _is_file(self._path(s))]
+                        queue.append((sidecar, depth + 1, "provenance", False))
+                is_manifest = path.name.lower() == "manifest.json"  # a run folder's manifest: resume reads it as JSON
+                required = need_json or is_manifest
+                wants = "parse-direct" if role == "direct" else "parse" if (role == "key" or is_manifest) else None
+                if wants and wants not in ops and not (wants == "parse" and "parse-direct" in ops):
+                    ops.add(wants)
+                    data = self._json(path, required)
+                    if data is not None:
+                        queue += [(self._path(v), depth + 1, "key", field in JSON_FIELDS)
+                                  for field, v in _known_path_values(data)]
+                        if role == "direct":  # given directly: any string naming an existing file, any spelling
+                            queue += [(self._path(s), depth + 1, "leaf", False)
+                                      for s in _strings(data) if _is_file(self._path(s))]
             except FreshSetRefused:
                 raise
             except (OSError, ValueError):
@@ -248,12 +288,12 @@ def _strings(value):
 
 
 def _known_path_values(value):
-    """Values of the path fields the supported formats open: a training manifest's config.task_definition and
-    config.init_from, a task definition's source_route (at any depth, any spelling)."""
+    """(field, value) for the path fields the supported formats open: a training manifest's config.task_definition
+    and config.init_from, a task definition's source_route (at any depth, any spelling)."""
     if isinstance(value, dict):
         for key, item in value.items():
             if key in KNOWN_PATH_KEYS and isinstance(item, str) and item:
-                yield item
+                yield key, item
             else:
                 yield from _known_path_values(item)
     elif isinstance(value, list):
@@ -343,9 +383,11 @@ def classify(command: list[str], fresh: dict = FRESH, repo: Path = REPO, read_co
     `scan` lets one check (a whole plan) share its memo; a new check always starts a new scan."""
     scan = scan or _Scan(fresh, repo, read_content)
     direct = any(scan.names(token) for token in command)
-    game_dirs = _game_dir_values(command)  # a game installation: checked itself, never listed
-    indirect = [(token, child) for token in command
-                for child in scan.indirect(token, listable=token not in game_dirs) if scan.names(child)]
+    game_dir_positions = _game_dir_positions(command)  # only that occurrence is a game installation (never listed)
+    indirect = [(token, child) for index, token in enumerate(command)
+                for child in scan.indirect(token, listable=index not in game_dir_positions,
+                                           json_required=_option_of(command, index) in JSON_OPTIONS)
+                if scan.names(child)]
     if indirect:
         raise FreshSetRefused(f"command makes its child read a fresh set through another input: {indirect}")
     if not direct:
@@ -359,9 +401,25 @@ def classify(command: list[str], fresh: dict = FRESH, repo: Path = REPO, read_co
     raise FreshSetRefused(f"command refers to a fresh held-out set outside the declared uses: {command}; {reasons}")
 
 
-def _game_dir_values(command: list[str]) -> set[str]:
-    values = {command[i + 1] for i, token in enumerate(command[:-1]) if token == "--game-dir"}
-    return values | {token for token in command if token.startswith("--game-dir=")}
+def _game_dir_positions(command: list[str]) -> set[int]:
+    """Indices of the tokens that are a --game-dir value: the same path elsewhere is an ordinary input."""
+    positions = {i + 1 for i, token in enumerate(command[:-1]) if token == "--game-dir"}
+    return positions | {i for i, token in enumerate(command) if token.startswith("--game-dir=")}
+
+
+def _option_of(command: list[str], index: int) -> str | None:
+    token = command[index]
+    if token.startswith("--"):
+        return token.split("=", 1)[0] if "=" in token else None
+    previous = command[index - 1] if index > 0 else ""
+    return previous if previous.startswith("--") else None
+
+
+def identity_problems(paths: list[str], fresh: dict = FRESH, repo: Path = REPO) -> list[str]:
+    """Files the runner reads itself before anything else (the plan, each game copy's settings): each must not be a
+    fresh set, recognised from name, real path or file identity before any content is read."""
+    scan = _Scan(fresh, repo)
+    return [f"fresh-set guard: runner input {path} refers to a fresh set" for path in paths if scan.names(path)]
 
 
 def paths_problems(paths: list[str], fresh: dict = FRESH, repo: Path = REPO) -> list[str]:

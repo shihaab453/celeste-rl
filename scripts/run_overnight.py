@@ -180,8 +180,11 @@ def parse_copy(text: str) -> GameCopy:
         raise ValueError(f"--copy {text!r} is not DIR:DEBUGRC_PORT:LOCKSTEP_PORT") from error
 
 
+SETTINGS_RELATIVE = Path("probe-profile") / "Saves" / "modsettings-Everest.celeste"
+
+
 def settings_debugrc_port(game_dir: Path) -> int | None:
-    settings = Path(game_dir) / "probe-profile" / "Saves" / "modsettings-Everest.celeste"
+    settings = Path(game_dir) / SETTINGS_RELATIVE
     if not settings.exists():
         return None
     match = re.search(r"^DebugRCPort:\s*(\d+)\s*$", settings.read_text(encoding="utf-8-sig"), re.MULTILINE)
@@ -307,7 +310,14 @@ def fresh_set_problems(plan: dict, game_dirs: list[Path], fresh: dict | None = N
 def launch_refusal(command: list[str], fresh_set_stage: str | None) -> list[str]:
     """The fresh-set guard on one built command, immediately before it launches (or is retried)."""
     plan = {"fresh_set_stage": fresh_set_stage} if fresh_set_stage else {}
-    return fresh_sets.plan_problems(plan, [command[1:]])
+    return fresh_sets.plan_problems(plan, [command[1:]], fresh_sets.FRESH)
+
+
+def runner_file_problems(plan_path: Path, copies: list["GameCopy"]) -> list[str]:
+    """The files the runner reads itself before the plan's commands are checked: the plan, and each game copy's
+    Everest settings (read by copy_problems). Identity only, before any of them is read."""
+    files = [str(plan_path)] + [str(Path(copy.game_dir) / SETTINGS_RELATIVE) for copy in copies]
+    return fresh_sets.identity_problems(files, fresh_sets.FRESH)
 
 
 def _sha256(path: Path) -> str:
@@ -560,8 +570,13 @@ def main() -> int:
     parallel = ({"copies": [{"game_dir": str(c.game_dir), "ports": [c.debug_port, c.lockstep_port]} for c in copies],
                  "memory_floor_gb": args.memory_floor_gb} if args.copy else None)
 
+    # The fresh-set guard comes first: the plan and settings files by identity before they are read, then every
+    # command and run folder before any later check reads an entry's inputs.
+    owned = runner_file_problems(args.plan, copies)
+    if owned:
+        print("Not starting:\n  " + "\n  ".join(owned))
+        return 2
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
-    # The fresh-set guard comes first: later checks read entries' run folders, which must not hold a fresh set.
     fresh_problems = fresh_set_problems(plan, [copy.game_dir for copy in copies])
     if fresh_problems:
         print("Not starting:\n  " + "\n  ".join(fresh_problems))

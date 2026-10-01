@@ -496,6 +496,135 @@ class RoundThreeTest(unittest.TestCase):
         self.assertEqual((record["status"], calls), ("refused_fresh_set", [False, True]))
 
 
+class RoundFourTest(unittest.TestCase):
+    """Review round 4: per-file checks by role (B1), JSON by role not name, refusing when too large (B2), the
+    game-folder exemption per occurrence (B3), the runner's own files (B4). A uniquely named stand-in in a fake
+    repository plays the protected set, so no real path can be mistaken for it."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.repo = self.dir / "repo"
+        self.data = (REPO / V1).read_bytes().replace(b"\r\n", b"\n")
+        (self.repo / "protected").mkdir(parents=True)
+        (self.repo / "protected" / "standin.json").write_bytes(self.data)
+        self.spec = {"room1": FreshSet("protected/standin.json", committed_blob(V1), None, None),
+                     "room2": FRESH["room2"]}
+        self.src = self.dir / "elsewhere" / "src.json"  # a renamed copy of the protected set, outside the run folders
+        self.src.parent.mkdir()
+        self.src.write_bytes(self.data)
+        self.ordinary = self.dir / "elsewhere" / "route.json"
+        self.ordinary.write_text('{"lines": []}', encoding="utf-8")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def refused(self, command):
+        with self.assertRaises(FreshSetRefused):
+            classify(command, self.spec, repo=self.repo)
+
+    def allowed(self, command, shape=None):
+        self.assertEqual(classify(command, self.spec, repo=self.repo), shape)
+
+    def write_json(self, path, value):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(value), encoding="utf-8")
+        return path
+
+    def run_folder(self, task_name="task.json", source=None):
+        run = self.dir / f"run-{task_name.replace('.', '_')}"
+        self.write_json(run / task_name, {"source_route": str(source or self.src)})
+        self.write_json(run / "manifest.json", {"config": {"task_definition": str(run / task_name)}})
+        (run / "checkpoints").mkdir()
+        (run / "checkpoints" / "latest.zip").write_bytes(b"PK\x03\x04 not json")
+        return run
+
+    # B1
+    def test_task_inside_the_resume_folder(self):
+        self.refused(["scripts/train_room1.py", "--resume", str(self.run_folder())])
+
+    def test_file_seen_first_as_provenance_then_as_a_known_path(self):
+        run = self.run_folder(task_name="play.json")  # a task definition that is also a provenance file name
+        self.refused(["scripts/evaluate_heldout.py", "--checkpoint", str(run / "checkpoints" / "latest.zip")])
+
+    def test_file_seen_first_as_a_leaf_then_as_a_known_path(self):
+        task = self.write_json(self.dir / "t" / "task.json", {"source_route": str(self.src)})
+        direct = self.write_json(self.dir / "t" / "direct.json", {"config": {"task_definition": str(task)},
+                                                                  "note": str(task)})
+        self.refused(["scripts/train_room1.py", "--task-definition", str(direct)])
+
+    def test_clone_provenance_stays_identity_only(self):
+        clone = self.dir / "clone"
+        clone.mkdir()
+        (clone / "cloned.zip").write_bytes(b"PK\x03\x04 not json")
+        self.write_json(clone / "results.json", {"heldout": "config/heldout_starts-room2-v2.json", "x": str(self.src)})
+        self.allowed(["scripts/train_room1.py", "--init-from", str(clone / "cloned.zip")])
+
+    # B2
+    def test_required_json_whatever_its_name(self):
+        for name in ("task.JSO", "task"):
+            with self.subTest(name=name):
+                task = self.write_json(self.dir / "named" / name, {"source_route": str(self.src)})
+                self.refused(["scripts/train_room1.py", "--task-definition", str(task)])
+                self.refused(["scripts/train_room1.py", "--resume", str(self.run_folder(task_name=name))])
+
+    def test_required_json_too_large_refuses_at_the_exact_boundary(self):
+        task = self.write_json(self.dir / "big" / "task.json", {"source_route": str(self.ordinary)})
+        run = self.run_folder(task_name="task.json", source=self.ordinary)
+        cases = [  # each command and every required JSON it reads (direct or by role)
+            (["scripts/train_room1.py", "--task-definition", str(task)], [task, self.ordinary]),
+            (["scripts/train_room1.py", "--resume", str(run)], [run / "manifest.json", run / "task.json", self.ordinary]),
+        ]
+        for command, required in cases:
+            largest = max(path.stat().st_size for path in required)
+            for limit, ok in ((largest, True), (largest - 1, False)):  # at the limit parsed; one byte over refused
+                with self.subTest(command=command[-1], limit=limit), \
+                        unittest.mock.patch("celeste_rl.fresh_sets.MAX_JSON_BYTES", limit):
+                    if ok:
+                        self.allowed(command)
+                    else:
+                        self.refused(command)
+
+    # B3
+    def test_game_dir_exemption_is_per_occurrence(self):
+        recording = self.dir / "recording"
+        self.write_json(recording / "dataset_note.json", {})
+        self.allowed(copy(mix=("default", str(recording)), extra=("--game-dir", str(recording))),
+                     "copy_overlap_guard")  # control: nothing protected
+        (recording / "play.json").write_bytes(self.data)
+        self.refused(copy(mix=("default", str(recording)), extra=("--game-dir", str(self.dir / "game"))))
+        self.refused(copy(mix=("default", str(recording)), extra=("--game-dir", str(recording))))
+        entry = {"id": "c", "run_dir": "runs/clone/x", "command": copy(mix=("default", str(recording)))}
+        self.refused(run_overnight.build_command(entry, recording)[1:])  # the runner-built form
+
+    # B4
+    def test_runner_files_checked_by_identity_before_reading(self):
+        v1 = {"room1": FreshSet(V1, committed_blob(V1), None, None)}  # the runner's checks use the real repository
+        plan_alias, settings_dir = self.dir / "plan.json", self.dir / "game" / run_overnight.SETTINGS_RELATIVE.parent
+        settings_dir.mkdir(parents=True)
+        try:
+            os.link(REPO / V1, plan_alias)
+            os.link(REPO / V1, settings_dir / run_overnight.SETTINGS_RELATIVE.name)
+        except OSError:
+            self.skipTest("hard links unavailable here")
+        ordinary_plan = self.write_json(self.dir / "ordinary-plan.json", {"name": "x", "runs": []})
+        with unittest.mock.patch.object(run_overnight.fresh_sets, "FRESH", v1):
+            game = run_overnight.GameCopy(self.dir / "game")
+            self.assertTrue(run_overnight.runner_file_problems(plan_alias, []))
+            self.assertTrue(run_overnight.runner_file_problems(ordinary_plan, [game]))
+            self.assertEqual(run_overnight.runner_file_problems(ordinary_plan, [run_overnight.GameCopy(self.dir)]), [])
+            real_read = Path.read_text
+
+            def trap(path, *args, **kwargs):
+                if os.path.samefile(path, REPO / V1):
+                    raise AssertionError(f"read {path} before the guard")
+                return real_read(path, *args, **kwargs)
+
+            with unittest.mock.patch.object(Path, "read_text", trap), \
+                    unittest.mock.patch("sys.argv", ["run_overnight.py", "--plan", str(plan_alias), "--dry-run"]):
+                self.assertEqual(run_overnight.main(), 2)
+
+
 class MetadataFirstTest(unittest.TestCase):
     """A file that IS a fresh set is recognised without reading it (review B3), and no answer outlives its check."""
 
