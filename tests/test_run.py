@@ -192,12 +192,12 @@ class RunTests(unittest.TestCase):
         self.assertLess(sum(float(row["component_unspent_deadline"]) for row in progress), 0.0)
         self.assertTrue(episodes, "the fake bridge dies inside the first rollout")
         for episode in episodes:
-            # Every death costs -1.03 before shaping, whenever it happened (Codex K1).
+            # Every death costs -1.03 before shaping, whenever it happened (review K1).
             unshaped = sum(value for name, value in episode["components"].items() if name != "shaping")
             self.assertAlmostEqual(unshaped, -1.03, places=9)
 
     def test_every_evaluation_names_the_checkpoint_it_measured(self):
-        """Codex J4: an evaluation is only evidence if you can say which weights produced it."""
+        """Review J4: an evaluation is only evidence if you can say which weights produced it."""
         train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
         _, _, _, evaluations = read(self.run_dir)
 
@@ -217,14 +217,14 @@ class RunTests(unittest.TestCase):
         self.assertEqual(len(steps), len(set(steps)), f"an evaluation was repeated: {steps}")
 
     def test_a_configuration_that_cannot_run_is_refused(self):
-        """Codex J10: a zero checkpoint interval never advances the scheduler and hangs the run."""
+        """Review J10: a zero checkpoint interval never advances the scheduler and hangs the run."""
         for field in ("checkpoint_every", "eval_episodes", "total_timesteps", "n_steps"):
             with self.subTest(field=field), self.assertRaises(ValueError) as caught:
                 config(**{field: 0})
             self.assertIn(field, str(caught.exception))
         with self.assertRaises(ValueError):
             config(eval_every=-1)
-        self.assertEqual(TrainConfig().eval_episodes, 50)  # Codex K7
+        self.assertEqual(TrainConfig().eval_episodes, 50)  # review K7
 
     def test_varied_starts_are_recorded_and_the_archive_is_saved(self):
         """starts-v1: the archive is the run's other learned artefact, so it is saved with the checkpoints."""
@@ -298,7 +298,7 @@ class RunTests(unittest.TestCase):
         self.assertNotEqual(draws[0], draws[1], "two seeds must not share the donor's random stream")
 
     def test_progress_records_say_how_far_each_episode_got(self):
-        """Codex J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
+        """Review J9 and K8: the unshaped campaign could not say where episodes ended, only that they ended."""
         train(config(), self.run_dir, CelesteRoomEnv(EpochBridge()), PROVENANCE)
         _, progress, episodes, evaluations = read(self.run_dir)
 
@@ -332,14 +332,14 @@ class RunTests(unittest.TestCase):
         self.assertEqual(sum(int(row["episodes"]) for row in progress), len(episodes))
 
         checkpoints = self.run_dir / "checkpoints"
-        # 96 is there because an evaluation writes the weights it measured before measuring them (Codex J4).
+        # 96 is there because an evaluation writes the weights it measured before measuring them (review J4).
         self.assertEqual(sorted(p.name for p in checkpoints.glob("step_*.zip")),
                          ["step_000000064.zip", "step_000000096.zip", "step_000000128.zip", "step_000000160.zip"])
         for name in ("latest.zip", "previous.zip", "best.zip"):
             self.assertTrue((checkpoints / name).exists(), name)
         self.assertEqual(list(checkpoints.glob("*.tmp*")), [])
 
-        # 96 was scheduled; 160 is the final policy, which no scheduled evaluation ever reached (Codex J4).
+        # 96 was scheduled; 160 is the final policy, which no scheduled evaluation ever reached (review J4).
         self.assertEqual([e["accepted_steps"] for e in evaluations], [96, 160])
         self.assertEqual(evaluations[0]["stochastic_episodes"], 2)
         self.assertEqual(evaluations[0]["deterministic"]["ending"], "death")

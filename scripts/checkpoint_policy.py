@@ -1,4 +1,4 @@
-"""What the policy actually became, checkpoint by checkpoint: entropy, per-input marginals and value (Codex K4).
+"""What the policy actually became, checkpoint by checkpoint: entropy, per-input marginals and value (review K4).
 
 Run from the repo root with the RL interpreter (offline, no game needed):
     .venv-rl/Scripts/python.exe scripts/checkpoint_policy.py --run-dir runs/train/<run>

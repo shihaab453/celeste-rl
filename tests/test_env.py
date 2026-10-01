@@ -154,7 +154,7 @@ def episode_total(ending: str, elapsed: int, config: RewardConfig = V2) -> float
 
 
 class RewardV2Tests(unittest.TestCase):
-    """rew-v2: the unspent-deadline charge (Codex K1). Shaping is exercised by ShapingTests."""
+    """rew-v2: the unspent-deadline charge (review K1). Shaping is exercised by ShapingTests."""
 
     def test_every_failure_costs_exactly_the_same_whenever_it_happens(self):
         for elapsed in (1, 2, 60, 900, DEADLINE_FRAMES):
@@ -436,7 +436,7 @@ def prefix(frames: int, position, room: str = "1", dashes: int | None = 1) -> St
 
 
 class StartReplayTests(unittest.TestCase):
-    """Starting an episode from a state the agent reached before (Codex K5)."""
+    """Starting an episode from a state the agent reached before (review K5)."""
 
     def test_the_prefix_is_replayed_and_does_not_count_as_transitions(self):
         bridge = MovingBridge(PATH)

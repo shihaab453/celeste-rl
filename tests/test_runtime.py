@@ -113,7 +113,7 @@ class RuntimeManifestTests(unittest.TestCase):
 
 
 class GitFailsClosedTests(unittest.TestCase):
-    """Codex J3: when git cannot answer, nothing may look attributable."""
+    """Review J3: when git cannot answer, nothing may look attributable."""
 
     @staticmethod
     def failing_git(returncode=128, stderr="fatal: not a git repository", stdout=""):

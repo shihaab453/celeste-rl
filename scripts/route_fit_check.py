@@ -1,4 +1,4 @@
-"""Can the policy network even reproduce a known solution? (Codex finding K4, the cheapest diagnostic.)
+"""Can the policy network even reproduce a known solution? (review finding K4, the cheapest diagnostic.)
 
 Run from the repo root with the RL interpreter (Steam running, mod installed):
     .venv-rl/Scripts/python.exe scripts/route_fit_check.py
@@ -26,7 +26,7 @@ Reported, all on the fitted frames:
   exact-frame accuracy   frames where all 21 enabled inputs are right at once, the honest version of the question
   worst inputs           the enabled inputs with the lowest accuracy
 
-Pass (Codex's bar): at least 95% per-input accuracy over the enabled inputs. Results and the fitted curve go to
+Pass (the review's bar): at least 95% per-input accuracy over the enabled inputs. Results and the fitted curve go to
 runs/route-fit/<timestamp>/results.json.
 """
 from __future__ import annotations
