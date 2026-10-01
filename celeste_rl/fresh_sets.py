@@ -32,6 +32,16 @@ Only the token at a `--game-dir` position is a game installation, checked itself
 another argument is an ordinary input. Limits (files per folder, total inputs, depth, JSON size) refuse the command;
 they never skip an input. A token or dependency that refers to a fresh set is never listed or parsed. The runner also
 checks the files it reads itself (the plan, each game copy's Everest settings) by identity before reading them.
+"Identity-checked" means the common detector without following dependencies: a fresh set or a linked alias of one
+is recognised from name, real path or file identity before its content is opened; an ordinary small file may still
+be hashed to catch a renamed byte copy.
+
+Scope (threat model agreed in review, 2026-10-01): this guard stops accidental use of a fresh set by the
+confirmation's own tools and by generated or hand-edited plans, through the supported inputs above. It does not
+approve the experiment's design, prove that arbitrary content carries no held-out information (re-formatted or
+embedded copies), cover modified tools or new readers (a new reader means updating and reviewing the supported
+roles here), or defend against files swapped between checking and reading. Those are covered by trusted, pinned
+inputs and by the confirmation's generators and analyzer, which must enforce pins, roles and stages themselves.
 
 A fresh set may appear only in its shape's designated slot, for its own room; every other input of an allowed
 command, fixed or free, direct or indirect, must not refer to either set.
@@ -259,11 +269,16 @@ class _Scan:
                         queue.append((sidecar, depth + 1, "provenance", False))
                 is_manifest = path.name.lower() == "manifest.json"  # a run folder's manifest: resume reads it as JSON
                 required = need_json or is_manifest
-                wants = "parse-direct" if role == "direct" else "parse" if (role == "key" or is_manifest) else None
-                if wants and wants not in ops and not (wants == "parse" and "parse-direct" in ops):
-                    ops.add(wants)
+                wants = role in ("direct", "key") or is_manifest
+                # An optional look that found no JSON must not satisfy a later role that requires JSON; only a
+                # successful parse (its references already queued) satisfies both.
+                attempt = "parse-required" if required else "parse-optional"
+                done_already = "parsed" in ops or attempt in ops or (not required and "parse-required" in ops)
+                if wants and not done_already:
+                    ops.add(attempt)
                     data = self._json(path, required)
                     if data is not None:
+                        ops.add("parsed")
                         queue += [(self._path(v), depth + 1, "key", field in JSON_FIELDS)
                                   for field, v in _known_path_values(data)]
                         if role == "direct":  # given directly: any string naming an existing file, any spelling
@@ -417,7 +432,9 @@ def _option_of(command: list[str], index: int) -> str | None:
 
 def identity_problems(paths: list[str], fresh: dict = FRESH, repo: Path = REPO) -> list[str]:
     """Files the runner reads itself before anything else (the plan, each game copy's settings): each must not be a
-    fresh set, recognised from name, real path or file identity before any content is read."""
+    fresh set. Uses the common detector without following dependencies: a fresh set or a linked alias of one is
+    recognised from name, real path or file identity before its content is opened; an ordinary small file may still
+    be hashed to catch a renamed byte copy, so this is not a promise of zero content reads."""
     scan = _Scan(fresh, repo)
     return [f"fresh-set guard: runner input {path} refers to a fresh set" for path in paths if scan.names(path)]
 

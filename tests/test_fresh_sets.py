@@ -553,6 +553,23 @@ class RoundFourTest(unittest.TestCase):
                                                                   "note": str(task)})
         self.refused(["scripts/train_room1.py", "--task-definition", str(direct)])
 
+    def test_optional_look_does_not_satisfy_a_required_parse(self):
+        """Review round 5, L1: a task listed as both init_from (optional JSON) and task_definition (required JSON),
+        with leading spaces that hide its first bracket from the optional look."""
+        for padding, source, protected in ((b" " * 64, self.src, True), (b"", self.ordinary, False)):
+            for order in (("task_definition", "init_from"), ("init_from", "task_definition")):
+                with self.subTest(padded=bool(padding), order=order):
+                    run = self.dir / f"mixed-{len(padding)}-{order[0]}"
+                    task = run / "task.json"
+                    task.parent.mkdir(parents=True, exist_ok=True)
+                    task.write_bytes(padding + json.dumps({"source_route": str(source)}).encode())
+                    self.write_json(run / "manifest.json", {"config": {key: str(task) for key in order}})
+                    command = ["scripts/train_room1.py", "--resume", str(run)]
+                    if protected:
+                        self.refused(command)
+                    else:
+                        self.allowed(command)  # control: the same mixed roles with an ordinary source
+
     def test_clone_provenance_stays_identity_only(self):
         clone = self.dir / "clone"
         clone.mkdir()
