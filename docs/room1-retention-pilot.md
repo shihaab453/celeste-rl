@@ -592,7 +592,8 @@ performed alike.
 both arms.** Most of E0's observed decay was on near starts, close to the frames
 the mixed copy was fitted on. On far starts E0 itself lost little on average,
 so there was little decay there for the anchor to prevent. This split cannot
-show whether the anchor's benefit extends beyond the fitted frames.
+show whether A1's advantage over E0 extends beyond the fitted frames; the next
+section shows that the control, unlike E0, did decline on far starts.
 It cannot simply be read as A1 losing as much far-start skill as
 E0 while preserving near-start skill. In particular, donor 4's far baseline
 was already lower than its near baseline: A1's far mean is slightly above that
@@ -628,3 +629,76 @@ Numbers and input pins are in
 extension, six for the preceding split). A separately written check script
 rebuilt integer-distance masks and verified
 46 subgroup, loss, pooling and baseline-cancellation checks.
+
+## Post hoc extension: the control also decayed on far starts
+
+The owner next requested the same split for the original control: the four
+mixed-copy policies fine-tuned on Room 2 with entropy coefficient 0.01 and no
+anchor. This adds only their existing 501,760-step Room 1 evaluations. The
+clone baselines and <=4-pixel same-dash masks are unchanged. Neither fresh v2
+set was read and no new game runs were performed.
+
+| Group, pooled state-weighted rates | Clone baseline | Control final | Control loss |
+|---|---:|---:|---:|
+| Near | 347 / 537 (64.6%) | 78 / 537 (14.5%) | 50.1 points |
+| Far | 135 / 263 (51.3%) | 21 / 263 (8.0%) | 43.3 points |
+
+These are correlated observations on four clones of the same 200 development
+starts. Donors with more near starts contribute more to the pooled near rate:
+donors 4 and 6 supply 55% of near starts but 39% of far starts. Equal-route,
+then equal-clone means provide a separate descriptive view:
+
+| Group, route-balanced means | Clone baseline | Control final | Control loss | A1 loss | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 66.0% | 14.3% | 51.7 points | 5.5 points | 14.7 points |
+| Far | 47.6% | 7.4% | 40.2 points | 2.4 points | 3.2 points |
+
+A1 and E0 columns reuse the preceding extension's means over two PPO batches
+per clone. The control has one run per clone, from an earlier campaign with
+different concurrency. This is not a balanced confirmation experiment.
+
+Every control declined in both groups. Per-clone route-balanced control losses
+are below, measured in success percentage points:
+
+| Donor | Near loss | Far loss |
+|---|---:|---:|
+| 3 | 61.7 | 48.5 |
+| 4 | 39.6 | 26.3 |
+| 5 | 57.7 | 53.7 |
+| 6 | 47.7 | 32.3 |
+
+The controls ended at or below the level of policies that never saw Room 1 in
+both groups (full-set floors of 14.2% for copies and 20.5% for fine-tuned
+policies; subgroup floors were not measured), losing about four fifths of
+their starting success near and far; donor 5's control cleared none of its 79
+far starts. The smaller far loss in points mainly reflects the lower far
+starting level, not partial protection.
+
+**Far-start decay is present in the control.** The small far-start decay seen
+with E0 is not a property of all the fine-tuning recipes. On these development
+starts, both A1 and E0 lost much less than the control away from the fitted
+frames as well as near them.
+
+This makes A1-versus-control on far starts a useful contrast for confirmation:
+there is a substantial control decline there for A1 to prevent. On these
+development starts A1 lost 2.4 points far against the control's 40.2
+(route-balanced), so its protection against the control's decline is not
+confined to near starts. This does not show how that protection works. It still does
+not determine whether A1 has an advantage over a retaining method without
+rehearsal, such as E0. Distance is a property of the start, not of the complete
+trajectory; a far start can later reach recorded frames. These observations do
+not isolate rehearsal as a cause or prove a general retention benefit.
+
+The shared clone baselines, stochastic evaluation, reused routes, thin far
+groups and different campaign times/concurrency remain limitations. No
+uncertainty interval or statistical significance is claimed. Losses are
+signed success percentage points, not the pilot's normalized donor-margin
+measure. The declared A1 selection is unchanged; confirmation has not started.
+
+The aggregates and input hashes are in
+[`docs/results/control-near-far.json`](results/control-near-far.json), written
+by `scripts/describe_control_near_far.py`. Control recipe, clone/checkpoint pins,
+episode identities and full/split outcomes were checked. The eight focused
+tests of the reused near/far and signed-loss helpers pass. A separately written
+script rebuilt squared-integer-distance masks and verified twenty outcome,
+loss and pooling checks.
