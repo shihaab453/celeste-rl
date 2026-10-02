@@ -232,6 +232,43 @@ class CorrectionTest(Temp):
                     original = {"policy_class": {**class_field(), "__abstractmethods__": "<property object at 0x1>"}}
                 self.assertTrue(self.differences(original, changed))
 
+    def test_marker_cannot_be_imitated_by_saved_text(self):
+        """Review of 519831d, item 1: version 2's first marker was text, so a saved literal equal to it matched."""
+        for literal in ("<function CelestePolicy.__init__ at (process address)>",
+                        str((rc.ADDRESS_MARKER, "function CelestePolicy.__init__")),
+                        json.dumps([rc.ADDRESS_MARKER, "function CelestePolicy.__init__"])):
+            with self.subTest(literal=literal):
+                imitation = {"policy_class": {**class_field(), "__init__": literal}}
+                self.assertTrue(self.differences({}, imitation))
+        listed = {"policy_class": {**class_field(), "__init__": [rc.ADDRESS_MARKER, "function CelestePolicy.__init__"]}}
+        self.assertTrue(self.differences({}, listed))  # a JSON list is not the tuple marker either
+
+    def test_extension_opcodes_are_refused_before_loading(self):
+        """Review of 519831d, item 2: EXT1/EXT2/EXT4 can return a cached object without find_class."""
+        for name, raw in (("EXT1", b"\x80\x02\x82\x01."), ("EXT2", b"\x80\x02\x83\x01\x00."),
+                          ("EXT4", b"\x80\x02\x84\x01\x00\x00\x00.")):
+            with self.subTest(opcode=name):
+                with self.assertRaisesRegex(pickle.UnpicklingError, "extension"):
+                    rc.restricted_load(raw, rc._DequeOnly)
+                with self.assertRaises(rc.Invalid):
+                    self.differences({}, {"ep_info_buffer": episodes(raw=raw)})
+                self.assertIsNone(rc.stored_path_parts({":serialized:": base64.b64encode(raw).decode()}))
+
+    def test_cached_extension_would_bypass_find_class_without_the_check(self):
+        """The gap the check closes: with a cached extension, a plain restricted unpickler runs the cached callable."""
+        import copyreg
+        code = 0x7FFFFFF0
+        copyreg.add_extension("builtins", "list", code)
+        try:
+            raw = pickle.dumps(list, protocol=2)  # uses EXT4 for the registered extension
+            self.assertIs(pickle.loads(raw), list)  # caches the extension
+            self.assertIs(rc._DequeOnly(io.BytesIO(raw)).load(), list)  # find_class never consulted
+            with self.assertRaises(pickle.UnpicklingError):
+                rc.restricted_load(raw, rc._DequeOnly)
+        finally:
+            copyreg.remove_extension("builtins", "list", code)
+            copyreg.clear_extension_cache()
+
     def test_rewards_lengths_order_count_and_capacity_still_count(self):
         swapped = [EPISODES[1], EPISODES[0], EPISODES[2]]
         for name, entries, extra in (
@@ -297,8 +334,13 @@ class DiagnosticBindingTest(Temp):
         record = {"exit_code": 0, "problems": [], "game_processes": [], "other_experiments": [],
                   "thread_variables_removed": {}, "worktree_commit": rc.HISTORICAL_COMMIT, "command": command,
                   "reading": "the conditions changed (the original code also differs)", **changes}
-        path = self.dir / f"diagnostic-{len(list(self.dir.glob('diagnostic*.json')))}.json"
+        self.count = getattr(self, "count", 0) + 1
+        path = self.dir / f"diagnostic-{self.count}.json"
         path.write_text(json.dumps(record), encoding="utf-8")
+        source = self.dir / f"diagnostic-{self.count}.source-saved-afterwards.py"
+        source.write_text("print('launcher')\n", encoding="utf-8")
+        (self.dir / f"diagnostic-{self.count}.source-note.json").write_text(
+            json.dumps({"file": source.name, "sha256": rc._sha256(source)}), encoding="utf-8")
         return path
 
     def manifest(self, commit=rc.HISTORICAL_COMMIT):
@@ -309,6 +351,33 @@ class DiagnosticBindingTest(Temp):
         bound = rc.diagnostic_binding(path, DECLARATION, GAME, self.manifest())
         self.assertEqual(bound["run_dir"], "runs/train/diag-B-seed7")
         self.assertEqual(bound["sha256"], rc._sha256(path))
+        source = bound["launcher_source"]
+        self.assertTrue(source["saved_afterwards"])
+        self.assertEqual(source["saved_source"]["sha256"], rc._sha256(path.with_name("diagnostic-1.source-saved-afterwards.py")))
+        self.assertEqual(source["note"]["sha256"], rc._sha256(path.with_name("diagnostic-1.source-note.json")))
+
+    def test_launcher_source_must_match_its_note(self):
+        """Review of 519831d, item 3: the record cites the note and the saved source, which must agree."""
+        for name, damage in (("source changed", lambda p: p.with_name(p.stem + ".source-saved-afterwards.py")
+                              .write_text("changed\n", encoding="utf-8")),
+                             ("note missing", lambda p: p.with_name(p.stem + ".source-note.json").unlink())):
+            with self.subTest(name=name):
+                path = self.record()
+                damage(path)
+                with self.assertRaises((rc.Invalid, OSError)):
+                    rc.diagnostic_binding(path, DECLARATION, GAME, self.manifest())
+
+    def test_malformed_commands_are_invalid_with_scope(self):
+        """Review of 519831d, item 3: a malformed command is INVALID (not a crash), and the report keeps its scope."""
+        for command in (None, {}, 1, "scripts/train_room1.py --run-dir x", ["--run-dir"], [1, "--run-dir", "x"],
+                        ["--run-dir", "a", "--run-dir", "b"]):
+            with self.subTest(command=command):
+                report = rc.diagnostic_acceptance(self.dir, self.dir, self.record(command=command), DECLARATION, GAME)
+                self.assertEqual((report["verdict"], report["scope"]), ("INVALID", rc.DIAGNOSTIC_SCOPE))
+        path = self.dir / "not-a-record.json"
+        path.write_text("[1, 2]", encoding="utf-8")
+        report = rc.diagnostic_acceptance(self.dir, self.dir, path, DECLARATION, GAME)
+        self.assertEqual((report["verdict"], report["scope"]), ("INVALID", rc.DIAGNOSTIC_SCOPE))
 
     def test_anything_else_is_invalid(self):
         seed8 = rc.declared_command(DECLARATION, GAME)

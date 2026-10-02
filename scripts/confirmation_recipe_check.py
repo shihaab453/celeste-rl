@@ -35,15 +35,17 @@ Comparator version 2 (after the review of the replay and the 8423081 diagnostic)
 between any two training processes, so version 1 called two runs of the same code DIFFERENT. policy_class and
 rollout_buffer_class: Stable-Baselines3 saves, beside the serialized class, the text description of each attribute,
 which includes its memory address in that process; only the address in the two recognized forms ("<function NAME at
-0x...>", "<_abc._abc_data object at 0x...>") is replaced, names, structure and the serialized payload are compared
-exactly, and no other field is touched. ep_info_buffer: decoded by a reader that accepts only a deque; capacity, order,
+0x...>", "<_abc._abc_data object at 0x...>") is replaced, by a tuple marker no saved JSON text can equal; names,
+structure and the serialized payload are compared exactly, and no other field is touched. ep_info_buffer: decoded by a
+reader that accepts only a deque (and refuses the pickle extension opcodes, which skip that check); capacity, order,
 length and every entry's reward r and length l (values and types) are compared exactly; each entry's wall-clock time t
 must be present, a float, finite and not negative, and only its value is excluded. Any other buffer structure is
 INVALID. Every record names the comparator version, this script's hash and the commit it ran at.
 
 compare-diagnostic: the same comparison between the original and the copy of the 2026-10-01 diagnostic rerun at the
 historical commit 8423081, bound to that diagnostic's live record. It supersedes that record's automatic reading,
-concerns the historical code only and says nothing about the current code (whose replay stays DIFFERENT).
+concerns the historical code only and says nothing about the current code (whose replay stays DIFFERENT). It cites
+the launcher source note and the source saved after the run, by path and hash; they cannot show the exact bytes that ran.
 """
 from __future__ import annotations
 
@@ -59,6 +61,7 @@ import math
 import os
 import pathlib
 import pickle
+import pickletools
 import re
 import subprocess
 import sys
@@ -105,6 +108,9 @@ COMPARATOR_VERSION = 2
 CLASS_FIELDS = ("policy_class", "rollout_buffer_class")  # descriptive text: process addresses replaced
 # The two descriptive forms that carry a process address; the name before " at " is kept and compared.
 ADDRESS_REPR = re.compile(r"<(function [A-Za-z_][\w.]*|_abc\._abc_data object) at 0x[0-9A-Fa-f]+>")
+ADDRESS_MARKER = "process address removed"
+# Pickle opcodes that load an object from the extension registry cache without calling find_class.
+EXTENSION_OPCODES = frozenset({"EXT1", "EXT2", "EXT4"})
 EPISODE_FIELD = "ep_info_buffer"                         # decoded; each entry's wall-clock t excluded after checks
 DEQUE_TYPE = "<class 'collections.deque'>"
 HISTORICAL_COMMIT = "842308100d8ee32e135e82d295860dab2acb11d2"  # the original donors' training commit
@@ -206,10 +212,18 @@ class _PathOnly(pickle.Unpickler):
         raise pickle.UnpicklingError(f"refusing {module}.{name}")
 
 
+def restricted_load(raw: bytes, unpickler: type[pickle.Unpickler]):
+    """Unpickle with a restricted reader, refusing first any opcode that could load an object without find_class."""
+    found = {op.name for op, _, _ in pickletools.genops(raw)} & EXTENSION_OPCODES
+    if found:
+        raise pickle.UnpicklingError(f"refusing extension opcodes {sorted(found)}")
+    return unpickler(io.BytesIO(raw)).load()
+
+
 def stored_path_parts(field) -> tuple[str, ...] | None:
     """The parts of an SB3-serialized path field, or None if it is not one."""
     try:
-        value = _PathOnly(io.BytesIO(base64.b64decode(field[":serialized:"]))).load()
+        value = restricted_load(base64.b64decode(field[":serialized:"]), _PathOnly)
         return tuple(pathlib.PurePath(value).parts)
     except (KeyError, TypeError, ValueError, pickle.UnpicklingError, EOFError):
         return None
@@ -217,7 +231,8 @@ def stored_path_parts(field) -> tuple[str, ...] | None:
 
 def without_addresses(field):
     """A saved class field with the process address removed from each recognized descriptive leaf. The serialized
-    payload, the type, every name and every other text are kept exactly; a field that is not a record is unchanged."""
+    payload, the type, every name and every other text are kept exactly; a field that is not a record is unchanged.
+    A recognized leaf becomes a tuple marker: JSON has no tuples, so no saved text can compare equal to one."""
     if not isinstance(field, dict):
         return field
 
@@ -225,7 +240,7 @@ def without_addresses(field):
         if key in (":type:", ":serialized:") or not isinstance(value, str):
             return value
         match = ADDRESS_REPR.fullmatch(value)
-        return f"<{match.group(1)} at (process address)>" if match else value
+        return (ADDRESS_MARKER, match.group(1)) if match else value
 
     return {key: leaf(key, value) for key, value in field.items()}
 
@@ -246,7 +261,7 @@ def episode_buffer(field, capacity, what: str) -> dict:
     if not isinstance(field, dict) or set(field) != {":type:", ":serialized:"} or field[":type:"] != DEQUE_TYPE:
         raise Invalid(f"{what}: {EPISODE_FIELD} is not a saved deque")
     try:
-        value = _DequeOnly(io.BytesIO(base64.b64decode(field[":serialized:"], validate=True))).load()
+        value = restricted_load(base64.b64decode(field[":serialized:"], validate=True), _DequeOnly)
     except (TypeError, ValueError, KeyError, IndexError, AttributeError, OverflowError, binascii.Error,
             pickle.UnpicklingError, EOFError) as error:
         raise Invalid(f"{what}: {EPISODE_FIELD} cannot be read: {type(error).__name__}: {str(error)[:200]}") from error
@@ -548,8 +563,7 @@ def diagnostic_binding(path: Path, declaration: dict, game_dir: Path, manifest: 
     """The diagnostic's live record, checked: exit 0, no problems, alone with no thread variables, run at the
     historical commit (record and every manifest session), with the declared seed 7 command in its own run folder."""
     record = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(record, dict) or not isinstance(record.get("command"), list):
-        raise Invalid(f"{path.name} is not a diagnostic record with a command")
+    run_dir = recorded_run_dir(record, path.name)
     checks = {"exit_code": 0, "problems": [], "game_processes": [], "other_experiments": [],
               "thread_variables_removed": {}, "worktree_commit": HISTORICAL_COMMIT}
     wrong = {key: record.get(key) for key, expected in checks.items() if record.get(key) != expected}
@@ -559,7 +573,6 @@ def diagnostic_binding(path: Path, declaration: dict, game_dir: Path, manifest: 
     if commits != {HISTORICAL_COMMIT}:
         raise Invalid(f"the diagnostic run's sessions ran at {sorted(map(str, commits))}, not {HISTORICAL_COMMIT}")
     command = record["command"]
-    run_dir = command[command.index("--run-dir") + 1]
     expected = declared_command(declaration, game_dir)
     expected[expected.index("--run-dir") + 1] = run_dir
     if command != expected:
@@ -567,7 +580,31 @@ def diagnostic_binding(path: Path, declaration: dict, game_dir: Path, manifest: 
     kept = ("purpose", "started", "worktree_commit", "init_clone_sha256", "command", "threads", "exit_code", "seconds",
             "run_copy", "verdict", "reading")
     return {"path": _relative(path).as_posix(), "sha256": _sha256(path), "run_dir": run_dir,
-            **{key: record.get(key) for key in kept}}
+            "launcher_source": launcher_source(path), **{key: record.get(key) for key in kept}}
+
+
+def recorded_run_dir(record, what: str) -> str:
+    """The run folder a diagnostic record's command names; Invalid unless the record and command are well formed."""
+    command = record.get("command") if isinstance(record, dict) else None
+    if not isinstance(command, list) or not all(isinstance(part, str) for part in command) \
+            or command.count("--run-dir") != 1 or command[-1] == "--run-dir":
+        raise Invalid(f"{what} is not a record whose command names one run folder")
+    return command[command.index("--run-dir") + 1]
+
+
+def launcher_source(record: Path) -> dict:
+    """The diagnostic launcher's source as preserved after the run: the note and the saved file, by path and hash.
+    The note must name that file and its hash. This cannot show the bytes that ran; the record says so."""
+    stem = record.name.removesuffix(".json")
+    note_path, source_path = record.with_name(f"{stem}.source-note.json"), record.with_name(f"{stem}.source-saved-afterwards.py")
+    note = json.loads(note_path.read_text(encoding="utf-8"))
+    if not isinstance(note, dict) or note.get("file") != source_path.name or note.get("sha256") != _sha256(source_path):
+        raise Invalid(f"{note_path.name} does not name {source_path.name} with its hash")
+    return {"note": {"path": _relative(note_path).as_posix(), "sha256": _sha256(note_path)},
+            "saved_source": {"path": _relative(source_path).as_posix(), "sha256": _sha256(source_path)},
+            "saved_afterwards": True,
+            "limit": "saved after the diagnostic ran; its hash was not recorded in the live record, so it cannot "
+                     "establish the exact launcher bytes that executed"}
 
 
 def comparator_identity() -> dict:
@@ -739,16 +776,15 @@ def diagnostic_acceptance(original: Path, run_copy: Path, record: Path, declarat
         bound.update(diagnostic_binding(record, declaration, game_dir, manifest))
         return bound
 
-    # The binding is read first so the abort path can be checked against the folder training actually wrote to.
+    report = {**report_header(original, run_copy), "scope": DIAGNOSTIC_SCOPE}
+    # The run folder is read first so the abort path can be checked against the folder training actually wrote to.
     try:
-        command = json.loads(record.read_text(encoding="utf-8"))["command"]
-        recorded = Path(command[command.index("--run-dir") + 1])
-    except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
-        return {**report_header(original, run_copy), "verdict": "INVALID",
-                "reason": f"{record.name} has no readable run folder: {type(error).__name__}: {str(error)[:300]}"}
-    report = _accepted(report_header(original, run_copy), original, run_copy, declaration, bind, recorded)
-    report["scope"] = DIAGNOSTIC_SCOPE
+        recorded = Path(recorded_run_dir(json.loads(record.read_text(encoding="utf-8")), record.name))
+    except (Invalid, OSError, ValueError) as error:
+        return {**report, "verdict": "INVALID", "reason": f"{type(error).__name__}: {str(error)[:300]}"}
+    report = _accepted(report, original, run_copy, declaration, bind, recorded)
     if bound:
+        report["launcher_source"] = bound["launcher_source"]
         report["supersedes"] = {"record": bound["path"], "sha256": bound["sha256"], "field": "reading",
                                 "was": bound.get("reading"),
                                 "why": f"comparator version 1 counted {CLASS_FIELDS} process addresses and "
