@@ -226,6 +226,39 @@ class PlanTest(Temp):
         self.assertTrue(h.plan_problems(wrong, DECLARATION, AUTH))
 
 
+class PlanActionTest(Temp):
+    """The plan command: written once, checked, revised only from a committed plan."""
+
+    def run_plan(self, check=False, rerun=None, replace=None, reason=None, committed=()):
+        with unittest.mock.patch.object(h, "PLAN", self.dir / "plan.json"), \
+                unittest.mock.patch.object(h, "RECORDS", self.dir / "records"), \
+                unittest.mock.patch.object(h, "authorization", return_value=AUTH), \
+                unittest.mock.patch.object(h, "committed", return_value=list(committed)):
+            return h.plan_action(check, rerun, replace, reason)
+
+    def test_write_once_check_and_revise(self):
+        self.assertEqual(self.run_plan(), 0)
+        first = (self.dir / "plan.json").read_text(encoding="utf-8")
+        self.assertEqual(self.run_plan(), 1)  # never overwritten
+        self.assertEqual((self.dir / "plan.json").read_text(encoding="utf-8"), first)
+        self.assertEqual(self.run_plan(check=True), 0)
+        self.assertEqual(self.run_plan(replace=12, reason="x", committed=["plan.json is not committed"]), 1)
+        self.assertEqual((self.dir / "plan.json").read_text(encoding="utf-8"), first)
+        self.assertEqual(self.run_plan(replace=12, reason="copy v1 margin below 0.20"), 0)
+        revised = json.loads((self.dir / "plan.json").read_text(encoding="utf-8"))
+        self.assertEqual((revised["revision"], revised["entries"][-1]["seed"]), (1, 15))
+        self.assertEqual(self.run_plan(check=True), 0)
+        revised["entries"][0]["command"].append("--resume")
+        (self.dir / "plan.json").write_text(json.dumps(revised), encoding="utf-8")
+        self.assertEqual(self.run_plan(check=True), 1)
+
+    def test_no_plan_without_authorization(self):
+        with unittest.mock.patch.object(h, "PLAN", self.dir / "plan.json"), \
+                unittest.mock.patch.object(h, "authorization", side_effect=h.Refused("no records")):
+            self.assertEqual(h.plan_action(False, None, None, None), 1)
+        self.assertFalse((self.dir / "plan.json").exists())
+
+
 class RunOrderTest(Temp):
     def plan(self, extra=()):
         plan = h.initial_plan(DECLARATION, AUTH)
