@@ -7,6 +7,7 @@ a validated, complete, successful replay means the current code reproduces the a
 Run from the repo root with the RL interpreter (Steam running, no other game or experiment running):
     .venv-rl/Scripts/python.exe scripts/confirmation_recipe_check.py run [--dry-run]
     .venv-rl/Scripts/python.exe scripts/confirmation_recipe_check.py compare
+    .venv-rl/Scripts/python.exe scripts/confirmation_recipe_check.py compare-diagnostic
 
 run: refuses unless the tracked tree is clean; the declared training code check exits 0; the command passes the
 fresh-set guard with no fresh use; the run folder does not exist; no Celeste process runs in ANY folder and no other
@@ -29,18 +30,36 @@ normalized to its file name and each recorded checkpoint_sha256 verified against
 diagnostics (episodes.jsonl, archive.json) are reported separately: a supplementary difference gives DIAGNOSE, which
 does not unlock new donors either. Records are created exclusively and never overwritten. Exit 0 only for IDENTICAL
 (or a passing dry run).
+
+Comparator version 2 (after the review of the replay and the 8423081 diagnostic): three saved data fields differ
+between any two training processes, so version 1 called two runs of the same code DIFFERENT. policy_class and
+rollout_buffer_class: Stable-Baselines3 saves, beside the serialized class, the text description of each attribute,
+which includes its memory address in that process; only the address in the two recognized forms ("<function NAME at
+0x...>", "<_abc._abc_data object at 0x...>") is replaced, names, structure and the serialized payload are compared
+exactly, and no other field is touched. ep_info_buffer: decoded by a reader that accepts only a deque; capacity, order,
+length and every entry's reward r and length l (values and types) are compared exactly; each entry's wall-clock time t
+must be present, a float, finite and not negative, and only its value is excluded. Any other buffer structure is
+INVALID. Every record names the comparator version, this script's hash and the commit it ran at.
+
+compare-diagnostic: the same comparison between the original and the copy of the 2026-10-01 diagnostic rerun at the
+historical commit 8423081, bound to that diagnostic's live record. It supersedes that record's automatic reading,
+concerns the historical code only and says nothing about the current code (whose replay stays DIFFERENT).
 """
 from __future__ import annotations
 
 import argparse
 import base64
+import binascii
+import collections
 import csv
 import hashlib
 import io
 import json
+import math
 import os
 import pathlib
 import pickle
+import re
 import subprocess
 import sys
 import time
@@ -82,6 +101,15 @@ IGNORED_MEMBERS = ("system_info.txt",)              # OS and library description
 VOLATILE_PROGRESS = ("env_steps_per_second", "game_private_mb", "game_working_set_mb")
 # Fields added to the training config after 8423081; a new run may carry them only at their unchanged defaults.
 COMPATIBILITY_DEFAULTS = {"task_definition": "", "stall_frames": 0}
+COMPARATOR_VERSION = 2
+CLASS_FIELDS = ("policy_class", "rollout_buffer_class")  # descriptive text: process addresses replaced
+# The two descriptive forms that carry a process address; the name before " at " is kept and compared.
+ADDRESS_REPR = re.compile(r"<(function [A-Za-z_][\w.]*|_abc\._abc_data object) at 0x[0-9A-Fa-f]+>")
+EPISODE_FIELD = "ep_info_buffer"                         # decoded; each entry's wall-clock t excluded after checks
+DEQUE_TYPE = "<class 'collections.deque'>"
+HISTORICAL_COMMIT = "842308100d8ee32e135e82d295860dab2acb11d2"  # the original donors' training commit
+DIAGNOSTIC = RECORDS / "diagnostic-20261001-202114.json"
+DIAGNOSTIC_RUN = RECORDS / "diagnostic-20261001-202114-run"
 
 
 class Invalid(Exception):
@@ -187,6 +215,65 @@ def stored_path_parts(field) -> tuple[str, ...] | None:
         return None
 
 
+def without_addresses(field):
+    """A saved class field with the process address removed from each recognized descriptive leaf. The serialized
+    payload, the type, every name and every other text are kept exactly; a field that is not a record is unchanged."""
+    if not isinstance(field, dict):
+        return field
+
+    def leaf(key, value):
+        if key in (":type:", ":serialized:") or not isinstance(value, str):
+            return value
+        match = ADDRESS_REPR.fullmatch(value)
+        return f"<{match.group(1)} at (process address)>" if match else value
+
+    return {key: leaf(key, value) for key, value in field.items()}
+
+
+class _DequeOnly(pickle.Unpickler):
+    """Unpickles a deque of plain values and nothing else."""
+
+    def find_class(self, module, name):
+        if (module, name) == ("collections", "deque"):
+            return collections.deque
+        raise pickle.UnpicklingError(f"refusing {module}.{name}")
+
+
+def episode_buffer(field, capacity, what: str) -> dict:
+    """The saved episode buffer with each entry's wall-clock time checked and then left out. Raises Invalid unless
+    it is a deque of the run's window size whose entries are exactly {r: finite float, l: int >= 0, t: finite float
+    >= 0}."""
+    if not isinstance(field, dict) or set(field) != {":type:", ":serialized:"} or field[":type:"] != DEQUE_TYPE:
+        raise Invalid(f"{what}: {EPISODE_FIELD} is not a saved deque")
+    try:
+        value = _DequeOnly(io.BytesIO(base64.b64decode(field[":serialized:"], validate=True))).load()
+    except (TypeError, ValueError, KeyError, IndexError, AttributeError, OverflowError, binascii.Error,
+            pickle.UnpicklingError, EOFError) as error:
+        raise Invalid(f"{what}: {EPISODE_FIELD} cannot be read: {type(error).__name__}: {str(error)[:200]}") from error
+    if type(value) is not collections.deque or type(capacity) is not int or value.maxlen != capacity:
+        raise Invalid(f"{what}: {EPISODE_FIELD} is not a deque of capacity {capacity!r}")
+    entries = []
+    for index, entry in enumerate(value):
+        if type(entry) is not dict or set(entry) != {"r", "l", "t"}:
+            raise Invalid(f"{what}: {EPISODE_FIELD} entry {index} is not exactly {{r, l, t}}")
+        r, length, t = entry["r"], entry["l"], entry["t"]
+        if type(r) is not float or not math.isfinite(r) or type(length) is not int or length < 0 \
+                or type(t) is not float or not math.isfinite(t) or t < 0:
+            raise Invalid(f"{what}: {EPISODE_FIELD} entry {index} has r {r!r}, l {length!r}, t {t!r}")
+        entries.append({"r": r, "l": length})
+    return {":type:": field[":type:"], "maxlen": value.maxlen, "entries": entries}
+
+
+def comparable_data(data: dict, what: str) -> dict:
+    """A checkpoint's data record as compared: the two class fields without process addresses and the episode
+    buffer decoded without wall-clock times. All three must be present."""
+    missing = [key for key in (*CLASS_FIELDS, EPISODE_FIELD) if key not in data]
+    if missing:
+        raise Invalid(f"{what} checkpoint data lacks {missing}")
+    return {**data, **{key: without_addresses(data[key]) for key in CLASS_FIELDS},
+            EPISODE_FIELD: episode_buffer(data[EPISODE_FIELD], data.get("_stats_window_size"), what)}
+
+
 # ----------------------------------------------------------------------------------------------------- checkpoints
 
 def _load_tensors(raw: bytes, what: str):
@@ -231,8 +318,8 @@ def compare_checkpoint(original: Path, new: Path, run_original: Path | None = No
                             expected = (*pathlib.PurePath(run).parts, "checkpoints", "aborted.zip")
                             if parts != expected:
                                 differences.append(f"data field {key} is {parts}, expected {expected}")
-                kept_a = {k: v for k, v in data_a.items() if k not in skipped}
-                kept_b = {k: v for k, v in data_b.items() if k not in skipped}
+                kept_a = {k: v for k, v in comparable_data(data_a, "original").items() if k not in skipped}
+                kept_b = {k: v for k, v in comparable_data(data_b, "new").items() if k not in skipped}
                 differences += [f"data {d}" for d in structural_differences(kept_a, kept_b)]
             elif name in TENSOR_MEMBERS:
                 differences += [f"{name} {d}" for d in structural_differences(
@@ -389,9 +476,10 @@ def latest_successful_run(records: Path, command: list[str], declaration_sha: st
 
 # ------------------------------------------------------------------------------------------------------- compare
 
-def compare_runs(original: Path, new: Path) -> dict:
-    """The declared and supplementary comparisons between two runs already validated as complete."""
-    run_a, run_b = _relative(original), _relative(new)
+def compare_runs(original: Path, new: Path, new_recorded: Path | None = None) -> dict:
+    """The declared and supplementary comparisons between two runs already validated as complete. new_recorded is
+    the folder the new run's training wrote to, when its files were copied elsewhere afterwards."""
+    run_a, run_b = _relative(original), new_recorded or _relative(new)
     primary: dict[str, list[str]] = {}
     for name in EXPECTED_CHECKPOINTS:
         primary[f"checkpoints/{name}"] = compare_checkpoint(original / "checkpoints" / name,
@@ -418,9 +506,24 @@ def compare_runs(original: Path, new: Path) -> dict:
 
 def acceptance(original: Path, new: Path, declaration: dict, records: Path, game_dir: Path) -> dict:
     """The acceptance record: INVALID, DIFFERENT, DIAGNOSE or IDENTICAL, with everything it rests on."""
-    report: dict = {"original": original.as_posix(), "new": new.as_posix(),
-                    "ignored": {"data": VOLATILE_DATA, "members": IGNORED_MEMBERS, "progress": VOLATILE_PROGRESS,
-                                "evaluations": "checkpoint path reduced to its file name; each hash verified per run"}}
+    return _accepted(report_header(original, new), original, new, declaration,
+                     lambda manifest: latest_successful_run(records, declared_command(declaration, game_dir),
+                                                            fresh_sets.text_sha256(DECLARATION),
+                                                            manifest["sessions"][-1]["provenance"]["commit"]))
+
+
+def report_header(original: Path, new: Path) -> dict:
+    return {"original": original.as_posix(), "new": new.as_posix(),
+            "ignored": {"data": VOLATILE_DATA, "members": IGNORED_MEMBERS, "progress": VOLATILE_PROGRESS,
+                        "evaluations": "checkpoint path reduced to its file name; each hash verified per run",
+                        "class_fields": f"{CLASS_FIELDS}: the process address in '<function NAME at 0x...>' and "
+                                        "'<_abc._abc_data object at 0x...>' leaves only",
+                        "episode_buffer": f"{EPISODE_FIELD}: each entry's wall-clock t value, after checking it"}}
+
+
+def _accepted(report: dict, original: Path, new: Path, declaration: dict, bind, new_recorded: Path | None = None) -> dict:
+    """Validate both runs, bind the new one to its live record (bind(new manifest) returns the record or raises
+    Invalid), compare, and give the verdict. Any malformed or unreadable evidence gives INVALID."""
     try:
         manifest_a = validate_run(original, "original")
         pin = declaration["donors"]["existing"]["7"]["sha256"]
@@ -430,10 +533,8 @@ def acceptance(original: Path, new: Path, declaration: dict, records: Path, game
         problems = config_problems(manifest_a["config"], manifest_b["config"])
         if problems:
             raise Invalid(f"the new run's config differs from the original: {problems}")
-        commit = manifest_b["sessions"][-1]["provenance"]["commit"]
-        report["run_record"] = latest_successful_run(
-            records, declared_command(declaration, game_dir), fresh_sets.text_sha256(DECLARATION), commit)
-        report.update(compare_runs(original, new))
+        report["run_record"] = bind(manifest_b)
+        report.update(compare_runs(original, new, new_recorded))
     except (Invalid, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, EOFError,
             pickle.UnpicklingError, RuntimeError, zipfile.BadZipFile) as error:
         # Malformed or unreadable evidence of any expected kind: recorded as INVALID, never a crash or a pass.
@@ -441,6 +542,37 @@ def acceptance(original: Path, new: Path, declaration: dict, records: Path, game
         return report
     report["verdict"] = ("DIFFERENT" if report["primary"] else "DIAGNOSE" if report["supplementary"] else "IDENTICAL")
     return report
+
+
+def diagnostic_binding(path: Path, declaration: dict, game_dir: Path, manifest: dict) -> dict:
+    """The diagnostic's live record, checked: exit 0, no problems, alone with no thread variables, run at the
+    historical commit (record and every manifest session), with the declared seed 7 command in its own run folder."""
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(record, dict) or not isinstance(record.get("command"), list):
+        raise Invalid(f"{path.name} is not a diagnostic record with a command")
+    checks = {"exit_code": 0, "problems": [], "game_processes": [], "other_experiments": [],
+              "thread_variables_removed": {}, "worktree_commit": HISTORICAL_COMMIT}
+    wrong = {key: record.get(key) for key, expected in checks.items() if record.get(key) != expected}
+    if wrong or record.get("timed_out"):
+        raise Invalid(f"{path.name} is not a successful historical diagnostic: {wrong or 'timed out'}")
+    commits = {session["provenance"].get("commit") for session in manifest["sessions"]}
+    if commits != {HISTORICAL_COMMIT}:
+        raise Invalid(f"the diagnostic run's sessions ran at {sorted(map(str, commits))}, not {HISTORICAL_COMMIT}")
+    command = record["command"]
+    run_dir = command[command.index("--run-dir") + 1]
+    expected = declared_command(declaration, game_dir)
+    expected[expected.index("--run-dir") + 1] = run_dir
+    if command != expected:
+        raise Invalid(f"{path.name} command is not the declared seed 7 command: {command}")
+    kept = ("purpose", "started", "worktree_commit", "init_clone_sha256", "command", "threads", "exit_code", "seconds",
+            "run_copy", "verdict", "reading")
+    return {"path": _relative(path).as_posix(), "sha256": _sha256(path), "run_dir": run_dir,
+            **{key: record.get(key) for key in kept}}
+
+
+def comparator_identity() -> dict:
+    """What produced a comparison record: the comparator version, this script's hash and the commit it ran at."""
+    return {"version": COMPARATOR_VERSION, "script_sha256": _sha256(Path(__file__)), "git": runtime.git_state()}
 
 
 def _relative(run: Path) -> Path:
@@ -575,17 +707,71 @@ def cleanup_own_game(game_dir: Path) -> dict:
 NEXT_IF_DIFFERENT = ("DIFFERENT: stop. Declared next step (donors.recipe_check.different): rerun the same command at "
                      "8423081 in a separate worktree under the same conditions, to tell 'the code changed behaviour' "
                      "from 'the conditions changed'; then stop for review and an owner choice before any new donor. "
-                     "That rerun needs its own authorization; this tool does not start it.")
+                     "That rerun needs its own authorization; this tool does not start it. (Done on 2026-10-01: see "
+                     "compare-diagnostic and the declaration's amendments.)")
+DIAGNOSTIC_SCOPE = ("Concerns the historical code 8423081 only. It says nothing about the current code, whose replay "
+                    "stays DIFFERENT, and does not by itself authorize any donor: that needs the owner's recorded "
+                    "choice in a reviewed, pushed declaration amendment.")
 
 
 def compare(game_dir: Path) -> int:
+    refusal = runtime.refusal(runtime.git_state(), allow_dirty=False)
+    if refusal:
+        print(f"Refused: a comparison record must name a committed comparator.\n{refusal}")
+        return 1
     declaration = json.loads(DECLARATION.read_text(encoding="utf-8"))
-    report = acceptance(REPO / ORIGINAL, REPO / CHECK_RUN, declaration, RECORDS, game_dir)
+    report = {"comparator": comparator_identity(),
+              **acceptance(REPO / ORIGINAL, REPO / CHECK_RUN, declaration, RECORDS, game_dir)}
     path = _write(report, "compare")
     messages = {"IDENTICAL": "IDENTICAL: the current code reproduces the arm B recipe for seed 7 under these conditions",
                 "DIAGNOSE": "DIAGNOSE: the declared comparisons match but a supplementary one differs; stop and review",
                 "INVALID": f"INVALID: {report.get('reason')}", "DIFFERENT": NEXT_IF_DIFFERENT}
     print(messages[report["verdict"]])
+    print(f"Record: {path}")
+    return 0 if report["verdict"] == "IDENTICAL" else 1
+
+
+def diagnostic_acceptance(original: Path, run_copy: Path, record: Path, declaration: dict, game_dir: Path) -> dict:
+    """The comparison of the original with the historical diagnostic's run copy, bound to its live record."""
+    bound: dict = {}
+
+    def bind(manifest):
+        bound.update(diagnostic_binding(record, declaration, game_dir, manifest))
+        return bound
+
+    # The binding is read first so the abort path can be checked against the folder training actually wrote to.
+    try:
+        command = json.loads(record.read_text(encoding="utf-8"))["command"]
+        recorded = Path(command[command.index("--run-dir") + 1])
+    except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+        return {**report_header(original, run_copy), "verdict": "INVALID",
+                "reason": f"{record.name} has no readable run folder: {type(error).__name__}: {str(error)[:300]}"}
+    report = _accepted(report_header(original, run_copy), original, run_copy, declaration, bind, recorded)
+    report["scope"] = DIAGNOSTIC_SCOPE
+    if bound:
+        report["supersedes"] = {"record": bound["path"], "sha256": bound["sha256"], "field": "reading",
+                                "was": bound.get("reading"),
+                                "why": f"comparator version 1 counted {CLASS_FIELDS} process addresses and "
+                                       f"{EPISODE_FIELD} wall-clock times, which differ between any two processes"}
+    return report
+
+
+def compare_diagnostic(game_dir: Path) -> int:
+    refusal = runtime.refusal(runtime.git_state(), allow_dirty=False)
+    if refusal:
+        print(f"Refused: a comparison record must name a committed comparator.\n{refusal}")
+        return 1
+    declaration = json.loads(DECLARATION.read_text(encoding="utf-8"))
+    report = {"comparator": comparator_identity(),
+              **diagnostic_acceptance(REPO / ORIGINAL, DIAGNOSTIC_RUN, DIAGNOSTIC, declaration, game_dir)}
+    path = _write(report, "compare-diagnostic")
+    messages = {"IDENTICAL": "IDENTICAL: the historical code 8423081 reproduces the original seed 7 run under the "
+                             "diagnostic's recorded conditions.",
+                "DIAGNOSE": "DIAGNOSE: the declared comparisons match but a supplementary one differs; stop and review.",
+                "INVALID": f"INVALID: {report.get('reason')}",
+                "DIFFERENT": "DIFFERENT: the historical code does not reproduce the original; stop and review."}
+    print(messages[report["verdict"]])
+    print(DIAGNOSTIC_SCOPE)
     print(f"Record: {path}")
     return 0 if report["verdict"] == "IDENTICAL" else 1
 
@@ -599,8 +785,12 @@ def main() -> int:
     run_parser.add_argument("--dry-run", action="store_true")
     compare_parser = sub.add_parser("compare")
     compare_parser.add_argument("--game-dir", type=Path, default=game, help="the folder the run used (its command)")
+    diagnostic_parser = sub.add_parser("compare-diagnostic")
+    diagnostic_parser.add_argument("--game-dir", type=Path, default=game, help="the folder the diagnostic used")
     args = parser.parse_args()
-    return run(args.game_dir, args.dry_run) if args.action == "run" else compare(args.game_dir)
+    actions = {"run": lambda: run(args.game_dir, args.dry_run), "compare": lambda: compare(args.game_dir),
+               "compare-diagnostic": lambda: compare_diagnostic(args.game_dir)}
+    return actions[args.action]()
 
 
 if __name__ == "__main__":

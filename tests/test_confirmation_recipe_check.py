@@ -1,12 +1,14 @@
 """The confirmation's recipe check (scripts/confirmation_recipe_check.py): what counts as identical, invalid or
 different, and what a launch records. Nothing here starts the game or training."""
 import base64
+import collections
 import io
 import json
 import pathlib
 import pickle
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import unittest.mock
@@ -34,10 +36,29 @@ def stored_path(*parts) -> dict:
             ":serialized:": base64.b64encode(pickle.dumps(pathlib.WindowsPath(*parts))).decode()}
 
 
+def class_field(name="CelestePolicy", address="0x00000169117C8FE0", payload="gAWVMAAAAAAAAACMGmNlbGVzdGVfcmw=") -> dict:
+    """A class field as Stable-Baselines3 saves it: the serialized class plus a text description of its attributes."""
+    return {":type:": "<class 'abc.ABCMeta'>", ":serialized:": payload, "__module__": "celeste_rl.training.policy",
+            "__init__": f"<function {name}.__init__ at {address}>",
+            "_abc_impl": f"<_abc._abc_data object at {address}>", "__abstractmethods__": "frozenset()"}
+
+
+EPISODES = ((-1.48082, 50, 97.489718), (-0.337355, 136, 97.783), (0.25, 120, 101.0))
+
+
+def episodes(entries=EPISODES, maxlen=100, raw=None) -> dict:
+    """An episode buffer as Stable-Baselines3 saves it: a pickled deque of {r, l, t} records."""
+    buffer = collections.deque(({"r": r, "l": l, "t": t} for r, l, t in entries), maxlen=maxlen)
+    return {":type:": "<class 'collections.deque'>",
+            ":serialized:": base64.b64encode(raw if raw is not None else pickle.dumps(buffer)).decode()}
+
+
 def checkpoint(path: Path, start_time=1, weight=1.0, lr=0.0003, system="Windows", run="runs/train/a",
                optimizer=None, variables=None, data_extra=None, drop=()):
     data = {"start_time": start_time, "num_timesteps": 51200, "learning_rate": lr, "target_kl": None,
-            "abort_checkpoint_path": stored_path(run, "checkpoints", "aborted.zip"), **(data_extra or {})}
+            "abort_checkpoint_path": stored_path(run, "checkpoints", "aborted.zip"), "_stats_window_size": 100,
+            "policy_class": class_field(), "rollout_buffer_class": class_field("DictRolloutBuffer"),
+            "ep_info_buffer": episodes(), **(data_extra or {})}
     members = {
         "data": json.dumps(data).encode(),
         "policy.pth": tensor_bytes({"layer.weight": torch.full((2, 2), weight)}),
@@ -133,6 +154,198 @@ class StructureTest(Temp):
     def test_restricted_path_reader(self):
         self.assertIsNone(rc.stored_path_parts({":serialized:": base64.b64encode(pickle.dumps(len)).decode()}))
         self.assertEqual(rc.stored_path_parts(stored_path("runs", "x")), ("runs", "x"))
+
+
+# Builds a checkpoint's data record the way Stable-Baselines3 does, in its own process: the class descriptions carry
+# that process's memory addresses and the episode times are the argument (wall clock in real training).
+SAVE_IN_PROCESS = r"""
+import collections, sys
+from stable_baselines3.common.buffers import DictRolloutBuffer
+from stable_baselines3.common.policies import ActorCriticPolicy
+from stable_baselines3.common.save_util import data_to_json
+from celeste_rl.training.policy import CelestePolicy
+start = float(sys.argv[1])
+policy = CelestePolicy if sys.argv[2] == "celeste" else ActorCriticPolicy
+buffer = collections.deque(({"r": round(-1.5 + i / 8, 6), "l": 50 + i, "t": round(start + i * 0.37, 6)}
+                            for i in range(100)), maxlen=100)
+print(data_to_json({"policy_class": policy, "rollout_buffer_class": DictRolloutBuffer, "ep_info_buffer": buffer,
+                    "_stats_window_size": 100, "start_time": 1}))
+"""
+
+
+class CrossProcessTest(unittest.TestCase):
+    """Review of the replay and diagnostic: version 1 was only tested inside one process, so it missed the fields
+    that differ between any two processes. These records come from separate processes, as real checkpoints do."""
+
+    @classmethod
+    def setUpClass(cls):
+        runs = {name: subprocess.Popen([sys.executable, "-c", SAVE_IN_PROCESS, start, policy], cwd=REPO,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                for name, start, policy in (("a", "97.5", "celeste"), ("b", "12.25", "celeste"),
+                                            ("other", "97.5", "base"))}
+        cls.data = {}
+        for name, process in runs.items():
+            out, err = process.communicate(timeout=300)
+            if process.returncode != 0:
+                raise RuntimeError(err)
+            cls.data[name] = json.loads(out)
+
+    def test_same_code_in_two_processes_is_identical_after_correction(self):
+        a, b = self.data["a"], self.data["b"]
+        self.assertTrue(rc.structural_differences(a, b))  # version 1's view: the times (at least) differ
+        self.assertEqual(rc.structural_differences(rc.comparable_data(a, "a"), rc.comparable_data(b, "b")), [])
+
+    def test_a_different_policy_class_still_differs(self):
+        differences = rc.structural_differences(rc.comparable_data(self.data["a"], "a"),
+                                                rc.comparable_data(self.data["other"], "other"))
+        self.assertTrue([d for d in differences if "policy_class" in d and ":serialized:" in d])
+
+
+class CorrectionTest(Temp):
+    """Negative controls: only the address in the two recognized descriptions and the episode times may differ."""
+
+    runs = (Path("runs/train/x"), Path("runs/train/y"))
+
+    def differences(self, a_extra, b_extra):
+        a = checkpoint(self.dir / "a.zip", run=self.runs[0], data_extra=a_extra)
+        b = checkpoint(self.dir / "b.zip", run=self.runs[1], data_extra=b_extra)
+        return rc.compare_checkpoint(a, b, *self.runs)
+
+    def test_addresses_and_times_alone_may_differ(self):
+        moved = {"policy_class": class_field(address="0x000001F25C8F2840"),
+                 "rollout_buffer_class": class_field("DictRolloutBuffer", address="0x1"),
+                 "ep_info_buffer": episodes([(r, l, t + 5000.5) for r, l, t in EPISODES])}
+        self.assertEqual(self.differences({}, moved), [])
+
+    def test_class_identity_and_other_text_still_count(self):
+        for name, changed in (
+                ("serialized payload", {"policy_class": class_field(payload="gAWVOgAAAAAAAACMIHN0YWJs")}),
+                ("function name", {"policy_class": class_field("OtherPolicy")}),
+                ("type", {"policy_class": {**class_field(), ":type:": "<class 'type'>"}}),
+                ("extra attribute", {"policy_class": {**class_field(), "reset": "<function X.reset at 0x1>"}}),
+                ("unrecognized address text", {"policy_class": {**class_field(), "__abstractmethods__":
+                                                                "<property object at 0x2>"}}),
+                ("address outside the class fields", {"policy_kwargs": "<function f at 0x2>"})):
+            with self.subTest(name=name):
+                original = {"policy_kwargs": "<function f at 0x1>"} if "outside" in name else {}
+                if "unrecognized" in name:
+                    original = {"policy_class": {**class_field(), "__abstractmethods__": "<property object at 0x1>"}}
+                self.assertTrue(self.differences(original, changed))
+
+    def test_rewards_lengths_order_count_and_capacity_still_count(self):
+        swapped = [EPISODES[1], EPISODES[0], EPISODES[2]]
+        for name, entries, extra in (
+                ("reward", [(-1.48081, 50, 97.489718), *EPISODES[1:]], {}),
+                ("length", [(-1.48082, 51, 97.489718), *EPISODES[1:]], {}),
+                ("order", swapped, {}), ("one fewer", EPISODES[1:], {}),
+                ("capacity with its window", EPISODES, {"_stats_window_size": 50})):
+            with self.subTest(name=name):
+                maxlen = extra.get("_stats_window_size", 100)
+                self.assertTrue(self.differences({}, {"ep_info_buffer": episodes(entries, maxlen=maxlen), **extra}))
+
+    def test_malformed_buffers_are_invalid(self):
+        good = pickle.dumps(collections.deque([{"r": 1.0, "l": 5, "t": 1.0}], maxlen=100))
+        for name, field in (
+                ("capacity not the window", episodes(maxlen=50)),
+                ("wrong type text", {**episodes(), ":type:": "<class 'list'>"}),
+                ("extra key", {**episodes(), "x": 1}),
+                ("not base64", {**episodes(), ":serialized:": "not base64!"}),
+                ("truncated", episodes(raw=good[:-5])),
+                ("refused global", episodes(raw=pickle.dumps(len))),
+                ("list not deque", episodes(raw=pickle.dumps([{"r": 1.0, "l": 5, "t": 1.0}]))),
+                ("entry not a record", episodes(raw=pickle.dumps(collections.deque([[1.0, 5, 1.0]], maxlen=100)))),
+                ("missing t", episodes(raw=pickle.dumps(collections.deque([{"r": 1.0, "l": 5}], maxlen=100)))),
+                ("extra entry key", episodes(raw=pickle.dumps(collections.deque([{"r": 1.0, "l": 5, "t": 1.0,
+                                                                                  "x": 0}], maxlen=100)))),
+                ("t not finite", episodes([(1.0, 5, float("nan"))])), ("t negative", episodes([(1.0, 5, -1.0)])),
+                ("t text", episodes([(1.0, 5, "1.0")])), ("t int", episodes([(1.0, 5, 1)])),
+                ("r int", episodes([(1, 5, 1.0)])), ("r not finite", episodes([(float("inf"), 5, 1.0)])),
+                ("l float", episodes([(1.0, 5.0, 1.0)])), ("l bool", episodes([(1.0, True, 1.0)])),
+                ("l negative", episodes([(1.0, -1, 1.0)]))):
+            with self.subTest(name=name):
+                with self.assertRaises(rc.Invalid):
+                    self.differences({}, {"ep_info_buffer": field})
+
+    def test_missing_corrected_field_is_invalid(self):
+        for key in ("policy_class", "rollout_buffer_class", "ep_info_buffer"):
+            with self.subTest(key=key):
+                a = checkpoint(self.dir / "a.zip")
+                with zipfile.ZipFile(a) as archive:
+                    members = {n: archive.read(n) for n in archive.namelist()}
+                data = json.loads(members["data"])
+                del data[key]
+                members["data"] = json.dumps(data).encode()
+                b = self.dir / f"b-{key}.zip"
+                with zipfile.ZipFile(b, "w") as archive:
+                    for name, raw in members.items():
+                        archive.writestr(name, raw)
+                with self.assertRaises(rc.Invalid):
+                    rc.compare_checkpoint(a, b)
+
+    def test_tensor_changes_still_count(self):
+        self.assertTrue(rc.compare_checkpoint(checkpoint(self.dir / "a.zip", run=self.runs[0]),
+                                              checkpoint(self.dir / "b.zip", run=self.runs[1], weight=1.5),
+                                              *self.runs))
+
+
+class DiagnosticBindingTest(Temp):
+    """compare-diagnostic accepts only the successful, alone, historical seed 7 diagnostic."""
+
+    def record(self, **changes):
+        command = rc.declared_command(DECLARATION, GAME)
+        command[command.index("--run-dir") + 1] = "runs/train/diag-B-seed7"
+        record = {"exit_code": 0, "problems": [], "game_processes": [], "other_experiments": [],
+                  "thread_variables_removed": {}, "worktree_commit": rc.HISTORICAL_COMMIT, "command": command,
+                  "reading": "the conditions changed (the original code also differs)", **changes}
+        path = self.dir / f"diagnostic-{len(list(self.dir.glob('diagnostic*.json')))}.json"
+        path.write_text(json.dumps(record), encoding="utf-8")
+        return path
+
+    def manifest(self, commit=rc.HISTORICAL_COMMIT):
+        return {"sessions": [{"provenance": {"commit": commit}}]}
+
+    def test_good_record_binds(self):
+        path = self.record()
+        bound = rc.diagnostic_binding(path, DECLARATION, GAME, self.manifest())
+        self.assertEqual(bound["run_dir"], "runs/train/diag-B-seed7")
+        self.assertEqual(bound["sha256"], rc._sha256(path))
+
+    def test_anything_else_is_invalid(self):
+        seed8 = rc.declared_command(DECLARATION, GAME)
+        seed8[seed8.index("--seed") + 1] = "8"
+        for name, path, manifest in (
+                ("failed", self.record(exit_code=1), self.manifest()),
+                ("problems", self.record(problems=["x"]), self.manifest()),
+                ("not alone", self.record(other_experiments=["python scripts/run_campaign.py"]), self.manifest()),
+                ("thread variables", self.record(thread_variables_removed={"OMP_NUM_THREADS": "4"}), self.manifest()),
+                ("current commit", self.record(worktree_commit="2bd1fc2"), self.manifest()),
+                ("timed out", self.record(timed_out=True), self.manifest()),
+                ("other seed", self.record(command=seed8), self.manifest()),
+                ("session at another commit", self.record(), self.manifest("2bd1fc2"))):
+            with self.subTest(name=name):
+                with self.assertRaises(rc.Invalid):
+                    rc.diagnostic_binding(path, DECLARATION, GAME, manifest)
+
+
+class RealEvidenceTest(unittest.TestCase):
+    """The existing artifacts under the corrected comparator (skipped where they are not present)."""
+
+    def test_historical_diagnostic_is_identical_and_supersedes_its_reading(self):
+        if not rc.DIAGNOSTIC_RUN.exists() or not (REPO / rc.ORIGINAL).exists():
+            self.skipTest("diagnostic run copy or original not present")
+        report = rc.diagnostic_acceptance(REPO / rc.ORIGINAL, rc.DIAGNOSTIC_RUN, rc.DIAGNOSTIC, DECLARATION,
+                                          Path("C:/Projects/celeste-research-scratch/game-probe"))
+        self.assertEqual(report["verdict"], "IDENTICAL", report.get("reason") or report.get("primary"))
+        self.assertEqual(report["supersedes"]["was"], "the conditions changed (the original code also differs)")
+        self.assertIn("historical code 8423081 only", report["scope"])
+
+    def test_current_replay_still_differs_in_behaviour_not_in_addresses(self):
+        if not (REPO / rc.CHECK_RUN).exists() or not (REPO / rc.ORIGINAL).exists():
+            self.skipTest("replay or original not present")
+        report = rc.compare_runs(REPO / rc.ORIGINAL, REPO / rc.CHECK_RUN)
+        found = [d for v in report["primary"].values() for d in v]
+        self.assertTrue([d for d in found if d.startswith("policy.pth")])
+        self.assertFalse([d for d in found if "policy_class" in d or "rollout_buffer_class" in d or "'t'" in d])
 
 
 class RecordsTest(Temp):
@@ -256,7 +469,9 @@ class LaunchTest(Temp):
 
     def patch_launch(self, check_code=0, check_text="PASS", games=(), others=()):
         check = subprocess.CompletedProcess([], check_code, stdout=check_text, stderr="")
+        # A run folder of the test's own: the real replay folder exists since the live check.
         return [unittest.mock.patch.object(rc, "RECORDS", self.dir),
+                unittest.mock.patch.object(rc, "CHECK_RUN", self.dir / "replay"),
                 unittest.mock.patch.object(rc.runtime, "refusal", return_value=None),
                 unittest.mock.patch.object(rc, "all_game_processes", return_value=list(games)),
                 unittest.mock.patch.object(rc, "other_experiments", return_value=list(others)),
@@ -278,6 +493,11 @@ class LaunchTest(Temp):
     def test_code_check_needs_exit_status_zero(self):
         self.assertEqual(self.run_with(self.patch_launch(check_code=1, check_text="PASS")), 1)
         self.assertTrue(any("exited 1" in p for p in self.record("dry-run")["problems"]))
+
+    def test_existing_run_folder_refuses(self):
+        (self.dir / "replay").mkdir()
+        self.assertEqual(self.run_with(self.patch_launch()), 1)
+        self.assertTrue(any("already exists" in p for p in self.record("dry-run")["problems"]))
 
     def test_other_games_or_experiments_refuse(self):
         self.assertEqual(self.run_with(self.patch_launch(games=["123 C:/other/Celeste.exe"])), 1)
