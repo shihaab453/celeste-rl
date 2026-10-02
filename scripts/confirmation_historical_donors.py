@@ -450,6 +450,9 @@ def prepare_action() -> int:
         if not (WORKTREE / INIT_CLONE).exists():
             shutil.copytree(REPO / INIT_CLONE, WORKTREE / INIT_CLONE)
             record["copied_init_clone"] = True
+        guard = fresh_sets.paths_problems([str(WORKTREE / INIT_CLONE)])  # the copy, before it is hashed
+        if guard:
+            raise Refused("; ".join(guard))
         problems, hashes = init_clone_problems()
         record["init_clone_files"] = hashes
         problems += source_problems()[0]
@@ -558,12 +561,15 @@ def launch_problems(plan: dict, item: dict, declaration: dict) -> tuple[list[str
         problems += plan_problems(plan, declaration, authorization())
     except Refused as error:
         problems.append(f"authorization: {error}")
+    # The fresh-set guard comes before anything reads the command's inputs (the init clone is hashed only after it).
+    guard = guard_problems(item["command"], WORKTREE)
+    problems += guard
+    conditions["fresh_set_check"] = "no allowed use; command as given and as resolved in the worktree; init clone"
     source, conditions["source_check"] = source_problems()
     problems += source
-    clone, conditions["init_clone_files"] = init_clone_problems()
-    problems += clone
-    problems += guard_problems(item["command"], WORKTREE)
-    conditions["fresh_set_check"] = "no allowed use; command as given and as resolved in the worktree; init clone"
+    if not guard:
+        clone, conditions["init_clone_files"] = init_clone_problems()
+        problems += clone
     for root in (WORKTREE, REPO):
         if (root / item["run_dir"]).exists():
             problems.append(f"{root / item['run_dir']} already exists")

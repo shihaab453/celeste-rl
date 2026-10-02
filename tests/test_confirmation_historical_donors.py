@@ -469,6 +469,14 @@ class LaunchTest(Temp):
             for p in reversed(patches):
                 p.stop()
 
+    def test_guard_refusal_reads_no_input(self):
+        """Nothing hashes the command's inputs once the fresh-set guard has refused."""
+        clone_check = unittest.mock.MagicMock(return_value=([], {}))
+        patches = self.patches(guard_problems=["fresh-set guard: x"])
+        patches.append(unittest.mock.patch.object(h, "init_clone_problems", clone_check))
+        self.assertEqual(self.launch(patches), "refused")
+        clone_check.assert_not_called()
+
     def test_all_clear_dry_run(self):
         self.assertEqual(self.launch(self.patches()), "dry-run")
         self.assertEqual(len(list((self.dir / "records").glob("dry-run-*.json"))), 1)
