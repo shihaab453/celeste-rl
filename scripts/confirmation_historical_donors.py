@@ -221,9 +221,10 @@ def _comparator_records(records: Path, pattern: re.Pattern) -> list[tuple[Path, 
     return found
 
 
-def authorization(records: Path = rc.RECORDS) -> dict:
+def authorization(records: Path | None = None) -> dict:
     """The two comparator version 2 records that permit historical donors; Refused unless every such record agrees:
     the current replay DIFFERENT (bound to the live replay) and the diagnostic IDENTICAL (bound to its record)."""
+    records = records or rc.RECORDS
     replay = _comparator_records(records, COMPARE_NAME)
     diagnostic = _comparator_records(records, DIAGNOSTIC_COMPARE_NAME)
     if not replay or not diagnostic:
@@ -346,6 +347,8 @@ def revised_plan(plan: dict, declaration: dict, records: Path, rerun: int | None
         if not attempts:
             raise Refused(f"seed {rerun} is not in the plan")
         last = attempts[-1]
+        if any(statuses.get((rerun, item["attempt"])) == "ok" for item in attempts):
+            raise Refused(f"seed {rerun} already has an ok attempt; no further attempt")
         if statuses.get((rerun, last["attempt"])) != "failed":
             raise Refused(f"seed {rerun} attempt {last['attempt']} has no failed record; a rerun follows a failure")
         if last["attempt"] > MAX_RERUNS:
@@ -579,9 +582,10 @@ def write_record(record: dict, stem: str, extra: dict[str, str] | None = None, d
 
 def attempt_statuses(records: Path) -> dict[tuple[int, int], str]:
     """'ok' or 'failed' per (seed, attempt) from the attempt records: a final record says which; a started marker
-    without its final record is an interrupted, failed attempt. Refusals and dry runs are not attempts. An unreadable
-    attempt file cannot be attributed, so it stops everything for review."""
-    outcomes: dict[tuple[int, int], set] = {}
+    without its final record is an interrupted, failed attempt. Refusals and dry runs are not attempts. An attempt
+    launches at most once, so a second record for the same seed and attempt (whatever its outcome) is a conflict that
+    stops everything for review, as does an unreadable attempt file: neither may become permission for another run."""
+    outcomes: dict[tuple[int, int], list] = {}
     for path in sorted(records.glob("attempt-*.json")):
         marker = path.name.endswith(STARTED)
         if marker and path.with_name(path.name[:-len(STARTED)] + ".json").exists():
@@ -593,8 +597,11 @@ def attempt_statuses(records: Path) -> dict[tuple[int, int], str]:
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise Refused(f"attempt file {path.name} cannot be read ({type(error).__name__}); stop for review")
         outcome = "failed" if marker else ("ok" if record.get("outcome") == "ok" else "failed")
-        outcomes.setdefault(key, set()).add(outcome)
-    return {key: "failed" if "failed" in found else "ok" for key, found in outcomes.items()}
+        outcomes.setdefault(key, []).append((path.name, outcome))
+    conflicts = {key: found for key, found in outcomes.items() if len(found) > 1}
+    if conflicts:
+        raise Refused(f"conflicting attempt records {conflicts}; an attempt launches once: stop for review")
+    return {key: found[0][1] for key, found in outcomes.items()}
 
 
 def entry_status(records: Path, item: dict) -> str | None:
@@ -654,24 +661,27 @@ def steam_running() -> bool:
 
 
 def launch_problems(plan: dict, item: dict, declaration: dict, preflight: bool = False) -> tuple[list[str], dict]:
-    """Why this attempt must not start, and the recorded conditions. The fresh-set checks come first; if they refuse,
-    nothing else is read or started."""
+    """Why this attempt must not start, and the recorded conditions, in stages that each return at once on a problem:
+    (1) the fresh-set checks of the inputs; (2) the records (authorization and attempt history, each record
+    identity-checked before it is read) and the plan; (3) the repository state; only then (4) the source check, which
+    imports the old trainer, the init clone hashes, the folders and the running processes."""
     conditions: dict = {"fresh_set_check": "identity of the original manifest and the game files the old trainer reads; "
                                            "full guard on the command as given and as resolved, and the init clone"}
     guard = identity_problems([REPO / rc.ORIGINAL / "manifest.json", *(GAME / name for name in GAME_FILES_READ)])
     guard += guard_problems(item["command"], WORKTREE)
     if guard:
         return guard, conditions
-    problems = []
-    refusal = runtime.refusal(runtime.git_state(), allow_dirty=False)
-    if refusal:
-        problems.append(refusal)
-    problems += committed(PLAN) + amendment_problems(declaration)
     try:
-        problems += plan_problems(plan, declaration, authorization())
+        problems = plan_problems(plan, declaration, authorization()) + amendment_problems(declaration)
         problems += eligibility_problems(plan, item, RECORDS, preflight)
-    except Refused as error:
-        problems.append(str(error))
+    except Refused as error:  # a record refused (fresh-set identity, conflict, unreadable): stop here
+        return [str(error)], conditions
+    if problems:
+        return problems, conditions
+    refusal = runtime.refusal(runtime.git_state(), allow_dirty=False)
+    problems = ([refusal] if refusal else []) + committed(PLAN)
+    if problems:
+        return problems, conditions
     source, conditions["source_check"] = source_problems()
     problems += source
     clone, conditions["init_clone_files"] = init_clone_problems()
@@ -801,16 +811,18 @@ def run_entry(plan: dict, item: dict, declaration: dict, dry_run: bool) -> str:
     """One attempt (or its preflight) with its record: 'ok', 'failed', 'refused' or 'dry-run'."""
     command = [str(REPO / INTERPRETER), *item["command"]]
     problems, conditions = launch_problems(plan, item, declaration, preflight=dry_run)
+    if problems:  # recorded from what is already known: no Git query, no further plan or declaration read
+        refused = {"entry": item, "command": command, "plan": {"path": _relative(PLAN), "revision": plan.get("revision")},
+                   "conditions": conditions, "launch_problems": problems, "dry_run": dry_run}
+        print("Refused:\n  " + "\n  ".join(problems))
+        print(f"Record: {write_record(refused, 'refused')}")
+        return "refused"
     record = {"executor": executor_identity(), "source": {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE},
               "plan": {"path": _relative(PLAN), "text_sha256": fresh_sets.text_sha256(PLAN),
                        "revision": plan.get("revision")},
               "entry": item, "worktree": WORKTREE.as_posix(), "cwd": WORKTREE.as_posix(), "command": command,
               "declaration_text_sha256": fresh_sets.text_sha256(DECLARATION), "limit_minutes": LIMIT_MINUTES,
               "conditions": conditions, "launch_problems": problems, "dry_run": dry_run}
-    if problems:
-        print("Refused:\n  " + "\n  ".join(problems))
-        print(f"Record: {write_record(record, 'refused')}")
-        return "refused"
     env = {**rc.stripped_env(dict(os.environ)), **NO_BYTECODE}
     record.update(thread_variables_removed=rc.thread_variables(dict(os.environ)), threads=rc.thread_probe(env),
                   environment_set=NO_BYTECODE)

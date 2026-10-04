@@ -359,15 +359,59 @@ class RunOrderTest(Temp):
         attempt_record(self.dir / "finished", 9, 1, "ok", "20261004-010000")
         write(self.dir / "finished", "attempt-20261004-010000.started.json", {"entry": {"seed": 9, "attempt": 1}})
         self.assertEqual(h.entry_status(self.dir / "finished", {"seed": 9, "attempt": 1}), "ok")
-        other = self.dir / "other"
-        attempt_record(other, 9, 1, "ok", "20261004-010000")
-        attempt_record(other, 9, 1, "maybe", "20261004-020000")
-        self.assertEqual(h.entry_status(other, {"seed": 9, "attempt": 1}), "failed")
         broken = self.dir / "broken"
         broken.mkdir()
         (broken / "attempt-20261004-010000.json").write_text("{", encoding="utf-8")
         with self.assertRaises(h.Refused):
             h.entry_status(broken, {"seed": 9, "attempt": 1})
+
+    def test_conflicting_records_stop_everything(self):
+        """Review round 2, repair 1: an ok record and a failed record for one attempt never permit another run."""
+        for name, records in (("ok and failed", [(9, 1, "ok", "010000"), (9, 1, "failed", "020000")]),
+                              ("two ok", [(9, 1, "ok", "010000"), (9, 1, "ok", "020000")])):
+            with self.subTest(case=name):
+                folder = self.dir / name.replace(" ", "-")
+                for seed, attempt, outcome, stamp in records:
+                    attempt_record(folder, seed, attempt, outcome, f"20261004-{stamp}")
+                with self.assertRaises(h.Refused):
+                    h.attempt_statuses(folder)
+        orphan = self.dir / "orphan-plus-final"  # a marker of one launch and the final record of another
+        write(orphan, "attempt-20261004-010000.started.json", {"entry": {"seed": 9, "attempt": 1}})
+        attempt_record(orphan, 9, 1, "ok", "20261004-020000")
+        with self.assertRaises(h.Refused):
+            h.attempt_statuses(orphan)
+
+    def test_conflicts_and_earlier_successes_block_the_revision_and_launch_gates(self):
+        conflict = self.dir / "conflict"
+        attempt_record(conflict, 9, 1, "ok", "20261004-010000")
+        attempt_record(conflict, 9, 1, "failed", "20261004-020000")
+        for seed in range(10, 15):
+            attempt_record(conflict, seed, 1, "ok", f"20261004-0{seed - 7}0000")
+        rerun = self.RERUN_9()
+        plan = self.plan([rerun])
+        with unittest.mock.patch.object(h, "PLAN", self.dir / "plan.json"):
+            (self.dir / "plan.json").write_text(json.dumps(self.plan()), encoding="utf-8")
+            with self.assertRaises(h.Refused):
+                h.revised_plan(self.plan(), DECLARATION, conflict, rerun=9)
+        with self.assertRaises(h.Refused):
+            h.eligibility_problems(plan, rerun, conflict)
+        with self.assertRaises(h.Refused):
+            h.next_entry(plan, conflict)
+        launch = unittest.mock.MagicMock(return_value="ok")
+        (self.dir / "plan2.json").write_text(json.dumps(plan), encoding="utf-8")
+        with unittest.mock.patch.object(h, "PLAN", self.dir / "plan2.json"), \
+                unittest.mock.patch.object(h, "RECORDS", conflict), unittest.mock.patch.object(h, "run_entry", launch):
+            self.assertEqual(h.run_action(False, None), 1)
+            self.assertEqual(h.run_action(True, None), 1)
+        launch.assert_not_called()
+        earlier_ok = self.dir / "earlier-ok"  # a hand-made history: attempt 1 ok, attempt 2 failed
+        attempt_record(earlier_ok, 9, 1, "ok", "20261004-010000")
+        attempt_record(earlier_ok, 9, 2, "failed", "20261004-020000")
+        with unittest.mock.patch.object(h, "PLAN", self.dir / "plan2.json"):
+            with self.assertRaises(h.Refused):
+                h.revised_plan(plan, DECLARATION, earlier_ok, rerun=9)
+        self.assertTrue(h.eligibility_problems(self.plan([rerun, self.RERUN_9(3)]), self.RERUN_9(3), earlier_ok,
+                                               preflight=True))
 
     def test_dry_run_preflights_every_pending_entry(self):
         plan_path = self.dir / "plan.json"
@@ -626,10 +670,11 @@ class LaunchTest(Temp):
 
     def launch(self, patches, item=None, dry_run=True):
         item = item or h.entry(DECLARATION, 2, 9, 1)
+        plan = h.initial_plan(DECLARATION, AUTH)  # built before any spy starts
         for p in patches:
             p.start()
         try:
-            return h.run_entry(h.initial_plan(DECLARATION, AUTH), item, DECLARATION, dry_run)
+            return h.run_entry(plan, item, DECLARATION, dry_run)
         finally:
             for p in reversed(patches):
                 p.stop()
@@ -641,11 +686,13 @@ class LaunchTest(Temp):
                 spies = {name: unittest.mock.MagicMock(return_value=([], {}))
                          for name in ("source_problems", "init_clone_problems")}
                 spies["authorization"] = unittest.mock.MagicMock(return_value=AUTH)
-                probe = unittest.mock.MagicMock()
+                probe, git_state, text_hash = (unittest.mock.MagicMock() for _ in range(3))
                 patches = self.patches(**override) + [unittest.mock.patch.object(h, n, s) for n, s in spies.items()]
-                patches.append(unittest.mock.patch.object(rc, "thread_probe", probe))
+                patches += [unittest.mock.patch.object(rc, "thread_probe", probe),
+                            unittest.mock.patch.object(h.runtime, "git_state", git_state),
+                            unittest.mock.patch.object(h.fresh_sets, "text_sha256", text_hash)]
                 self.assertEqual(self.launch(patches, dry_run=False), "refused")
-                for spy in [*spies.values(), probe]:
+                for spy in [*spies.values(), probe, git_state, text_hash]:
                     spy.assert_not_called()
         self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
@@ -827,6 +874,36 @@ class ReadingRuleTest(Temp):
         with unittest.mock.patch.object(h, "FRESH", self.spec), self.no_read_text():
             with self.assertRaises(h.Refused):
                 h.attempt_statuses(attempts)
+
+    def test_comparator_alias_refusal_stops_the_run_at_once(self):
+        """Review round 2, repair 2: a record refused by the reading rule ends the launch check; no source import,
+        clone hash, Git state query, text hash, thread probe or attempt follows."""
+        comparator_records = self.dir / "comparator"
+        comparator_records.mkdir()
+        os.link(REPO / V1, comparator_records / "compare-diagnostic-20261004-000000.json")
+        plan_path = self.dir / "plan.json"
+        plan_path.write_text(json.dumps(h.initial_plan(DECLARATION, AUTH)), encoding="utf-8")
+        spies = {"source_problems": unittest.mock.MagicMock(return_value=([], {})),
+                 "init_clone_problems": unittest.mock.MagicMock(return_value=([], {}))}
+        git_state, text_hash, probe = (unittest.mock.MagicMock() for _ in range(3))
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run), unittest.mock.patch.object(h, "FRESH", self.spec), \
+                    unittest.mock.patch.object(rc, "RECORDS", comparator_records), \
+                    unittest.mock.patch.object(h, "PLAN", plan_path), \
+                    unittest.mock.patch.object(h, "RECORDS", self.dir / "records"), \
+                    unittest.mock.patch.object(h, "WORKTREE", self.dir / "worktree"), \
+                    unittest.mock.patch.object(h, "source_problems", spies["source_problems"]), \
+                    unittest.mock.patch.object(h, "init_clone_problems", spies["init_clone_problems"]), \
+                    unittest.mock.patch.object(h.runtime, "git_state", git_state), \
+                    unittest.mock.patch.object(h.fresh_sets, "text_sha256", text_hash), \
+                    unittest.mock.patch.object(rc, "thread_probe", probe):
+                self.assertEqual(h.run_action(dry_run, None), 1)
+        for spy in [*spies.values(), git_state, text_hash, probe]:
+            spy.assert_not_called()
+        refusals = list((self.dir / "records").glob("refused-*.json"))
+        self.assertEqual(len(refusals), 7)  # one live entry, then the six preflights
+        self.assertIn("fresh-set guard", json.loads(refusals[0].read_text(encoding="utf-8"))["launch_problems"][0])
+        self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
     def test_game_settings_alias_stops_the_launch(self):
         game = self.dir / "game"
