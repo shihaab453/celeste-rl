@@ -3,6 +3,7 @@ fresh-set checks, what counts as ok, and the run order. Nothing here starts the 
 import copy
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -210,8 +211,29 @@ class PlanTest(Temp):
         with self.assertRaises(h.Refused):  # attempt 3 failed: two reruns used
             h.revised_plan(revised, DECLARATION, self.records, rerun=10)
 
+    def test_replacement_is_for_inclusion_never_for_a_training_failure(self):
+        """Review B2: a failed or untrained donor is recovered with its own seed, not replaced."""
+        plan = self.initial()
+        with self.assertRaises(h.Refused):  # not trained yet: no inclusion outcome exists
+            h.revised_plan(plan, DECLARATION, self.records, replace=9, reason="copy v1 margin below 0.20")
+        attempt_record(self.records, 9, 1, "failed", "20261004-010000")
+        with self.assertRaises(h.Refused):
+            h.revised_plan(plan, DECLARATION, self.records, replace=9, reason="training timed out")
+        rerun = h.revised_plan(plan, DECLARATION, self.records, rerun=9)
+        attempt_record(self.records, 9, 2, "ok", "20261004-020000")
+        replaced = h.revised_plan(rerun, DECLARATION, self.records, replace=9, reason="donor v1 margin below 0.20")
+        self.assertEqual((replaced["entries"][-1]["seed"], replaced["entries"][-1]["j"]), (15, 2))
+
+    def test_replacement_order_is_validated_in_hand_edited_plans(self):
+        plan = self.initial()
+        attempt_record(self.records, 11, 1, "ok", "20261004-010000")
+        sixteen_first = copy.deepcopy(plan)
+        sixteen_first["entries"].append({**h.entry(DECLARATION, 4, 16, 1, "replaces seed 11: x")})
+        self.assertTrue([p for p in h.plan_problems(sixteen_first, DECLARATION, AUTH) if "order" in p])
+
     def test_replacements_take_the_replaced_j_within_the_budget(self):
         plan = self.initial()
+        attempt_record(self.records, 11, 1, "ok", "20261004-010000")
         with self.assertRaises(h.Refused):
             h.revised_plan(plan, DECLARATION, self.records, replace=11)  # no reason
         first = h.revised_plan(plan, DECLARATION, self.records, replace=11, reason="copy v1 margin below 0.20")
@@ -242,6 +264,7 @@ class PlanActionTest(Temp):
         self.assertEqual(self.run_plan(), 1)  # never overwritten
         self.assertEqual((self.dir / "plan.json").read_text(encoding="utf-8"), first)
         self.assertEqual(self.run_plan(check=True), 0)
+        attempt_record(self.dir / "records", 12, 1, "ok", "20261004-010000")
         self.assertEqual(self.run_plan(replace=12, reason="x", committed=["plan.json is not committed"]), 1)
         self.assertEqual((self.dir / "plan.json").read_text(encoding="utf-8"), first)
         self.assertEqual(self.run_plan(replace=12, reason="copy v1 margin below 0.20"), 0)
@@ -265,35 +288,97 @@ class RunOrderTest(Temp):
         plan["entries"] += list(extra)
         return plan
 
-    def test_pending_entries_follow_the_records(self):
-        plan = self.plan()
-        self.assertEqual(len(h.next_entries(plan, self.dir)), 6)
-        attempt_record(self.dir, 9, 1, "ok", "20261004-010000")
-        write(self.dir, "refused-20261004-010500.json", {"entry": {"seed": 10, "attempt": 1}})  # does not count
-        write(self.dir, "dry-run-20261004-010600.json", {"entry": {"seed": 10, "attempt": 1}})
-        self.assertEqual([e["seed"] for e in h.next_entries(plan, self.dir)], [10, 11, 12, 13, 14])
+    RERUN_9 = staticmethod(lambda n=2: h.entry(DECLARATION, 2, 9, n, "rerun after a failed attempt"))
 
-    def test_a_failure_stops_until_the_plan_is_revised(self):
+    def test_next_entry_follows_the_records(self):
+        plan = self.plan()
+        self.assertEqual(h.next_entry(plan, self.dir)["seed"], 9)
+        attempt_record(self.dir, 9, 1, "ok", "20261004-010000")
+        write(self.dir, "refused-20261004-010500.json", {"entry": {"seed": 10, "attempt": 1}})  # not an attempt
+        write(self.dir, "dry-run-20261004-010600.json", {"entry": {"seed": 10, "attempt": 1}})
+        self.assertEqual(h.next_entry(plan, self.dir)["seed"], 10)
+
+    def test_a_failure_stops_until_a_rerun_is_planned(self):
         attempt_record(self.dir, 9, 1, "failed", "20261004-010000")
         with self.assertRaises(h.Refused):
-            h.next_entries(self.plan(), self.dir)
-        rerun = h.entry(DECLARATION, 2, 9, 2, "rerun after a failed attempt")
-        self.assertEqual(h.next_entries(self.plan([rerun]), self.dir)[-1], rerun)
+            h.next_entry(self.plan(), self.dir)
+        replacement = h.entry(DECLARATION, 2, 15, 1, "replaces seed 9: x")
+        with self.assertRaises(h.Refused):  # a replacement does not recover a training failure
+            h.next_entry(self.plan([replacement]), self.dir)
+        self.assertEqual(h.next_entry(self.plan([self.RERUN_9()]), self.dir)["seed"], 10)  # rerun resolves seed 9
 
-    def test_no_second_attempt_after_an_ok_one(self):
+    def test_eligibility_at_launch(self):
+        """Review B2: rules that depend on the records are checked again immediately before each launch."""
+        rerun = self.RERUN_9()
+        plan = self.plan([rerun])
+        self.assertTrue(h.eligibility_problems(plan, rerun, self.dir, preflight=True))  # no failed attempt 1
+        self.assertTrue(h.eligibility_problems(plan, plan["entries"][1], self.dir))  # seed 9 unresolved
+        self.assertEqual(h.eligibility_problems(plan, plan["entries"][1], self.dir, preflight=True), [])
         attempt_record(self.dir, 9, 1, "ok", "20261004-010000")
-        with self.assertRaises(h.Refused):
-            h.next_entries(self.plan([h.entry(DECLARATION, 2, 9, 2, "rerun after a failed attempt")]), self.dir)
-        too_many = self.plan([h.entry(DECLARATION, 2, 9, n, "rerun after a failed attempt") for n in (2, 3, 4)])
+        self.assertTrue([p for p in h.eligibility_problems(plan, rerun, self.dir, preflight=True) if "ok attempt" in p])
+        self.assertTrue(h.eligibility_problems(plan, plan["entries"][0], self.dir))  # already has a record
+        replacement = h.entry(DECLARATION, 3, 15, 1, "replaces seed 10: x")
+        plan = self.plan([replacement])
+        self.assertTrue(h.eligibility_problems(plan, replacement, self.dir, preflight=True))  # seed 10 not ok
+        attempt_record(self.dir, 10, 1, "ok", "20261004-020000")
+        self.assertEqual(h.eligibility_problems(plan, replacement, self.dir, preflight=True), [])
+
+    def test_batch_rereads_records_before_every_launch(self):
+        """Review B2: after six successes in one batch, a hand-added attempt 2 of seed 9 is refused, not trained."""
+        plan = self.plan([self.RERUN_9()])
+        self.assertEqual(h.plan_problems(plan, DECLARATION, AUTH), [])  # statically valid
+        plan_path = self.dir / "plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        launched = []
+
+        def fake_entry(plan, item, declaration, dry_run):
+            if h.eligibility_problems(plan, item, self.dir / "records"):
+                launched.append(("refused", item["seed"], item["attempt"]))
+                return "refused"
+            launched.append(("ok", item["seed"], item["attempt"]))
+            attempt_record(self.dir / "records", item["seed"], item["attempt"], "ok",
+                           f"20261004-0{len(launched)}0000")
+            return "ok"
+
+        (self.dir / "records").mkdir()
+        with unittest.mock.patch.object(h, "PLAN", plan_path), \
+                unittest.mock.patch.object(h, "RECORDS", self.dir / "records"), \
+                unittest.mock.patch.object(h, "run_entry", side_effect=fake_entry):
+            self.assertEqual(h.run_action(False, None), 1)
+        self.assertEqual(launched[-1], ("refused", 9, 2))
+        self.assertEqual([l for l in launched if l[0] == "ok"], [("ok", s, 1) for s in range(9, 15)])
+
+    def test_rerun_limit_in_the_plan(self):
+        too_many = self.plan([self.RERUN_9(n) for n in (2, 3, 4)])
         self.assertTrue([p for p in h.plan_problems(too_many, DECLARATION, AUTH) if "reruns" in p])
 
-    def test_unreadable_or_contradicting_records_are_failures(self):
-        (self.dir / "attempt-20261004-010000.json").write_text("{", encoding="utf-8")
+    def test_markers_contradictions_and_unreadable_files(self):
+        """Review B3: a started marker without its record is a failed attempt; an unreadable file stops for review."""
+        write(self.dir, "attempt-20261004-010000.started.json", {"entry": {"seed": 9, "attempt": 1}})
         self.assertEqual(h.entry_status(self.dir, {"seed": 9, "attempt": 1}), "failed")
+        attempt_record(self.dir / "finished", 9, 1, "ok", "20261004-010000")
+        write(self.dir / "finished", "attempt-20261004-010000.started.json", {"entry": {"seed": 9, "attempt": 1}})
+        self.assertEqual(h.entry_status(self.dir / "finished", {"seed": 9, "attempt": 1}), "ok")
         other = self.dir / "other"
         attempt_record(other, 9, 1, "ok", "20261004-010000")
         attempt_record(other, 9, 1, "maybe", "20261004-020000")
         self.assertEqual(h.entry_status(other, {"seed": 9, "attempt": 1}), "failed")
+        broken = self.dir / "broken"
+        broken.mkdir()
+        (broken / "attempt-20261004-010000.json").write_text("{", encoding="utf-8")
+        with self.assertRaises(h.Refused):
+            h.entry_status(broken, {"seed": 9, "attempt": 1})
+
+    def test_dry_run_preflights_every_pending_entry(self):
+        plan_path = self.dir / "plan.json"
+        plan_path.write_text(json.dumps(self.plan()), encoding="utf-8")
+        calls = []
+        with unittest.mock.patch.object(h, "PLAN", plan_path), \
+                unittest.mock.patch.object(h, "RECORDS", self.dir / "records"), \
+                unittest.mock.patch.object(h, "run_entry",
+                                           side_effect=lambda p, item, d, dry_run: calls.append(item["seed"]) or "dry-run"):
+            self.assertEqual(h.run_action(True, None), 0)
+        self.assertEqual(calls, [9, 10, 11, 12, 13, 14])
 
 
 def git(root: Path, *args):
@@ -360,10 +445,56 @@ class SourceCheckTest(Temp):
     def test_declared_ignored_files_are_allowed(self):
         repo, commit, tree = self.make_repo()
         for relative in ("runs/clone/20260918-183508/cloned.zip", "runs/train/confirm-donor-B-seed9/checkpoints/a.zip",
-                         "runs/train/confirm-donor-B-seed9-rerun1/manifest.json", "celeste_rl/__pycache__/r.pyc"):
+                         "runs/train/confirm-donor-B-seed9-rerun1/manifest.json"):
             (repo / relative).parent.mkdir(parents=True, exist_ok=True)
             (repo / relative).write_text("x", encoding="utf-8")
         self.assertEqual(self.problems(repo, commit, tree)[0], [])
+
+    def import_children(self):
+        """A spy on subprocess.run that records whether the import child started (git calls pass through)."""
+        real, children = subprocess.run, []
+
+        def spy(args, **kwargs):
+            if h.CLOSURE_CODE in args:
+                children.append(kwargs.get("env", {}))
+            return real(args, **kwargs)
+        return spy, children
+
+    def test_stale_bytecode_is_refused_before_any_import(self):
+        """Review B1: a cache compiled from edited source, valid for the restored source, would run instead of it."""
+        import py_compile
+        repo, commit, tree = self.make_repo()
+        reward = repo / "celeste_rl" / "reward.py"
+        stamp = reward.stat().st_mtime
+        reward.write_text("SCALE = 3.0\n", encoding="utf-8")  # same size as the committed SCALE = 2.0
+        os.utime(reward, (stamp, stamp))
+        py_compile.compile(str(reward), cfile=str(repo / "celeste_rl" / "__pycache__" /
+                                                  f"reward.{sys.implementation.cache_tag}.pyc"), doraise=True)
+        reward.write_text("SCALE = 2.0\n", encoding="utf-8")
+        os.utime(reward, (stamp, stamp))
+        self.assertEqual(subprocess.run(["git", "-C", str(repo), "status", "--porcelain"], capture_output=True,
+                                        text=True).stdout, "")  # the source and git look clean
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONDONTWRITEBYTECODE"}
+        ran = subprocess.run([sys.executable, "-c", "import celeste_rl.reward as r; print(r.SCALE)"], cwd=repo,
+                             capture_output=True, text=True, env=env).stdout.strip()
+        self.assertEqual(ran, "3.0")  # the gap: the cached edit runs, not the checked source
+        spy, children = self.import_children()
+        with unittest.mock.patch.object(h.subprocess, "run", side_effect=spy):
+            problems = self.problems(repo, commit, tree)[0]
+        self.assertTrue([p for p in problems if "bytecode" in p])
+        self.assertEqual(children, [])  # refused before the import child started
+
+    def test_failed_preconditions_start_no_import_and_imports_write_no_bytecode(self):
+        repo, commit, tree = self.make_repo()
+        (repo / "notes.txt").write_text("x", encoding="utf-8")
+        spy, children = self.import_children()
+        with unittest.mock.patch.object(h.subprocess, "run", side_effect=spy):
+            self.assertTrue(self.problems(repo, commit, tree)[0])
+            self.assertEqual(children, [])
+            (repo / "notes.txt").unlink()
+            self.assertEqual(self.problems(repo, commit, tree)[0], [])
+        self.assertEqual(children[0].get("PYTHONDONTWRITEBYTECODE"), "1")
+        self.assertFalse(list(repo.rglob("*.pyc")))
 
     def test_a_module_imported_from_outside_fails(self):
         repo, commit, tree = self.make_repo(with_package=False)
@@ -476,8 +607,9 @@ class LaunchTest(Temp):
     """run: every launch condition refuses, and a refused attempt writes a refusal, never an attempt record."""
 
     def patches(self, **overrides):
-        values = {"source_problems": ([], {}), "init_clone_problems": ([], {}), "guard_problems": [],
-                  "authorization": AUTH, "committed": [], "plan_problems": [], "steam_running": True}
+        values = {"identity_problems": [], "guard_problems": [], "source_problems": ([], {}),
+                  "init_clone_problems": ([], {}), "authorization": AUTH, "committed": [], "plan_problems": [],
+                  "eligibility_problems": [], "steam_running": True}
         values.update(overrides)
         patches = [unittest.mock.patch.object(h, name, return_value=value) for name, value in values.items()]
         plan = self.dir / "plan.json"
@@ -502,23 +634,33 @@ class LaunchTest(Temp):
             for p in reversed(patches):
                 p.stop()
 
-    def test_guard_refusal_reads_no_input(self):
-        """Nothing hashes the command's inputs once the fresh-set guard has refused."""
-        clone_check = unittest.mock.MagicMock(return_value=([], {}))
-        patches = self.patches(guard_problems=["fresh-set guard: x"])
-        patches.append(unittest.mock.patch.object(h, "init_clone_problems", clone_check))
-        self.assertEqual(self.launch(patches), "refused")
-        clone_check.assert_not_called()
+    def test_guard_refusal_stops_everything_else(self):
+        """Review B4: after a fresh-set refusal no other input is read and no child starts."""
+        for override in ({"guard_problems": ["fresh-set guard: x"]}, {"identity_problems": ["fresh-set guard: y"]}):
+            with self.subTest(override=override):
+                spies = {name: unittest.mock.MagicMock(return_value=([], {}))
+                         for name in ("source_problems", "init_clone_problems")}
+                spies["authorization"] = unittest.mock.MagicMock(return_value=AUTH)
+                probe = unittest.mock.MagicMock()
+                patches = self.patches(**override) + [unittest.mock.patch.object(h, n, s) for n, s in spies.items()]
+                patches.append(unittest.mock.patch.object(rc, "thread_probe", probe))
+                self.assertEqual(self.launch(patches, dry_run=False), "refused")
+                for spy in [*spies.values(), probe]:
+                    spy.assert_not_called()
+        self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
     def test_all_clear_dry_run(self):
         self.assertEqual(self.launch(self.patches()), "dry-run")
-        self.assertEqual(len(list((self.dir / "records").glob("dry-run-*.json"))), 1)
+        record = json.loads(next((self.dir / "records").glob("dry-run-*.json")).read_text(encoding="utf-8"))
+        self.assertEqual(record["environment_set"], {"PYTHONDONTWRITEBYTECODE": "1"})
 
     def test_each_condition_refuses(self):
         for name, override in (("source", {"source_problems": (["not 8423081"], {})}),
                                ("init clone", {"init_clone_problems": (["differs"], {})}),
                                ("fresh set", {"guard_problems": ["fresh-set guard: x"]}),
+                               ("game file", {"identity_problems": ["fresh-set guard: settings"]}),
                                ("plan", {"plan_problems": ["plan entry differs"]}),
+                               ("eligibility", {"eligibility_problems": ["already has an ok attempt"]}),
                                ("plan not committed", {"committed": ["not committed"]}),
                                ("steam", {"steam_running": False})):
             with self.subTest(case=name):
@@ -529,26 +671,186 @@ class LaunchTest(Temp):
                 self.assertEqual(self.launch(self.patches() + [patch]), "refused")
         (self.dir / "worktree" / "runs/train/confirm-donor-B-seed9").mkdir(parents=True)
         self.assertEqual(self.launch(self.patches()), "refused")
-        self.assertFalse(list((self.dir / "records").glob("attempt-*.json")))
+        self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
-    def test_failed_training_is_recorded_and_stops(self):
+    def test_failed_training_is_recorded_with_streamed_logs(self):
         real_run = subprocess.run
 
         def fake_run(args, **kwargs):
             if "scripts/train_room1.py" in args:
                 self.assertEqual(Path(kwargs["cwd"]), self.dir / "worktree")
                 self.assertFalse([k for k in kwargs["env"] if k.upper().startswith(rc.THREAD_PREFIXES)])
-                return subprocess.CompletedProcess(args, 3, stdout="out", stderr="err")
+                self.assertEqual(kwargs["env"]["PYTHONDONTWRITEBYTECODE"], "1")
+                kwargs["stdout"].write("out")
+                kwargs["stderr"].write("err")
+                return subprocess.CompletedProcess(args, 3)
             return real_run(args, **kwargs)  # git state queries
 
         with unittest.mock.patch.dict(os.environ, {"OMP_NUM_THREADS": "4"}):
             status = self.launch(self.patches() + [unittest.mock.patch.object(h.subprocess, "run", side_effect=fake_run)],
                                  dry_run=False)
         self.assertEqual(status, "failed")
-        record = json.loads(next((self.dir / "records").glob("attempt-*.json")).read_text(encoding="utf-8"))
+        record = final_record(self.dir / "records")
         self.assertEqual((record["outcome"], record["exit_code"]), ("failed", 3))
         self.assertEqual(record["thread_variables_removed"], {"OMP_NUM_THREADS": "4"})
         self.assertEqual(Path(record["log_files"]["stderr.txt"]).read_text(encoding="utf-8"), "err")
+        self.assertEqual(h.entry_status(self.dir / "records", {"seed": 9, "attempt": 1}), "failed")
+
+
+def final_record(records: Path) -> dict:
+    finals = [p for p in records.glob("attempt-*.json") if not p.name.endswith(h.STARTED)]
+    assert len(finals) == 1, finals
+    return json.loads(finals[0].read_text(encoding="utf-8"))
+
+
+class FinalizationTest(Temp):
+    """Review B3: every way out of an attempt leaves its record and logs (trainer and game mocked)."""
+
+    def setUp(self):
+        super().setUp()
+        self.records, self.worktree = self.dir / "records", self.dir / "worktree"
+        self.item = h.entry(DECLARATION, 2, 9, 1)
+        plan = self.dir / "plan.json"
+        plan.write_text("{}", encoding="utf-8")
+        self.cleanup = unittest.mock.MagicMock(return_value={"stopped": [1]})
+        self.base = [unittest.mock.patch.object(h, "PLAN", plan),
+                     unittest.mock.patch.object(h, "RECORDS", self.records),
+                     unittest.mock.patch.object(h, "WORKTREE", self.worktree),
+                     unittest.mock.patch.object(h, "launch_problems", return_value=([], {})),
+                     unittest.mock.patch.object(h, "worktree_problems", return_value=([], {})),
+                     unittest.mock.patch.object(rc, "thread_probe", return_value={}),
+                     unittest.mock.patch.object(rc, "cleanup_own_game", self.cleanup)]
+
+    def attempt(self, child=None, **patches):
+        real = subprocess.run
+
+        def trainer(args, **kwargs):
+            if "scripts/train_room1.py" not in args:
+                return real(args, **kwargs)
+            kwargs["stdout"].write("training output\n")
+            kwargs["stdout"].flush()
+            (self.worktree / self.item["run_dir"]).mkdir(parents=True)
+            (self.worktree / self.item["run_dir"] / "manifest.json").write_text("{}", encoding="utf-8")
+            if child:
+                raise child
+            return subprocess.CompletedProcess(args, 0)
+
+        active = self.base + [unittest.mock.patch.object(h.subprocess, "run", side_effect=trainer)]
+        active += [unittest.mock.patch.object(h, name, **spec) for name, spec in patches.items()]
+        for p in active:
+            p.start()
+        try:
+            return h.run_entry({"revision": 0}, self.item, DECLARATION, dry_run=False)
+        finally:
+            for p in reversed(active):
+                p.stop()
+
+    def logged(self, record):
+        return Path(record["log_files"]["stdout.txt"]).read_text(encoding="utf-8")
+
+    def reset(self):
+        shutil.rmtree(self.records)
+        shutil.rmtree(self.worktree)
+
+    def test_postprocessing_errors_are_recorded(self):
+        for name, patches in (("hashing", {"file_hashes": {"side_effect": OSError("disk")}}),
+                              ("malformed metadata", {"outcome_problems": {"side_effect": KeyError("sessions")}})):
+            with self.subTest(case=name):
+                self.assertEqual(self.attempt(**patches), "failed")
+                record = final_record(self.records)
+                self.assertTrue(record["problems"])
+                self.assertEqual(self.logged(record), "training output\n")
+                self.assertEqual(h.entry_status(self.records, self.item), "failed")
+                self.reset()
+
+    def test_interrupted_copy_is_recorded_then_reraised(self):
+        with self.assertRaises(KeyboardInterrupt):
+            self.attempt(outcome_problems={"return_value": ([], {})}, copy_run={"side_effect": KeyboardInterrupt()})
+        record = final_record(self.records)
+        self.assertEqual(record["outcome"], "failed")
+        self.assertEqual(record["copy_target"], "runs/train/confirm-donor-B-seed9")
+        self.cleanup.assert_not_called()  # the child had already finished
+
+    def test_timeout_and_interrupted_child_keep_partial_logs(self):
+        self.assertEqual(self.attempt(child=subprocess.TimeoutExpired("train", 5400)), "failed")
+        record = final_record(self.records)
+        self.assertTrue(record["timed_out"])
+        self.assertEqual(self.logged(record), "training output\n")
+        self.reset()
+        with self.assertRaises(KeyboardInterrupt):
+            self.attempt(child=KeyboardInterrupt())
+        record = final_record(self.records)
+        self.assertTrue(record["interrupted_child"])
+        self.assertEqual(self.logged(record), "training output\n")
+        self.assertEqual(self.cleanup.call_count, 2)
+
+    def test_ok_attempt(self):
+        self.assertEqual(self.attempt(outcome_problems={"return_value": ([], {"faults": []})},
+                                      copy_run={"return_value": {"verified": True}}), "ok")
+        record = final_record(self.records)
+        self.assertEqual((record["outcome"], record["problems"], record["copy"]), ("ok", [], {"verified": True}))
+        self.assertEqual(h.entry_status(self.records, self.item), "ok")
+
+
+class ReadingRuleTest(Temp):
+    """Review B4: inputs the executor (or the old trainer) reads are identity-checked first; v1 stands in."""
+
+    def setUp(self):
+        super().setUp()
+        self.spec = {"room1": FreshSet(V1, fresh_sets.git_blob(REPO / V1), None, None)}
+        self.alias = self.dir / "alias.json"
+        os.link(REPO / V1, self.alias)  # a hard link: identity, no content read
+
+    def no_read_text(self):
+        return unittest.mock.patch.object(Path, "read_text", side_effect=AssertionError("protected content read"))
+
+    def test_plan_or_declaration_alias_is_refused_before_reading(self):
+        with unittest.mock.patch.object(h, "FRESH", self.spec), unittest.mock.patch.object(h, "PLAN", self.alias):
+            with self.no_read_text():
+                self.assertEqual(h.run_action(False, None), 1)
+                self.assertEqual(h.run_action(True, None), 1)
+                self.assertEqual(h.plan_action(True, None, None, None), 1)
+        with unittest.mock.patch.object(h, "FRESH", self.spec), unittest.mock.patch.object(h, "DECLARATION", self.alias):
+            with self.no_read_text():
+                self.assertEqual(h.plan_action(False, None, None, None), 1)
+
+    def test_record_aliases_are_refused(self):
+        records = self.dir / "records"
+        records.mkdir()
+        os.link(REPO / V1, records / "compare-diagnostic-20261004-000000.json")
+        with unittest.mock.patch.object(h, "FRESH", self.spec), self.no_read_text():
+            with self.assertRaises(h.Refused):
+                h.authorization(records)
+        attempts = self.dir / "attempts"
+        attempts.mkdir()
+        os.link(REPO / V1, attempts / "attempt-20261004-000000.json")
+        with unittest.mock.patch.object(h, "FRESH", self.spec), self.no_read_text():
+            with self.assertRaises(h.Refused):
+                h.attempt_statuses(attempts)
+
+    def test_game_settings_alias_stops_the_launch(self):
+        game = self.dir / "game"
+        (game / "probe-profile" / "Saves").mkdir(parents=True)
+        os.link(REPO / V1, game / "probe-profile" / "Saves" / "modsettings-Everest.celeste")
+        command = h.entry(DECLARATION, 2, 9, 1)["command"]
+        self.assertEqual(h.guard_problems(command, self.dir, fresh=self.spec), [])  # the command guard alone misses it
+        spies = {name: unittest.mock.MagicMock(return_value=([], {})) for name in ("source_problems", "init_clone_problems")}
+        probe = unittest.mock.MagicMock()
+        (self.dir / "plan.json").write_text("{}", encoding="utf-8")
+        with unittest.mock.patch.object(h, "FRESH", self.spec), unittest.mock.patch.object(h, "GAME", game), \
+                unittest.mock.patch.object(h, "WORKTREE", self.dir / "worktree"), \
+                unittest.mock.patch.object(h, "RECORDS", self.dir / "records"), \
+                unittest.mock.patch.object(h, "PLAN", self.dir / "plan.json"), \
+                unittest.mock.patch.object(h, "source_problems", spies["source_problems"]), \
+                unittest.mock.patch.object(h, "init_clone_problems", spies["init_clone_problems"]), \
+                unittest.mock.patch.object(rc, "thread_probe", probe):
+            plan, item = h.initial_plan(DECLARATION, AUTH), h.entry(DECLARATION, 2, 9, 1)
+            problems, _ = h.launch_problems(plan, item, DECLARATION)
+            self.assertTrue([p for p in problems if "modsettings-Everest.celeste" in p])
+            self.assertEqual(h.run_entry(plan, item, DECLARATION, False), "refused")
+        for spy in [*spies.values(), probe]:
+            spy.assert_not_called()
+        self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
 
 if __name__ == "__main__":

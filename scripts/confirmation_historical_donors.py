@@ -15,36 +15,49 @@ Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py check
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py run [--dry-run] [--max N]
 
+Reading rule (fresh sets): every file this script reads itself (the declaration, the plan, the comparator and attempt
+records, the original seed 7 manifest) is identity-checked by the fresh-set guard before it is read, and so are the
+game copy's files the old trainer reads (its four profile settings, the lockstep mod's manifest and the hashed game
+files). The command, as given and as resolved in the worktree, and the copied init clone go through the full guard.
+A refusal stops at once: nothing else is read and no child process starts.
+
 plan: writes config/confirmation-donors-historical.json (refuses to overwrite) once the authorization exists: the
-declaration carries amendment 2, and the recipe check's comparator version 2, at a reviewed commit on a clean tree,
-has recorded the current replay as DIFFERENT and the 8423081 diagnostic as IDENTICAL (no record of the current code
-as IDENTICAL is needed or produced). The plan pins the declaration's text hash, both records, the source commit, the
-worktree, the game copy, the interpreter, the init clone, the limit and one entry per donor (j, seed, attempt, run
-folder, command). --check recomputes everything and reports any difference. --rerun and --replace write a revision
-that keeps every earlier entry unchanged: a rerun only after a failed attempt of that seed (at most two reruns), a
-replacement only within the two-seed budget, in order 15 then 16, taking the replaced donor's j. Commit and push the
-plan (and each revision) before running it.
+declaration carries amendment 2, and every record of the recipe check's comparator version 2, at a reviewed commit on
+a clean tree, agrees that the current replay is DIFFERENT and the 8423081 diagnostic IDENTICAL (no record of the
+current code as IDENTICAL is needed or produced). The plan pins the declaration's text hash, both records, the source
+commit, the worktree, the game copy, the interpreter, the init clone, the limit and one entry per donor (j, seed,
+attempt, run folder, command). --check recomputes everything. --rerun and --replace write a revision that keeps every
+earlier entry: a rerun only after a failed attempt of that seed (at most two reruns); a replacement only for the
+inclusion rule, of a donor whose training succeeded (a failed training attempt is recovered with the same seed),
+within the two-seed budget, in order 15 then 16, taking the replaced donor's j. Commit and push the plan (and each
+revision) before running it.
 
 prepare: creates the worktree (git worktree add --detach) if absent and copies the init clone folder into it,
 verifying every file's sha256; records both. It never changes an existing worktree's files.
 
 check: the declared source check (code_checks.historical_donors): HEAD and tree are 8423081's; no tracked or
-untracked change and no index flag that hides one; ignored files only under the declared input and run folders or
-Python caches; every module of scripts/train_room1.py's import closure, imported there with this interpreter, lies
-inside the worktree and equals its blob at 8423081.
+untracked change and no index flag that hides one; no Python bytecode anywhere in the worktree (a stale cache could
+run other code than the checked source); ignored files only under the declared input and run folders. Only then is
+scripts/train_room1.py imported there, without writing bytecode, and every module of its import closure must lie
+inside the worktree and equal its blob at 8423081.
 
-run: trains the plan's entries in order, one at a time, stopping at the first attempt that is not ok. Before each
-launch it refuses unless: this repository's tracked tree is clean (so the executor and plan are committed); the plan
-passes --check; the source check passes; the init clone copy matches its pin; the fresh-set guard allows no use on
-the command as given and as resolved in the worktree, nor on the copied inputs; the run folder exists neither in the
-worktree nor here; Steam runs; no Celeste process runs in any folder and no other script of this repository runs;
-this is the declared interpreter. It removes every thread variable, probes torch's default threads, and runs the
-command with the worktree as working directory for at most 90 minutes (a timeout stops only the default copy's
-game). An attempt is ok only if the run is complete and finished at the historical commit with exactly one
-attributable session, no runtime problems, the original seed 7 runtime record, seed 7's config apart from the seed and
-truthful evaluation references; it is then copied to the same relative folder here and every file's hash is checked.
+run: trains the plan's entries in order, one at a time, stopping at the first attempt that is not ok; the records are
+read again before every launch, so eligibility always reflects the latest attempt. Before each launch it refuses
+unless: the reading rule's checks pass (first, before anything else); this repository's tracked tree is clean and the
+plan committed; the plan passes --check; the entry is eligible (never run, no ok attempt of its seed, a rerun only
+after a failed attempt, a replacement only of a donor whose training succeeded, every earlier entry resolved); the
+source check passes; the init clone copy matches its pin; the run folder exists neither in the worktree nor here;
+this is the declared interpreter; Steam runs; no Celeste process runs in any folder and no other script of this
+repository runs. It removes every thread variable, disables bytecode writing, probes torch's default threads and runs
+the command with the worktree as working directory for at most 90 minutes, streaming stdout and stderr to files. A
+started marker is written before launch, and the attempt's record is written on every path out (success, failure,
+timeout, error, interruption); a marker without a record counts as a failed attempt. An attempt is ok only if the
+run is complete and finished at the historical commit with exactly one attributable session, no runtime problems,
+the original seed 7 runtime record, seed 7's config apart from the seed, truthful evaluation references and no
+bytecode left in the worktree; it is then copied to the same relative folder here and every file's hash is checked.
 Faults are recorded by name. A failed attempt stays in the worktree with its record; a rerun needs a plan revision.
-Every record (and full stdout and stderr) is created exclusively in runs/confirmation/donors/, never overwritten.
+--dry-run preflights every pending entry without launching (earlier entries need not be resolved).
+Records are created exclusively in runs/confirmation/donors/, never overwritten.
 """
 from __future__ import annotations
 
@@ -67,6 +80,7 @@ from celeste_rl import fresh_sets, runtime  # noqa: E402
 from scripts import confirmation_recipe_check as rc  # noqa: E402
 
 DECLARATION = rc.DECLARATION
+FRESH = fresh_sets.FRESH  # the protected sets (tests substitute a stand-in)
 HISTORICAL_COMMIT = rc.HISTORICAL_COMMIT
 HISTORICAL_TREE = "8ee839019d8ef4c68890a327dcfa970e903a45a1"
 WORKTREE = Path("C:/Projects/celeste-research-scratch/historical-donors-8423081")
@@ -87,6 +101,15 @@ RECIPE_CHECK_RUN = "run-20261001-194858.json"  # the live replay's launch record
 DIAGNOSTIC_SHA256 = "36f5460cf45b474c072ffd78372acb0267a95732c53d0c804ae6cb13a8710fd3"
 COMPARE_NAME = re.compile(r"compare-\d{8}-\d{6}(-\d+)?\.json")
 DIAGNOSTIC_COMPARE_NAME = re.compile(r"compare-diagnostic-\d{8}-\d{6}(-\d+)?\.json")
+# Game copy files that 8423081's runtime check reads (celeste_rl/runtime.py there: REQUIRED_SETTINGS, HASHED_FILES,
+# MOD_MANIFESTS). log.txt is written by the game during the run, so it cannot be checked before launch.
+GAME_FILES_READ = tuple(f"probe-profile/Saves/{name}" for name in (
+    "modsettings-Everest.celeste", "settings.celeste", "modsettings-CelesteTAS.celeste",
+    "modsettings-SpeedrunTool.celeste")) + (
+    "Celeste.exe", "Celeste.dll", "Celeste.Mod.mm.dll", "FNA.dll", "MMHOOK_Celeste.dll", "Mods/CelesteTAS.zip",
+    "Mods/SpeedrunTool.zip", "Mods/CelesteRLLockstep/CelesteRLLockstep.dll", "Mods/CelesteRLLockstep/everest.yaml")
+NO_BYTECODE = {"PYTHONDONTWRITEBYTECODE": "1"}
+STARTED = ".started.json"
 
 
 class Refused(Exception):
@@ -104,10 +127,42 @@ def _git(root: Path, *args: str) -> str:
     return done.stdout
 
 
+# ----------------------------------------------------------------------------------------------- the reading rule
+
+def identity_problems(paths) -> list[str]:
+    """The fresh-set identity check for files this script (or the old trainer) reads itself, before any is read."""
+    return fresh_sets.identity_problems([str(path) for path in paths], fresh=FRESH)
+
+
+def read_json(path: Path):
+    """A JSON file this script reads itself, identity-checked first; Refused if it refers to a fresh set."""
+    problems = identity_problems([path])
+    if problems:
+        raise Refused("; ".join(problems))
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def guard_problems(command: list[str], worktree: Path, fresh: dict | None = None) -> list[str]:
+    """The fresh-set guard with no allowed use: the command as given, as resolved in the worktree, and the copied init
+    clone with its dependencies."""
+    fresh = fresh or FRESH
+    try:
+        fresh_sets.refuse_unless_declared([command, resolved(command, worktree)], (), fresh=fresh)
+    except fresh_sets.FreshSetRefused as error:
+        return [f"fresh-set guard: {error}"]
+    return fresh_sets.paths_problems([str(worktree / INIT_CLONE)], fresh=fresh)
+
+
+def resolved(command: list[str], root: Path) -> list[str]:
+    """The command as the child sees it: each relative path that exists under its working directory made absolute."""
+    return [str(root / token) if not token.startswith("-") and not Path(token).is_absolute() and (root / token).exists()
+            else token for token in command]
+
+
 # -------------------------------------------------------------------------------------------------- the declaration
 
 def load_declaration() -> dict:
-    return json.loads(DECLARATION.read_text(encoding="utf-8"))
+    return read_json(DECLARATION)
 
 
 def amendment_problems(declaration: dict) -> list[str]:
@@ -154,7 +209,7 @@ def _comparator_records(records: Path, pattern: re.Pattern) -> list[tuple[Path, 
         if not pattern.fullmatch(path.name):
             continue
         try:
-            record = json.loads(path.read_text(encoding="utf-8"))
+            record = read_json(path)
         except (OSError, ValueError):
             continue  # an unreadable record authorizes nothing
         comparator = record.get("comparator") if isinstance(record, dict) else None
@@ -181,11 +236,10 @@ def authorization(records: Path = rc.RECORDS) -> dict:
     for path, record in diagnostic:
         if record.get("verdict") != "IDENTICAL" or (record.get("run_record") or {}).get("sha256") != DIAGNOSTIC_SHA256:
             raise Refused(f"{path.name}: verdict {record.get('verdict')}; expected IDENTICAL bound to the diagnostic")
-    newest = {"compare": replay[-1][0], "compare_diagnostic": diagnostic[-1][0]}
-    return {key: {"path": _relative(path), "sha256": _sha256(path),
-                  "verdict": "DIFFERENT" if key == "compare" else "IDENTICAL",
-                  "comparator_commit": json.loads(path.read_text(encoding="utf-8"))["comparator"]["git"]["commit"]}
-            for key, path in newest.items()}
+    newest = {"compare": replay[-1], "compare_diagnostic": diagnostic[-1]}
+    return {key: {"path": _relative(path), "sha256": _sha256(path), "verdict": record["verdict"],
+                  "comparator_commit": record["comparator"]["git"]["commit"]}
+            for key, (path, record) in newest.items()}
 
 
 def _relative(path: Path) -> str:
@@ -222,13 +276,21 @@ def initial_plan(declaration: dict, auth: dict) -> dict:
     return {**fixed_fields(declaration, auth), "revision": 0, "entries": entries}
 
 
+def replaced_seed(item: dict) -> int | None:
+    """The donor a replacement entry names in its reason ('replaces seed N: ...'), or None."""
+    named = re.match(r"replaces seed (\d+):", str(item.get("reason", "")))
+    return int(named.group(1)) if named else None
+
+
 def plan_problems(plan: dict, declaration: dict, auth: dict) -> list[str]:
-    """Differences between a plan and what the declaration and records require now."""
+    """Differences between a plan and what the declaration and records require now (static rules only; the attempt
+    records are checked by eligibility_problems before each launch)."""
     if not isinstance(plan, dict) or not isinstance(plan.get("entries"), list):
         return ["the plan is not a record with entries"]
     problems = [f"plan {key}: {plan.get(key)!r}, expected {value!r}"
                 for key, value in fixed_fields(declaration, auth).items() if plan.get(key) != value]
-    allowed = set(declaration["donors"]["new_seeds"]) | set(declaration["donors"]["replacement_seeds"])
+    replacements = list(declaration["donors"]["replacement_seeds"])
+    allowed = set(declaration["donors"]["new_seeds"]) | set(replacements)
     seen = set()
     for item in plan["entries"]:
         try:
@@ -246,6 +308,10 @@ def plan_problems(plan: dict, declaration: dict, auth: dict) -> list[str]:
         if item["attempt"] > MAX_RERUNS + 1:
             problems.append(f"plan entry {key} exceeds {MAX_RERUNS} reruns")
         seen.add(key)
+    used = [item.get("seed") for item in plan["entries"]
+            if isinstance(item, dict) and item.get("seed") in replacements and item.get("attempt") == 1]
+    if used != replacements[:len(used)]:
+        problems.append(f"replacement seeds {used} are not used in the declared order {replacements}")
     problems += index_problems(plan["entries"], declaration)
     initial = initial_plan(declaration, auth)["entries"]
     if plan["entries"][:len(initial)] != initial:
@@ -254,7 +320,7 @@ def plan_problems(plan: dict, declaration: dict, auth: dict) -> list[str]:
 
 
 def index_problems(entries: list, declaration: dict) -> list[str]:
-    """Every attempt of a seed keeps its j; a replacement takes the j of the donor its reason names."""
+    """Every attempt of a seed keeps its j; a replacement takes the j of a donor named earlier in its reason."""
     known, problems = dict(donor_index(declaration)), []
     replacements = set(declaration["donors"]["replacement_seeds"])
     for item in entries:
@@ -262,8 +328,7 @@ def index_problems(entries: list, declaration: dict) -> list[str]:
             continue
         seed, j = item.get("seed"), item.get("j")
         if seed in replacements and item.get("attempt") == 1:
-            named = re.match(r"replaces seed (\d+):", str(item.get("reason", "")))
-            if not named or known.get(int(named.group(1))) != j:
+            if known.get(replaced_seed(item)) != j:
                 problems.append(f"replacement seed {seed} (j {j}) does not take the j of the donor it names")
             known[seed] = j
         elif known.get(seed) != j:
@@ -275,12 +340,13 @@ def revised_plan(plan: dict, declaration: dict, records: Path, rerun: int | None
                  replace: int | None = None, reason: str | None = None) -> dict:
     """A revision with one more entry; every earlier entry is kept exactly."""
     entries = list(plan["entries"])
+    statuses = attempt_statuses(records)
     if rerun is not None:
         attempts = [item for item in entries if item["seed"] == rerun]
         if not attempts:
             raise Refused(f"seed {rerun} is not in the plan")
         last = attempts[-1]
-        if entry_status(records, last) != "failed":
+        if statuses.get((rerun, last["attempt"])) != "failed":
             raise Refused(f"seed {rerun} attempt {last['attempt']} has no failed record; a rerun follows a failure")
         if last["attempt"] > MAX_RERUNS:
             raise Refused(f"seed {rerun} has had {MAX_RERUNS} reruns; stop for review")
@@ -291,6 +357,10 @@ def revised_plan(plan: dict, declaration: dict, records: Path, rerun: int | None
         index = {**donor_index(declaration), **{item["seed"]: item["j"] for item in entries}}
         if replace not in index:
             raise Refused(f"seed {replace} is not a donor")
+        attempts = [item for item in entries if item["seed"] == replace]
+        if attempts and statuses.get((replace, attempts[-1]["attempt"])) != "ok":
+            raise Refused(f"seed {replace}'s latest training attempt is not ok: a replacement is only for the inclusion "
+                          "rule; a failed training attempt is recovered with the same seed (plan --rerun)")
         used = [item["seed"] for item in entries if item["seed"] in declaration["donors"]["replacement_seeds"]]
         spare = [s for s in declaration["donors"]["replacement_seeds"] if s not in used]
         if len(set(used)) >= MAX_REPLACEMENTS or not spare:
@@ -312,14 +382,17 @@ def committed(path: Path) -> list[str]:
 
 
 def plan_action(check: bool, rerun: int | None, replace: int | None, reason: str | None) -> int:
-    declaration = load_declaration()
     try:
+        problems = identity_problems([DECLARATION, PLAN])
+        if problems:
+            raise Refused("; ".join(problems))
+        declaration = load_declaration()
         problems = amendment_problems(declaration)
         if problems:
             raise Refused("; ".join(problems))
         auth = authorization()
         if check:
-            problems = plan_problems(json.loads(PLAN.read_text(encoding="utf-8")), declaration, auth)
+            problems = plan_problems(read_json(PLAN), declaration, auth)
             print("\n".join(problems) if problems else f"PASS: {_relative(PLAN)} is the declared plan")
             return 1 if problems else 0
         if rerun is None and replace is None:
@@ -328,12 +401,12 @@ def plan_action(check: bool, rerun: int | None, replace: int | None, reason: str
             plan = initial_plan(declaration, auth)
         else:
             problems = committed(PLAN)
-            current = json.loads(PLAN.read_text(encoding="utf-8"))
+            current = read_json(PLAN)
             problems += plan_problems(current, declaration, auth)
             if problems:
                 raise Refused("; ".join(problems))
             plan = revised_plan(current, declaration, RECORDS, rerun, replace, reason)
-    except Refused as error:
+    except (Refused, OSError, ValueError) as error:
         print(f"Refused: {error}")
         return 1
     PLAN.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
@@ -345,8 +418,11 @@ def plan_action(check: bool, rerun: int | None, replace: int | None, reason: str
 # ------------------------------------------------------------------------------------------------ the worktree source
 
 def _ignored_allowed(path: str) -> bool:
-    return (path.startswith(INIT_CLONE.as_posix() + "/") or path.startswith(RUN_PREFIX)
-            or "/__pycache__/" in f"/{path}" or path.endswith((".pyc", ".pyo")))
+    return path.startswith(INIT_CLONE.as_posix() + "/") or path.startswith(RUN_PREFIX)
+
+
+def _bytecode(path: str) -> bool:
+    return "/__pycache__/" in f"/{path}" or path.endswith((".pyc", ".pyo"))
 
 
 CLOSURE_CODE = ("import os, sys; sys.path.insert(0, 'scripts'); import train_room1; "
@@ -355,10 +431,8 @@ CLOSURE_CODE = ("import os, sys; sys.path.insert(0, 'scripts'); import train_roo
                 "| {os.path.abspath(train_room1.__file__)})))")
 
 
-def source_problems(worktree: Path | None = None, commit: str = HISTORICAL_COMMIT, tree: str = HISTORICAL_TREE,
-                    interpreter: Path | None = None) -> tuple[list[str], dict]:
-    """The declared source check (code_checks.historical_donors), with the evidence it rests on."""
-    worktree = worktree or WORKTREE
+def worktree_problems(worktree: Path, commit: str, tree: str) -> tuple[list[str], dict]:
+    """The git-level part of the source check (no import): commit, tree, changes, index flags, bytecode, strays."""
     if not (worktree / ".git").exists():
         return [f"{worktree} is not a git worktree"], {}
     evidence: dict = {"worktree": worktree.as_posix()}
@@ -377,15 +451,30 @@ def source_problems(worktree: Path | None = None, commit: str = HISTORICAL_COMMI
         problems.append(f"the worktree has changes: {changes[:10]}")
     if flags:
         problems.append(f"index flags that can hide changes: {flags[:10]}")
-    ignored = [line[3:].strip('"') for line in listed if line.startswith("!! ")]
-    stray = [path for path in ignored if not _ignored_allowed(path)]
+    extra = [line[3:].strip('"') for line in listed if line.startswith(("!! ", "?? "))]
+    bytecode = [path for path in extra if _bytecode(path)]
+    if bytecode:
+        problems.append(f"Python bytecode in the worktree (it could run instead of the checked source): {bytecode[:10]}")
+    stray = [line[3:].strip('"') for line in listed if line.startswith("!! ")]
+    stray = [path for path in stray if not _ignored_allowed(path) and not _bytecode(path)]
     if stray:
         problems.append(f"undeclared ignored files in the worktree: {stray[:10]}")
-    evidence["ignored_files"] = len(ignored)
+    evidence["ignored_files"] = sum(line.startswith("!! ") for line in listed)
+    return problems, evidence
+
+
+def source_problems(worktree: Path | None = None, commit: str = HISTORICAL_COMMIT, tree: str = HISTORICAL_TREE,
+                    interpreter: Path | None = None) -> tuple[list[str], dict]:
+    """The declared source check (code_checks.historical_donors), with the evidence it rests on. The trainer is
+    imported only if every git-level check passed, and never with bytecode written."""
+    worktree = worktree or WORKTREE
+    problems, evidence = worktree_problems(worktree, commit, tree)
+    if problems:
+        return problems, evidence
     done = subprocess.run([str(interpreter or REPO / INTERPRETER), "-c", CLOSURE_CODE], cwd=worktree,
-                          capture_output=True, text=True, env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+                          capture_output=True, text=True, env={**os.environ, **NO_BYTECODE})
     if done.returncode != 0:
-        return problems + [f"importing scripts/train_room1.py in the worktree failed: {done.stderr.strip()[-300:]}"], evidence
+        return [f"importing scripts/train_room1.py in the worktree failed: {done.stderr.strip()[-300:]}"], evidence
     closure, tracked = {}, set(_git(worktree, "ls-files").splitlines())
     for line in done.stdout.splitlines():
         file = Path(line)
@@ -397,13 +486,14 @@ def source_problems(worktree: Path | None = None, commit: str = HISTORICAL_COMMI
         blob = _git(worktree, "hash-object", f"--path={relative}", str(file)).strip()
         try:
             expected = _git(worktree, "rev-parse", f"{commit}:{relative}").strip() if relative in tracked else None
-        except Refused:  # the file is not in that commit (for example the worktree is at another commit)
+        except Refused:  # the file is not in that commit
             expected = None
         if blob != expected:
             problems.append(f"{relative} is not its blob at {commit[:7]} ({blob} vs {expected})")
         closure[relative] = blob
     if "scripts/train_room1.py" not in closure or not any(p.startswith("celeste_rl/") for p in closure):
         problems.append(f"the import closure is incomplete: {sorted(closure)}")
+    problems += worktree_problems(worktree, commit, tree)[0]  # the import wrote nothing
     evidence["closure"] = closure
     return problems, evidence
 
@@ -441,7 +531,7 @@ def prepare_action() -> int:
     record: dict = {"action": "prepare", "worktree": WORKTREE.as_posix(), "commit": HISTORICAL_COMMIT,
                     "executor": executor_identity()}
     try:
-        guard = fresh_sets.paths_problems([str(REPO / INIT_CLONE)])
+        guard = fresh_sets.paths_problems([str(REPO / INIT_CLONE)], fresh=FRESH)
         if guard:
             raise Refused("; ".join(guard))
         if not WORKTREE.exists():
@@ -450,7 +540,7 @@ def prepare_action() -> int:
         if not (WORKTREE / INIT_CLONE).exists():
             shutil.copytree(REPO / INIT_CLONE, WORKTREE / INIT_CLONE)
             record["copied_init_clone"] = True
-        guard = fresh_sets.paths_problems([str(WORKTREE / INIT_CLONE)])  # the copy, before it is hashed
+        guard = fresh_sets.paths_problems([str(WORKTREE / INIT_CLONE)], fresh=FRESH)  # the copy, before it is hashed
         if guard:
             raise Refused("; ".join(guard))
         problems, hashes = init_clone_problems()
@@ -487,25 +577,73 @@ def write_record(record: dict, stem: str, extra: dict[str, str] | None = None, d
     raise FileExistsError(f"no free record name for {stem}-{stamp}")
 
 
-def entry_status(records: Path, item: dict) -> str | None:
-    """'ok' or 'failed' from this entry's attempt records (refusals and dry runs do not count); None if never run."""
-    outcomes = set()
-    for path in records.glob("attempt-*.json"):
+def attempt_statuses(records: Path) -> dict[tuple[int, int], str]:
+    """'ok' or 'failed' per (seed, attempt) from the attempt records: a final record says which; a started marker
+    without its final record is an interrupted, failed attempt. Refusals and dry runs are not attempts. An unreadable
+    attempt file cannot be attributed, so it stops everything for review."""
+    outcomes: dict[tuple[int, int], set] = {}
+    for path in sorted(records.glob("attempt-*.json")):
+        marker = path.name.endswith(STARTED)
+        if marker and path.with_name(path.name[:-len(STARTED)] + ".json").exists():
+            continue  # its final record decides
         try:
-            record = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            outcomes.add("failed")  # an unreadable attempt record is never taken as success
-            continue
-        planned = record.get("entry") if isinstance(record, dict) else None
-        if isinstance(planned, dict) and (planned.get("seed"), planned.get("attempt")) == (item["seed"], item["attempt"]):
-            outcomes.add(record.get("outcome") if record.get("outcome") == "ok" else "failed")
-    if "failed" in outcomes:
-        return "failed"
-    return "ok" if outcomes else None
+            record = read_json(path)
+            planned = record["entry"]
+            key = (int(planned["seed"]), int(planned["attempt"]))
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise Refused(f"attempt file {path.name} cannot be read ({type(error).__name__}); stop for review")
+        outcome = "failed" if marker else ("ok" if record.get("outcome") == "ok" else "failed")
+        outcomes.setdefault(key, set()).add(outcome)
+    return {key: "failed" if "failed" in found else "ok" for key, found in outcomes.items()}
+
+
+def entry_status(records: Path, item: dict) -> str | None:
+    return attempt_statuses(records).get((item["seed"], item["attempt"]))
 
 
 def executor_identity() -> dict:
     return {"script_sha256": _sha256(Path(__file__)), "git": runtime.git_state()}
+
+
+# ------------------------------------------------------------------------------------------------------ eligibility
+
+def eligibility_problems(plan: dict, item: dict, records: Path, preflight: bool = False) -> list[str]:
+    """Whether the attempt records allow this entry to launch now. preflight (dry run) skips only the rule that every
+    earlier entry is resolved."""
+    statuses = attempt_statuses(records)
+    seed, attempt = item["seed"], item["attempt"]
+    problems = []
+    if (seed, attempt) in statuses:
+        problems.append(f"seed {seed} attempt {attempt} already has an attempt record")
+    if any(statuses.get((seed, a)) == "ok" for a in range(1, attempt)):
+        problems.append(f"seed {seed} already has an ok attempt")
+    if attempt > 1 and statuses.get((seed, attempt - 1)) != "failed":
+        problems.append(f"seed {seed} attempt {attempt} is a rerun, but attempt {attempt - 1} has no failed record")
+    replaced = replaced_seed(item)
+    if replaced is not None:
+        tries = [e["attempt"] for e in plan["entries"] if e["seed"] == replaced]
+        if tries and statuses.get((replaced, tries[-1])) != "ok":
+            problems.append(f"seed {seed} replaces seed {replaced}, whose latest training attempt is not ok")
+    if not preflight:
+        for earlier in plan["entries"][:plan["entries"].index(item)]:
+            status = statuses.get((earlier["seed"], earlier["attempt"]))
+            later = [e for e in plan["entries"] if e["seed"] == earlier["seed"] and e["attempt"] > earlier["attempt"]]
+            if status is None or (status == "failed" and not later):
+                problems.append(f"earlier entry seed {earlier['seed']} attempt {earlier['attempt']} is unresolved")
+    return problems
+
+
+def next_entry(plan: dict, records: Path) -> dict | None:
+    """The first entry without an attempt record; Refused if a failed attempt has no later attempt planned."""
+    statuses = attempt_statuses(records)
+    for item in plan["entries"]:
+        status = statuses.get((item["seed"], item["attempt"]))
+        if status == "failed" and not [e for e in plan["entries"]
+                                       if e["seed"] == item["seed"] and e["attempt"] > item["attempt"]]:
+            raise Refused(f"seed {item['seed']} attempt {item['attempt']} failed; revise the plan (plan --rerun)")
+        if status is None:
+            return item
+    return None
 
 
 # ------------------------------------------------------------------------------------------------------------- run
@@ -515,61 +653,29 @@ def steam_running() -> bool:
     return any(line.strip().lower().startswith('"steam.exe"') for line in output.splitlines())
 
 
-def resolved(command: list[str], root: Path) -> list[str]:
-    """The command as the child sees it: each relative path that exists under its working directory made absolute."""
-    return [str(root / token) if not token.startswith("-") and not Path(token).is_absolute() and (root / token).exists()
-            else token for token in command]
-
-
-def guard_problems(command: list[str], worktree: Path, fresh: dict = fresh_sets.FRESH) -> list[str]:
-    """The fresh-set guard with no allowed use: the command as given, as resolved in the worktree, and the copied init
-    clone with its dependencies."""
-    try:
-        fresh_sets.refuse_unless_declared([command, resolved(command, worktree)], (), fresh=fresh)
-    except fresh_sets.FreshSetRefused as error:
-        return [f"fresh-set guard: {error}"]
-    return fresh_sets.paths_problems([str(worktree / INIT_CLONE)], fresh=fresh)
-
-
-def next_entries(plan: dict, records: Path) -> list[dict]:
-    """The entries still to run, in plan order; Refused if a failed attempt has no later attempt planned."""
-    pending, done = [], set()
-    for item in plan["entries"]:
-        status = entry_status(records, item)
-        if item["seed"] in done:
-            raise Refused(f"seed {item['seed']} already has an ok attempt; attempt {item['attempt']} is not allowed")
-        if status == "ok":
-            done.add(item["seed"])
-        if status == "failed":
-            later = [e for e in plan["entries"] if e["seed"] == item["seed"] and e["attempt"] > item["attempt"]]
-            replaced = [e for e in plan["entries"] if f"replaces seed {item['seed']}:" in str(e.get("reason", ""))]
-            if not later and not replaced:
-                raise Refused(f"seed {item['seed']} attempt {item['attempt']} failed; revise the plan (plan --rerun)")
-        elif status is None:
-            pending.append(item)
-    return pending
-
-
-def launch_problems(plan: dict, item: dict, declaration: dict) -> tuple[list[str], dict]:
-    """Why this attempt must not start, and the recorded conditions."""
-    problems, conditions = [], {}
+def launch_problems(plan: dict, item: dict, declaration: dict, preflight: bool = False) -> tuple[list[str], dict]:
+    """Why this attempt must not start, and the recorded conditions. The fresh-set checks come first; if they refuse,
+    nothing else is read or started."""
+    conditions: dict = {"fresh_set_check": "identity of the original manifest and the game files the old trainer reads; "
+                                           "full guard on the command as given and as resolved, and the init clone"}
+    guard = identity_problems([REPO / rc.ORIGINAL / "manifest.json", *(GAME / name for name in GAME_FILES_READ)])
+    guard += guard_problems(item["command"], WORKTREE)
+    if guard:
+        return guard, conditions
+    problems = []
     refusal = runtime.refusal(runtime.git_state(), allow_dirty=False)
     if refusal:
         problems.append(refusal)
     problems += committed(PLAN) + amendment_problems(declaration)
     try:
         problems += plan_problems(plan, declaration, authorization())
+        problems += eligibility_problems(plan, item, RECORDS, preflight)
     except Refused as error:
-        problems.append(f"authorization: {error}")
-    # The fresh-set guard comes before anything reads the command's inputs (the init clone is hashed only after it).
-    guard = guard_problems(item["command"], WORKTREE)
-    problems += guard
-    conditions["fresh_set_check"] = "no allowed use; command as given and as resolved in the worktree; init clone"
+        problems.append(str(error))
     source, conditions["source_check"] = source_problems()
     problems += source
-    if not guard:
-        clone, conditions["init_clone_files"] = init_clone_problems()
-        problems += clone
+    clone, conditions["init_clone_files"] = init_clone_problems()
+    problems += clone
     for root in (WORKTREE, REPO):
         if (root / item["run_dir"]).exists():
             problems.append(f"{root / item['run_dir']} already exists")
@@ -592,13 +698,14 @@ def launch_problems(plan: dict, item: dict, declaration: dict) -> tuple[list[str
 
 
 def outcome_problems(run: Path, seed: int, original: Path = REPO / rc.ORIGINAL) -> tuple[list[str], dict]:
-    """Why a finished attempt does not count as a donor (donors.historical_training.ok), and its fault report."""
+    """Why a finished attempt does not count as a donor (donors.historical_training.ok), and its fault report.
+    Unexpected structure raises; the caller records it as a failed attempt."""
     try:
         manifest = rc.validate_run(run, f"seed {seed}")
-        rows = rc._rows_jsonl(run / "evaluations.jsonl")
-        reference = json.loads((original / "manifest.json").read_text(encoding="utf-8"))
-    except (rc.Invalid, OSError, ValueError, KeyError, IndexError, TypeError) as error:
-        return [f"incomplete run: {type(error).__name__}: {error}"], {}
+    except rc.Invalid as error:
+        return [f"incomplete run: {error}"], {}
+    rows = rc._rows_jsonl(run / "evaluations.jsonl")
+    reference = read_json(original / "manifest.json")
     problems = []
     sessions = manifest["sessions"]
     if len(sessions) != 1:
@@ -631,84 +738,145 @@ def copy_run(source: Path, target: Path) -> dict:
     return {"path": _relative(target), "files": after, "verified": True}
 
 
+def start_attempt(record: dict) -> Path:
+    """Reserve the attempt's name with an exclusively created started marker; returns the base path (no suffix)."""
+    RECORDS.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    for number in range(1, 100):
+        base = RECORDS / (f"attempt-{stamp}" + (f"-{number}" if number > 1 else ""))
+        try:
+            with open(f"{base}{STARTED}", "x", encoding="utf-8") as handle:
+                handle.write(json.dumps({"entry": record["entry"], "started": datetime.now().isoformat(),
+                                         "command": record["command"]}, indent=2) + "\n")
+            return base
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free attempt name for attempt-{stamp}")
+
+
+def _tail(path: Path, lines: int) -> list[str]:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").strip().splitlines()[-lines:]
+    except OSError:
+        return []
+
+
+def finish_attempt(base: Path, record: dict) -> str:
+    """Write the attempt's final record exclusively, with its log files; returns the outcome."""
+    logs = {"stdout.txt": Path(f"{base}.stdout.txt"), "stderr.txt": Path(f"{base}.stderr.txt")}
+    record.update(log_files={k: v.as_posix() for k, v in logs.items()}, stdout_tail=_tail(logs["stdout.txt"], 5),
+                  stderr_tail=_tail(logs["stderr.txt"], 8), outcome="failed" if record["problems"] else "ok")
+    with open(f"{base}.json", "x", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, indent=2, default=str) + "\n")
+    print(f"seed {record['entry']['seed']} attempt {record['entry']['attempt']}: {record['outcome'].upper()}"
+          + (f" ({'; '.join(map(str, record['problems']))})" if record["problems"] else f" in {record['seconds']} s"))
+    print(f"Record: {base}.json")
+    return record["outcome"]
+
+
+def postprocess(record: dict, item: dict) -> None:
+    """Judge a finished child and copy an ok run here; fills record['problems']. Unexpected errors propagate."""
+    problems = record["problems"]
+    if record.get("exit_code") != 0:
+        problems.append(f"exit status {record.get('exit_code')}")
+    after = worktree_problems(WORKTREE, HISTORICAL_COMMIT, HISTORICAL_TREE)[0]
+    problems += [f"after the run: {p}" for p in after]
+    run = WORKTREE / item["run_dir"]
+    if not run.is_dir():
+        problems.append(f"{run} was not created")
+        return
+    guard = fresh_sets.paths_problems([str(run)], fresh=FRESH)  # the outputs, before they are read
+    if guard:
+        problems += guard
+        return
+    record["run_files"] = file_hashes(run)
+    found, record["faults"] = outcome_problems(run, item["seed"])
+    problems += found
+    if not problems:
+        record["copy_target"] = _relative(REPO / item["run_dir"])  # names a partial copy if copying is interrupted
+        record["copy"] = copy_run(run, REPO / item["run_dir"])
+
+
 def run_entry(plan: dict, item: dict, declaration: dict, dry_run: bool) -> str:
-    """One attempt (or its dry run) with its record: 'ok', 'failed', 'refused' or 'dry-run'."""
+    """One attempt (or its preflight) with its record: 'ok', 'failed', 'refused' or 'dry-run'."""
     command = [str(REPO / INTERPRETER), *item["command"]]
-    problems, conditions = launch_problems(plan, item, declaration)
-    env = rc.stripped_env(dict(os.environ))
+    problems, conditions = launch_problems(plan, item, declaration, preflight=dry_run)
     record = {"executor": executor_identity(), "source": {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE},
               "plan": {"path": _relative(PLAN), "text_sha256": fresh_sets.text_sha256(PLAN),
                        "revision": plan.get("revision")},
               "entry": item, "worktree": WORKTREE.as_posix(), "cwd": WORKTREE.as_posix(), "command": command,
-              "declaration_text_sha256": fresh_sets.text_sha256(DECLARATION),
-              "thread_variables_removed": rc.thread_variables(dict(os.environ)), "threads": rc.thread_probe(env),
-              "limit_minutes": LIMIT_MINUTES, "conditions": conditions, "launch_problems": problems, "dry_run": dry_run}
-    if problems or dry_run:
-        print(("Refused:\n  " + "\n  ".join(problems)) if problems else f"Dry run passed: seed {item['seed']} "
-              f"attempt {item['attempt']}: {' '.join(item['command'])}")
-        status = "refused" if problems else "dry-run"
-        print(f"Record: {write_record(record, status)}")
-        return status
-    started, output = time.time(), {"stdout": "", "stderr": ""}
+              "declaration_text_sha256": fresh_sets.text_sha256(DECLARATION), "limit_minutes": LIMIT_MINUTES,
+              "conditions": conditions, "launch_problems": problems, "dry_run": dry_run}
+    if problems:
+        print("Refused:\n  " + "\n  ".join(problems))
+        print(f"Record: {write_record(record, 'refused')}")
+        return "refused"
+    env = {**rc.stripped_env(dict(os.environ)), **NO_BYTECODE}
+    record.update(thread_variables_removed=rc.thread_variables(dict(os.environ)), threads=rc.thread_probe(env),
+                  environment_set=NO_BYTECODE)
+    if dry_run:
+        print(f"Dry run passed: seed {item['seed']} attempt {item['attempt']}: {' '.join(item['command'])}")
+        print(f"Record: {write_record(record, 'dry-run')}")
+        return "dry-run"
+    record["problems"] = []
+    base = start_attempt(record)
+    child_running, started = False, time.time()
     try:
-        done = subprocess.run(command, cwd=WORKTREE, env=env, capture_output=True, text=True,
-                              timeout=LIMIT_MINUTES * 60)
-        output.update(stdout=done.stdout or "", stderr=done.stderr or "")
-        record["exit_code"] = done.returncode
-    except subprocess.TimeoutExpired as error:
-        for key, value in (("stdout", error.stdout), ("stderr", error.stderr)):
-            output[key] = value.decode(errors="replace") if isinstance(value, bytes) else (value or "")
-        record.update(exit_code=None, timed_out=True, game_cleanup=rc.cleanup_own_game(GAME))
-    except BaseException as error:  # stopped by hand or broken: stop the game, keep what was captured, then re-raise
-        record.update(exit_code=None, launch_error=f"{type(error).__name__}: {error}", outcome="failed",
-                      problems=["the launch was interrupted"], game_cleanup=rc.cleanup_own_game(GAME))
-        print(f"Record: {write_record(record, 'attempt', {'stdout.txt': output['stdout'], 'stderr.txt': output['stderr']})}")
-        raise
-    record["seconds"] = round(time.time() - started)
-    run = WORKTREE / item["run_dir"]
-    outcome = [f"exit status {record['exit_code']}"] if record.get("exit_code") != 0 else []
-    faults: dict = {}
-    if run.is_dir():
-        found, faults = outcome_problems(run, item["seed"])
-        outcome += found
-        record["run_files"] = file_hashes(run)
-    else:
-        outcome.append(f"{run} was not created")
-    record["faults"] = faults
-    if not outcome:
-        try:
-            record["copy"] = copy_run(run, REPO / item["run_dir"])
-        except (Refused, OSError) as error:
-            outcome.append(f"copy: {error}")
-    record.update(problems=outcome, outcome="failed" if outcome else "ok",
-                  stdout_tail=output["stdout"].strip().splitlines()[-5:],
-                  stderr_tail=output["stderr"].strip().splitlines()[-8:])
-    path = write_record(record, "attempt", {"stdout.txt": output["stdout"], "stderr.txt": output["stderr"]})
-    print(f"seed {item['seed']} attempt {item['attempt']}: {record['outcome'].upper()}"
-          + (f" ({'; '.join(outcome)})" if outcome else f" in {record['seconds']} s"))
-    print(f"Record: {path}")
-    return record["outcome"]
+        with open(f"{base}.stdout.txt", "x", encoding="utf-8") as out, \
+                open(f"{base}.stderr.txt", "x", encoding="utf-8") as err:
+            child_running = True
+            try:
+                done = subprocess.run(command, cwd=WORKTREE, env=env, stdout=out, stderr=err, text=True,
+                                      timeout=LIMIT_MINUTES * 60)
+                record["exit_code"] = done.returncode
+            except subprocess.TimeoutExpired:
+                record.update(exit_code=None, timed_out=True, game_cleanup=rc.cleanup_own_game(GAME))
+            child_running = False
+        record["seconds"] = round(time.time() - started)
+        postprocess(record, item)
+    except BaseException as error:  # any failure or interruption still leaves the attempt's record and logs
+        record["problems"].append(f"{type(error).__name__}: {error}")
+        record.setdefault("seconds", round(time.time() - started))
+        if child_running:
+            record["interrupted_child"] = True
+            record["game_cleanup"] = rc.cleanup_own_game(GAME)
+        finish_attempt(base, record)
+        if not isinstance(error, Exception):
+            raise  # stopped by hand: the record is written, then the interruption goes on
+        return "failed"
+    return finish_attempt(base, record)
 
 
 def run_action(dry_run: bool, limit: int | None) -> int:
-    declaration = load_declaration()
     try:
+        problems = identity_problems([DECLARATION, PLAN])
+        if problems:
+            raise Refused("; ".join(problems))
         if not PLAN.exists():
             raise Refused(f"{_relative(PLAN)} does not exist; run plan first")
-        plan = json.loads(PLAN.read_text(encoding="utf-8"))
-        pending = next_entries(plan, RECORDS)
+        declaration, plan = load_declaration(), read_json(PLAN)
+        if dry_run:
+            statuses = attempt_statuses(RECORDS)
+            pending = [item for item in plan["entries"] if (item["seed"], item["attempt"]) not in statuses]
+            if not pending:
+                print("Nothing to run: every planned attempt has a record.")
+                return 0
+            results = [run_entry(plan, item, declaration, dry_run=True) for item in pending]
+            print(f"Preflight: {results.count('dry-run')} of {len(results)} pending entries passed.")
+            return 0 if all(result == "dry-run" for result in results) else 1
+        count = 0
+        while limit is None or count < limit:
+            item = next_entry(plan, RECORDS)  # the records are read again before every launch
+            if item is None:
+                print("Nothing to run: every planned attempt has a record.")
+                return 0
+            count += 1
+            if run_entry(plan, item, declaration, dry_run=False) != "ok":
+                return 1
+        return 0
     except (Refused, OSError, ValueError) as error:
         print(f"Refused: {error}")
         return 1
-    if not pending:
-        print("Nothing to run: every planned attempt has a record.")
-        return 0
-    if dry_run:
-        return 0 if run_entry(plan, pending[0], declaration, dry_run=True) == "dry-run" else 1
-    for item in pending[:limit] if limit is not None else pending:
-        if run_entry(plan, item, declaration, dry_run=False) != "ok":
-            return 1
-    return 0
 
 
 def main() -> int:
