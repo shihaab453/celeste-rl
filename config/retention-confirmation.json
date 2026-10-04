@@ -267,6 +267,29 @@
         "after the first review of amendment 2 (2026-10-04): donors.historical_training.bytecode added and failure_policy, fresh_sets and code_checks.historical_donors made explicit about replacements, attempt records, bytecode and the files read; donors.recipe_check.scope marked as the superseded original scope; running.stage1 gives 7 to 8 hours when the later stage 1 steps run one at a time"
       ],
       "unchanged": "the question, claims, donors 7 and 8, seeds 9 to 16, the command, inclusion and replacement rules, donor order and indices, arms, measurements, outcomes, thresholds, the carry-forward rule, the evaluation campaign and the fresh-set schedule"
+    },
+    {
+      "number": 3,
+      "date": "2026-10-05",
+      "before_any_run": false,
+      "made_after": "historical donor training (seeds 9 to 14, all ok on their first attempt, 2026-10-04) and the stage 1 generator design reviews; made before any stage 1 inclusion evaluation, recording or copy, and before any donor's stage 1 score was seen",
+      "declaration_before_this_amendment": {"commit": "6738d8a", "text_sha256": "883fc5bd662a15da41058d90fc6cdab840ae47eed0fdaeddbf954bc3facab4ae"},
+      "form": "only this appended entry; no other part of the declaration is changed, so every earlier rule, command, seed, threshold and amendment stands as written",
+      "reason": "the declaration fixes the stage 1 recipes and the inclusion lines but not how the timestamp-dependent stage 1 steps are sequenced, how technical failures are recovered, or which failure receives replacement seed 15 and which 16; these are fixed here before any stage 1 score exists",
+      "stage1_structure": "stage 1 after the donors runs as four committed runner campaigns per round, each written by scripts/make_confirmation_stage1_plans.py: donor-v1 (the declared v1 inclusion evaluation; round 0 evaluates all eight original donors, seeds 7 to 14, together), record (the declared recording, only for donors whose donor-v1 margin passes), copy (the declared copy command, only for donors with an accepted recording, one at a time on one game copy at 10 threads), copy-v1 (the declared v1 evaluation of each accepted copy); then an inclusion record. Evaluations and recordings run on the three game copies side by side",
+      "lines": "margin = route_macro_success_rate - 0.142 (the literal floor), from the unrounded aggregate, rounded to 6 decimals, then compared with >= 0.20 (equality passes); a donor below the donor line gets no recording or copy; included = both the donor line and the copy line passed",
+      "recording_binding": "a recording is accepted only from the folder its own successful runner entry announced (scripts/run_overnight.py stores each attempt's announced paths), and only if its play.json and dataset.npz validate; matching metadata alone is not enough",
+      "completion_and_recovery": "a campaign summary is audited but never advances a phase; a phase completion record maps every planned item to exactly one valid outcome from the original campaign or a recovery revision, keeping every failed attempt. Technical failures (missing or invalid artifacts, timeouts, errors, malformed scores, wrong counts, invalid provenance) are recovered with the same command and seed in a new plan revision; a valid score or fit is never repeated. An evaluation with stale starts, an interrupted campaign whose completion is uncertain, or an entry started without an outcome stops for review; a recovery is planned only after the original campaign has provably ended",
+      "replacement_allocation": "only performance exclusions (a donor or copy below its line) allocate replacements; technical failures never do. A round completes all four phases and its inclusion record before replacements are proposed. Within a completed round, donor-line exclusions come before copy-line exclusions, each by ascending j; seeds are allocated in the declared order 15, then 16, from one budget shared by both lines and all rounds; a seed is reserved when proposed and never given to another slot. A replacement takes the replaced donor's j (so its copy seed is 10 + j), is trained by the historical donor executor (plan --replace) and must pass its own donor line, recording, copy and copy line in the next round; if it fails a line it gets the next seed only if one is still free. Indices are never compacted. With the budget used up, the experiment proceeds only with at least six fully qualified donors, otherwise it stops for review (donors.inclusion.end_state)",
+      "executor_rebind": "this amendment changes the declaration's text hash, which the historical donor plan pins; the executor's one-time plan --rebind-amendment-3 records it as a plan revision with every entry unchanged (attempt records keep their original bindings)",
+      "evidence": {
+        "stage1_design_review_round1": {"path": "runs/scratch/overnight-20260930/received-verdict-stage1-design.md (private)", "sha256": "bd25b06acee167221f31ec125992e2fb6e076e496eeb31b78ac2f5f08ac0419b"},
+        "stage1_design_review_round2": {"path": "runs/scratch/overnight-20260930/received-verdict-stage1-design-round2.md (private)", "sha256": "2d5218df6e97c33716ec601c7f076bf3b15692f16fdde33e0e90548d6dd5d95d"},
+        "stage1_design_review_round3": {"path": "runs/scratch/overnight-20260930/received-verdict-stage1-design-round3.md (private)", "sha256": "fdd675c9d07a0d87691fafb44826bdcd8686c289e1e04ed2bd8009dda41ebcd5", "verdict": "approved for implementation"},
+        "executor_launcher_review": {"path": "runs/scratch/overnight-20260930/received-verdict-executor-launcher-fix.md (private)", "sha256": "d6773544932bf19b6f310f1dd19f00201d4be960704f55d394fe32153565515a"},
+        "historical_donors": "runs/confirmation/donors/attempt-*.json at executor 933c3a0 (pushed); plan config/confirmation-donors-historical.json revision 0"
+      },
+      "unchanged": "everything outside this entry"
     }
   ]
 }
