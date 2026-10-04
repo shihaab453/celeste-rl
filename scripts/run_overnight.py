@@ -384,6 +384,12 @@ def result_artifact(stdout: str, repo: Path = REPO) -> dict | None:
     return artifact
 
 
+def announced_paths(stdout: str) -> list[str]:
+    """Every path a child announced after "Results:" anywhere in a line of its own stdout (the policy recorder prints
+    it mid-line). Strings only: nothing is opened or followed here; whoever reads them validates them first."""
+    return [line.split("Results:", 1)[1].strip() for line in stdout.splitlines() if "Results:" in line]
+
+
 def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, env: dict | None = None,
             fresh_set_stage: str | None = None) -> dict:
     """One run, bounded in time. Returns its outcome. `env` is the child's environment (None: inherit).
@@ -413,7 +419,8 @@ def execute(entry: dict, logfile: Path, game_dir: Path, resume: bool = False, en
         for line in (finished.stderr or "").strip().splitlines()[-6:]:
             log(logfile, f"  ! {line}")
     outcome = {"status": "ok" if code == 0 else f"exit_{code}",
-               "seconds": round(time.time() - started), "command": command[1:]}
+               "seconds": round(time.time() - started), "command": command[1:],
+               "announced": announced_paths(stdout)}  # this attempt's own output only (a retry keeps its own)
     artifact = result_artifact(stdout)
     if artifact is not None:
         outcome["artifact"] = artifact

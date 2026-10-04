@@ -216,6 +216,57 @@ class ExecuteTests(unittest.TestCase):
         ])
 
 
+class AnnouncedTests(unittest.TestCase):
+    """Each attempt keeps the paths its own child announced, so a recording binds to its entry (stage 1 review)."""
+
+    def test_announced_paths(self) -> None:
+        cases = {
+            "recorder (mid-line)": ("5276 frames over 25 episodes, endings {}. Results: runs/policy-play/x/1\n",
+                                    ["runs/policy-play/x/1"]),
+            "evaluator (line start)": ("held-out success\nResults: runs/heldout-evaluation/2/results.json\n",
+                                       ["runs/heldout-evaluation/2/results.json"]),
+            "several": ("Results: a\nnoise\nlater Results: b\n", ["a", "b"]),
+            "none": ("held-out success 3/4\nby route: r1 75%\n", []),
+            "empty path": ("Results:\n", [""]),
+        }
+        for name, (stdout, expected) in cases.items():
+            with self.subTest(case=name):
+                self.assertEqual(run_overnight.announced_paths(stdout), expected)
+
+    @mock.patch.object(run_overnight.subprocess, "run")
+    def test_each_attempt_keeps_its_own_announcements(self, run: mock.Mock) -> None:
+        run.side_effect = [
+            run_overnight.subprocess.CompletedProcess([], 1, stdout="partial. Results: runs/policy-play/x/failed\n",
+                                                      stderr=""),
+            run_overnight.subprocess.CompletedProcess([], 0, stdout="25 episodes. Results: runs/policy-play/x/ok\n",
+                                                      stderr=""),
+        ]
+        entry = {"id": "record-j0", "run_dir": "runs/evaluation/_planned-record-j0", "limit_minutes": 1,
+                 "command": ["scripts/record_policy_play.py", "--seed", "20260926"]}
+        with tempfile.TemporaryDirectory() as temporary:
+            logfile = Path(temporary) / "campaign.log"
+            first = run_overnight.execute(entry, logfile, Path("C:/games/celeste"))
+            retry = run_overnight.execute(entry, logfile, Path("C:/games/celeste"))
+            merged = run_overnight.merge_attempts(first, retry)
+            log_text = logfile.read_text(encoding="utf-8")
+        self.assertEqual(merged["announced"], ["runs/policy-play/x/ok"])  # the final, successful attempt's own
+        self.assertEqual([a["announced"] for a in merged["attempts"]],
+                         [["runs/policy-play/x/failed"], ["runs/policy-play/x/ok"]])
+        self.assertNotIn("frames", json.dumps(merged["announced"]))  # paths only, no other output text
+        self.assertIn("record-j0", log_text)
+
+    @mock.patch.object(run_overnight.subprocess, "run",
+                       side_effect=run_overnight.subprocess.TimeoutExpired(["x"], 60))
+    @mock.patch.object(run_overnight, "clear_game")
+    def test_timeout_announces_nothing(self, clear: mock.Mock, run: mock.Mock) -> None:
+        entry = {"id": "record-j0", "run_dir": "runs/evaluation/_planned-record-j0", "limit_minutes": 1,
+                 "command": ["scripts/record_policy_play.py"]}
+        with tempfile.TemporaryDirectory() as temporary:
+            outcome = run_overnight.execute(entry, Path(temporary) / "campaign.log", Path("C:/games/celeste"))
+        self.assertEqual(outcome["status"], "timed_out")
+        self.assertNotIn("announced", outcome)
+
+
 class CampaignOutcomeTests(unittest.TestCase):
     def test_successful_retry_is_final_success_and_retains_attempts(self) -> None:
         first = {"status": "exit_1", "seconds": 5, "command": ["first"]}
