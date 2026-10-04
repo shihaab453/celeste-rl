@@ -11,6 +11,7 @@ Run from the repo root with the RL interpreter:
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py plan --check
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py plan --rerun SEED
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py plan --replace SEED --reason TEXT
+    .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py plan --rebind-amendment-3
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py prepare
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py check
     .venv-rl/Scripts/python.exe scripts/confirmation_historical_donors.py run [--dry-run] [--max N]
@@ -31,6 +32,15 @@ earlier entry: a rerun only after a failed attempt of that seed (at most two rer
 inclusion rule, of a donor whose training succeeded (a failed training attempt is recovered with the same seed),
 within the two-seed budget, in order 15 then 16, taking the replaced donor's j. Commit and push the plan (and each
 revision) before running it.
+
+plan --rebind-amendment-3 (one time): amendment 3 changes the declaration's text hash that the plan pins. This
+writes a plan revision with every entry unchanged, bound to the amended declaration, only if: the plan and the
+declaration are committed; the declaration text the plan pins is read from the commit holding that plan version
+(identity-checked, never assumed to be HEAD) and the plan passes plan_problems against it; the new declaration is
+that text plus exactly one appended entry, the reviewed amendment 3 (canonical JSON hash AMENDMENT_3_SHA256, number
+the integer 3), compared type-preservingly with duplicate JSON keys refused; and every attempt record names a
+committed plan version and the declaration that version pinned. Run again after it is committed: nothing to do.
+Any other declaration change, a second amendment 3 or an edited plan is refused.
 
 prepare: creates the worktree (git worktree add --detach) if absent and copies the init clone folder into it,
 verifying every file's sha256; records both. It never changes an existing worktree's files.
@@ -252,11 +262,12 @@ def _relative(path: Path) -> str:
 
 # --------------------------------------------------------------------------------------------------------- the plan
 
-def fixed_fields(declaration: dict, auth: dict) -> dict:
-    """Everything a plan pins apart from its entries and revision."""
+def fixed_fields(declaration: dict, auth: dict, declaration_sha256: str | None = None) -> dict:
+    """Everything a plan pins apart from its entries and revision. declaration_sha256 names the declaration text the
+    plan was written against (default: the live file's), so an earlier plan can be checked against its own text."""
     return {"name": "confirmation-donors-historical",
             "declaration": {"path": "config/retention-confirmation.json",
-                            "text_sha256": fresh_sets.text_sha256(DECLARATION)},
+                            "text_sha256": declaration_sha256 or fresh_sets.text_sha256(DECLARATION)},
             "rules": "donors.historical_training (amendment 2)",
             "source": {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE},
             "worktree": WORKTREE.as_posix(), "game_dir": GAME.as_posix(), "interpreter": INTERPRETER.as_posix(),
@@ -283,13 +294,13 @@ def replaced_seed(item: dict) -> int | None:
     return int(named.group(1)) if named else None
 
 
-def plan_problems(plan: dict, declaration: dict, auth: dict) -> list[str]:
+def plan_problems(plan: dict, declaration: dict, auth: dict, declaration_sha256: str | None = None) -> list[str]:
     """Differences between a plan and what the declaration and records require now (static rules only; the attempt
     records are checked by eligibility_problems before each launch)."""
     if not isinstance(plan, dict) or not isinstance(plan.get("entries"), list):
         return ["the plan is not a record with entries"]
     problems = [f"plan {key}: {plan.get(key)!r}, expected {value!r}"
-                for key, value in fixed_fields(declaration, auth).items() if plan.get(key) != value]
+                for key, value in fixed_fields(declaration, auth, declaration_sha256).items() if plan.get(key) != value]
     replacements = list(declaration["donors"]["replacement_seeds"])
     allowed = set(declaration["donors"]["new_seeds"]) | set(replacements)
     seen = set()
@@ -416,6 +427,156 @@ def plan_action(check: bool, rerun: int | None, replace: int | None, reason: str
     print(f"Wrote {_relative(PLAN)} revision {plan['revision']} with {len(plan['entries'])} entries; commit and push it "
           "before running it.")
     return 0
+
+
+# --------------------------------------------------------------------------- the one-time amendment 3 rebind
+
+def strict_json(text: str):
+    """JSON with duplicate keys refused (a later duplicate would silently replace an earlier value)."""
+    def pairs(items):
+        keys = [key for key, _ in items]
+        repeated = sorted({key for key in keys if keys.count(key) > 1})
+        if repeated:
+            raise Refused(f"duplicate JSON keys {repeated}")
+        return dict(items)
+    return json.loads(text, object_pairs_hook=pairs)
+
+
+def same_json(a, b) -> bool:
+    """Type-preserving JSON equality: true is not 1, 1 is not 1.0, and key sets must match exactly."""
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(same_json(a[key], b[key]) for key in a)
+    if isinstance(a, list):
+        return len(a) == len(b) and all(same_json(x, y) for x, y in zip(a, b))
+    return a == b
+
+
+def canonical_sha256(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                          .encode("utf-8")).hexdigest()
+
+
+def _text_sha256_of(blob: bytes) -> str:
+    """The texthash of committed bytes (CRLF taken as LF), as fresh_sets.text_sha256 computes it for a file."""
+    return hashlib.sha256(blob.replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _git_bytes(*args: str) -> bytes:
+    done = subprocess.run(["git", "-C", str(REPO), *args], capture_output=True)
+    if done.returncode != 0:
+        raise Refused(f"git {' '.join(args)} exited {done.returncode}: {done.stderr.decode(errors='replace')[:300]}")
+    return done.stdout
+
+
+# The reviewed amendment 3 entry, by canonical JSON hash: the rebind accepts exactly this appended entry.
+AMENDMENT_3_SHA256 = "96c5f7d54d2028fe031c4c54c575c2cd7ce7785393b3ae5367dca628484cec42"
+PLAN_RELATIVE = "config/confirmation-donors-historical.json"
+DECLARATION_RELATIVE = "config/retention-confirmation.json"
+
+
+def plan_history() -> list[tuple[str, str, dict]]:
+    """Every committed version of the plan, newest first: (commit, plan text hash, plan)."""
+    commits = _git_bytes("log", "--format=%H", "--", PLAN_RELATIVE).decode().split()
+    history = []
+    for commit in commits:
+        blob = _git_bytes("show", f"{commit}:{PLAN_RELATIVE}")
+        history.append((commit, _text_sha256_of(blob), strict_json(blob.decode("utf-8"))))
+    return history
+
+
+def rebind_problems(old_text: bytes, new_text: bytes) -> list[str]:
+    """Whether the new declaration is the old one plus exactly the reviewed amendment 3, nothing else."""
+    try:
+        old, new = strict_json(old_text.decode("utf-8")), strict_json(new_text.decode("utf-8"))
+    except (Refused, ValueError) as error:
+        return [f"declaration cannot be read strictly: {error}"]
+    old_amendments, new_amendments = old.get("amendments"), new.get("amendments")
+    if not isinstance(old_amendments, list) or not isinstance(new_amendments, list):
+        return ["a declaration has no amendments list"]
+    if any(isinstance(a, dict) and "number" in a for a in old_amendments):
+        return ["the previous declaration already has a numbered amendment (amendment 3 was applied before)"]
+    if len(new_amendments) != len(old_amendments) + 1:
+        return [f"expected exactly one appended amendment, found {len(new_amendments) - len(old_amendments)}"]
+    appended = new_amendments[-1]
+    problems = []
+    if not isinstance(appended, dict) or type(appended.get("number")) is not int or appended.get("number") != 3:
+        problems.append("the appended entry is not numbered with the integer 3")
+    if canonical_sha256(appended) != AMENDMENT_3_SHA256:
+        problems.append("the appended entry is not the reviewed amendment 3")
+    if not same_json({**new, "amendments": new_amendments[:-1]}, old):
+        problems.append("the declaration differs from the previous one outside the appended amendment")
+    return problems
+
+
+def rebind_action() -> int:
+    """Record amendment 3's new declaration hash as a plan revision; entries and attempt evidence unchanged."""
+    try:
+        problems = identity_problems([DECLARATION, PLAN]) + committed(PLAN) + committed(DECLARATION)
+        if problems:
+            raise Refused("; ".join(problems))
+        history = plan_history()
+        if not history:
+            raise Refused(f"{PLAN_RELATIVE} has no committed version")
+        _, current_hash, current = history[0]
+        if current_hash != fresh_sets.text_sha256(PLAN) or not same_json(current, read_json(PLAN)):
+            raise Refused("the plan on disk is not its last committed version")
+        new_text = DECLARATION.read_bytes()
+        new_hash = _text_sha256_of(new_text)
+        rebind = current.get("rebind")
+        if rebind is not None:
+            if rebind.get("amendment") == 3 and current["declaration"]["text_sha256"] == new_hash:
+                print("Already rebound to amendment 3; nothing to do.")
+                return 0
+            raise Refused("the plan was already rebound; another amendment 3 is not accepted")
+        old_hash = current["declaration"]["text_sha256"]
+        # The declaration text the plan pins, from a commit holding exactly this plan version and that declaration
+        # text (never HEAD by default: HEAD may already hold the amended declaration).
+        old_text, commit = None, None
+        for candidate, plan_hash, _ in history:
+            if plan_hash != current_hash:
+                continue
+            text = _git_bytes("show", f"{candidate}:{DECLARATION_RELATIVE}")
+            if _text_sha256_of(text) == old_hash:
+                old_text, commit = text, candidate
+                break
+        if old_text is None:
+            raise Refused(f"no commit holds this plan version with the declaration it pins ({old_hash[:12]})")
+        problems = rebind_problems(old_text, new_text)
+        old_declaration = strict_json(old_text.decode("utf-8"))
+        problems += plan_problems(current, old_declaration, authorization(), declaration_sha256=old_hash)
+        problems += attempt_binding_problems(history)
+        if problems:
+            raise Refused("; ".join(problems))
+    except (Refused, OSError, ValueError) as error:
+        print(f"Refused: {error}")
+        return 1
+    revised = {**current, "declaration": {"path": DECLARATION_RELATIVE, "text_sha256": new_hash},
+               "revision": current["revision"] + 1, "previous_text_sha256": current_hash,
+               "rebind": {"amendment": 3, "from_declaration_sha256": old_hash, "to_declaration_sha256": new_hash,
+                          "amendment_sha256": AMENDMENT_3_SHA256, "from_plan_commit": commit,
+                          "reason": "amendment 3 appended to the declaration; entries and attempts unchanged"}}
+    PLAN.write_text(json.dumps(revised, indent=2) + "\n", encoding="utf-8")
+    print(f"Wrote {PLAN_RELATIVE} revision {revised['revision']} bound to the amended declaration; commit and push it.")
+    return 0
+
+
+def attempt_binding_problems(history: list[tuple[str, str, dict]]) -> list[str]:
+    """Every attempt record must name a committed plan version and the declaration that version pinned."""
+    versions = {plan_hash: plan["declaration"]["text_sha256"] for _, plan_hash, plan in history}
+    problems = []
+    for path in sorted(RECORDS.glob("attempt-*.json")):
+        if path.name.endswith(STARTED):
+            continue
+        record = read_json(path)
+        bound = (record.get("plan") or {}).get("text_sha256")
+        if bound not in versions:
+            problems.append(f"{path.name} names plan {str(bound)[:12]}, not a committed plan version")
+        elif record.get("declaration_text_sha256") != versions[bound]:
+            problems.append(f"{path.name} names declaration {str(record.get('declaration_text_sha256'))[:12]}, "
+                            f"not the one its plan version pinned")
+    return problems
 
 
 # ------------------------------------------------------------------------------------------------ the worktree source
@@ -940,12 +1101,16 @@ def main() -> int:
     plan.add_argument("--rerun", type=int)
     plan.add_argument("--replace", type=int)
     plan.add_argument("--reason")
+    plan.add_argument("--rebind-amendment-3", action="store_true",
+                      help="record amendment 3's declaration hash as a plan revision (one time)")
     sub.add_parser("prepare")
     sub.add_parser("check")
     run = sub.add_parser("run")
     run.add_argument("--dry-run", action="store_true")
     run.add_argument("--max", type=int, help="run at most this many attempts")
     args = parser.parse_args()
+    if args.action == "plan" and args.rebind_amendment_3:
+        return rebind_action()
     if args.action == "plan":
         return plan_action(args.check, args.rerun, args.replace, args.reason)
     if args.action == "prepare":

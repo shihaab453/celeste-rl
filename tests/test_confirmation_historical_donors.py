@@ -668,8 +668,11 @@ class LaunchTest(Temp):
             unittest.mock.patch.object(h, "other_experiments", return_value=[]),
             unittest.mock.patch.object(rc, "thread_probe", return_value={"torch_intra_op_threads": 10})]
 
+    # Attempt 3 of seed 9: its folder (-rerun2) never exists in this repository, unlike seed 9's trained run.
+    ITEM = staticmethod(lambda: h.entry(DECLARATION, 2, 9, 3, "rerun after a failed attempt"))
+
     def launch(self, patches, item=None, dry_run=True):
-        item = item or h.entry(DECLARATION, 2, 9, 1)
+        item = item or self.ITEM()
         plan = h.initial_plan(DECLARATION, AUTH)  # built before any spy starts
         for p in patches:
             p.start()
@@ -716,7 +719,7 @@ class LaunchTest(Temp):
                             ("experiment", unittest.mock.patch.object(h, "other_experiments", return_value=["x.py"]))):
             with self.subTest(case=name):
                 self.assertEqual(self.launch(self.patches() + [patch]), "refused")
-        (self.dir / "worktree" / "runs/train/confirm-donor-B-seed9").mkdir(parents=True)
+        (self.dir / "worktree" / "runs/train/confirm-donor-B-seed9-rerun2").mkdir(parents=True)
         self.assertEqual(self.launch(self.patches()), "refused")
         self.assertFalse(list((self.dir / "records").glob("attempt-*")))
 
@@ -741,7 +744,7 @@ class LaunchTest(Temp):
         self.assertEqual((record["outcome"], record["exit_code"]), ("failed", 3))
         self.assertEqual(record["thread_variables_removed"], {"OMP_NUM_THREADS": "4"})
         self.assertEqual(Path(record["log_files"]["stderr.txt"]).read_text(encoding="utf-8"), "err")
-        self.assertEqual(h.entry_status(self.dir / "records", {"seed": 9, "attempt": 1}), "failed")
+        self.assertEqual(h.entry_status(self.dir / "records", {"seed": 9, "attempt": 3}), "failed")
 
 
 def final_record(records: Path) -> dict:
@@ -976,6 +979,154 @@ class ReadingRuleTest(Temp):
         for spy in [*spies.values(), probe]:
             spy.assert_not_called()
         self.assertFalse(list((self.dir / "records").glob("attempt-*")))
+
+
+LIVE = json.loads((REPO / "config" / "retention-confirmation.json").read_text(encoding="utf-8"))
+AMENDMENT_3 = LIVE["amendments"][-1]
+BEFORE_3 = {**LIVE, "amendments": LIVE["amendments"][:-1]}
+
+
+def declaration_text(value) -> bytes:
+    return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+class RebindRuleTest(unittest.TestCase):
+    """Review: the rebind accepts exactly the reviewed amendment 3 appended, compared type-preservingly."""
+
+    def test_the_reviewed_amendment_is_pinned(self):
+        self.assertEqual(AMENDMENT_3["number"], 3)
+        self.assertEqual(h.canonical_sha256(AMENDMENT_3), h.AMENDMENT_3_SHA256)
+        self.assertEqual(h.rebind_problems(declaration_text(BEFORE_3), declaration_text(LIVE)), [])
+
+    def test_anything_else_is_refused(self):
+        def amended(**changes):
+            return {**LIVE, "amendments": LIVE["amendments"][:-1] + [{**AMENDMENT_3, **changes}]}
+        cases = {
+            "unrelated change": {**LIVE, "label": LIVE["label"] + " "},
+            "second appended amendment": {**LIVE, "amendments": LIVE["amendments"] + [AMENDMENT_3]},
+            "edited earlier amendment": {**LIVE, "amendments": [{**LIVE["amendments"][0], "date": "2026-10-02"}]
+                                         + LIVE["amendments"][1:]},
+            "number as text": amended(number="3"),
+            "number as true": amended(number=True),
+            "number as float": amended(number=3.0),
+            "other content": amended(reason="different"),
+            "type change elsewhere": {**LIVE, "donors": {**LIVE["donors"], "new_seeds": [9.0, 10, 11, 12, 13, 14]}},
+            "nothing appended": BEFORE_3}
+        for name, new in cases.items():
+            with self.subTest(case=name):
+                self.assertTrue(h.rebind_problems(declaration_text(BEFORE_3), declaration_text(new)))
+        self.assertTrue(h.rebind_problems(declaration_text(LIVE), declaration_text(
+            {**LIVE, "amendments": LIVE["amendments"] + [AMENDMENT_3]})))  # amendment 3 already applied
+
+    def test_duplicate_keys_are_refused(self):
+        text = declaration_text(LIVE).decode("utf-8").replace('"name": ', '"name": "x", "name": ', 1)
+        self.assertTrue(h.rebind_problems(declaration_text(BEFORE_3), text.encode("utf-8")))
+        with self.assertRaises(h.Refused):
+            h.strict_json('{"a": 1, "a": 2}')
+
+    def test_type_preserving_equality(self):
+        self.assertFalse(h.same_json(True, 1))
+        self.assertFalse(h.same_json(1, 1.0))
+        self.assertFalse(h.same_json({"a": [1]}, {"a": [1], "b": None}))
+        self.assertTrue(h.same_json({"a": [1, {"b": None}]}, {"a": [1, {"b": None}]}))
+
+
+class RebindActionTest(Temp):
+    """The one-time rebind in a stand-in repository: old declaration and plan committed, then amendment 3."""
+
+    def setUp(self):
+        super().setUp()
+        self.repo = self.dir / "repo"
+        (self.repo / "config").mkdir(parents=True)
+        self.records = self.dir / "records"
+        self.records.mkdir()
+        git(self.dir, "init", "-q", str(self.repo))
+        self.declaration = self.repo / "config" / "retention-confirmation.json"
+        self.plan = self.repo / "config" / "confirmation-donors-historical.json"
+        self.patches = [unittest.mock.patch.object(h, "REPO", self.repo),
+                        unittest.mock.patch.object(h, "DECLARATION", self.declaration),
+                        unittest.mock.patch.object(h, "PLAN", self.plan),
+                        unittest.mock.patch.object(h, "RECORDS", self.records),
+                        unittest.mock.patch.object(h, "authorization", return_value=AUTH)]
+        for p in self.patches:
+            p.start()
+        self.declaration.write_bytes(declaration_text(BEFORE_3))
+        self.plan.write_text(json.dumps(h.initial_plan(BEFORE_3, AUTH), indent=2) + "\n", encoding="utf-8")
+        self.commit("declaration and plan before amendment 3")
+        self.old_plan_hash = fresh_sets.text_sha256(self.plan)
+        record = {"entry": {"seed": 9, "attempt": 1}, "outcome": "ok",
+                  "plan": {"text_sha256": self.old_plan_hash},
+                  "declaration_text_sha256": fresh_sets.text_sha256(self.declaration)}
+        write(self.records, "attempt-20261004-193850.json", record)
+
+    def tearDown(self):
+        for p in reversed(self.patches):
+            p.stop()
+        super().tearDown()
+
+    def commit(self, message):
+        git(self.repo, "add", "-A")
+        git(self.repo, "commit", "-qm", message)
+
+    def amend(self, value=None):
+        self.declaration.write_bytes(declaration_text(LIVE if value is None else value))
+        self.commit("amendment 3")
+
+    def test_rebind_keeps_entries_and_attempts_then_replace_works(self):
+        before = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.amend()
+        self.assertEqual(h.rebind_action(), 0)
+        after = json.loads(self.plan.read_text(encoding="utf-8"))
+        self.assertEqual(after["entries"], before["entries"])
+        self.assertEqual(after["revision"], before["revision"] + 1)
+        self.assertEqual(after["previous_text_sha256"], self.old_plan_hash)
+        self.assertEqual(after["declaration"]["text_sha256"], fresh_sets.text_sha256(self.declaration))
+        self.assertEqual(after["rebind"]["amendment_sha256"], h.AMENDMENT_3_SHA256)
+        self.assertEqual(h.plan_problems(after, LIVE, AUTH), [])  # the live, amended declaration now
+        self.assertEqual(h.rebind_action(), 1)  # the revision must be committed first
+        self.commit("rebind")
+        self.assertEqual(h.rebind_action(), 0)  # already rebound: nothing to do
+        self.assertEqual(json.loads(self.plan.read_text(encoding="utf-8")), after)
+        attempt_record(self.records, 11, 1, "ok", "20261004-203807")
+        replaced = h.revised_plan(after, LIVE, self.records, replace=11, reason="copy v1 margin below 0.20")
+        self.assertEqual((replaced["entries"][-1]["seed"], replaced["entries"][-1]["j"]), (15, 4))
+
+    def refused(self):
+        self.assertEqual(h.rebind_action(), 1)
+        self.assertNotIn(b'"rebind"', self.plan.read_bytes())
+
+    def test_unrelated_declaration_change_is_refused(self):
+        self.amend({**LIVE, "label": "changed"})
+        self.refused()
+
+    def test_second_amendment_is_refused(self):
+        self.amend({**LIVE, "amendments": LIVE["amendments"] + [AMENDMENT_3]})
+        self.refused()
+
+    def test_altered_plan_entry_is_refused(self):
+        self.plan.write_text(self.plan.read_text(encoding="utf-8").replace('"seed": 9,', '"seed": 99,', 1),
+                             encoding="utf-8")
+        self.amend()  # commits the altered plan too
+        self.refused()
+
+    def test_uncommitted_plan_is_refused(self):
+        self.amend()
+        self.plan.write_text(self.plan.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        self.refused()
+
+    def test_attempt_bound_to_an_unknown_plan_is_refused(self):
+        write(self.records, "attempt-20261004-200901.json", {
+            "entry": {"seed": 10, "attempt": 1}, "outcome": "ok", "plan": {"text_sha256": "0" * 64},
+            "declaration_text_sha256": "1" * 64})
+        self.amend()
+        self.refused()
+
+    def test_head_is_not_assumed_to_be_the_pinned_declaration(self):
+        """The plan's own commit supplies the old declaration: here the plan is recommitted after the amendment."""
+        self.amend()
+        self.plan.write_text(self.plan.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        self.commit("plan touched after the amendment")  # the plan's last commit now holds the amended declaration
+        self.refused()
 
 
 if __name__ == "__main__":
