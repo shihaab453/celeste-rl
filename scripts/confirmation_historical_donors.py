@@ -655,6 +655,47 @@ def next_entry(plan: dict, records: Path) -> dict | None:
 
 # ------------------------------------------------------------------------------------------------------------- run
 
+PROCESS_MARKER = "__QUERY_OK__"
+PROCESS_QUERY = ("Get-CimInstance Win32_Process -Filter \"Name='python.exe'\" -ErrorAction Stop | ForEach-Object { "
+                 "\"$($_.ProcessId)`t$($_.ParentProcessId)`t$($_.ExecutablePath)`t$($_.CommandLine)\" }; '"
+                 + PROCESS_MARKER + "'")
+
+
+def _arguments(command_line: str) -> str:
+    """A Windows command line without its first token (the program, quoted or not)."""
+    match = re.match(r'\s*("[^"]*"|\S+)\s*(.*)$', command_line or "", re.DOTALL)
+    return match.group(2).strip() if match else ""
+
+
+def other_experiments(output: str | None = None, own_pid: int | None = None) -> list[str]:
+    """Command lines of running python processes that run any script of this repository (the recipe check included),
+    except this process and its own venv launcher: on Windows .venv-rl's python.exe starts the real interpreter as a
+    child with the same arguments, so the parent is excluded only if it is that launcher with identical arguments.
+    Another executor, or anything that started this one, is still reported."""
+    if output is None:
+        output = rc._query(["powershell", "-NoProfile", "-Command", PROCESS_QUERY], "python process query")
+    if PROCESS_MARKER not in output:
+        raise rc.ProcessEvidenceUnavailable("python process query did not complete")
+    rows = {}
+    for line in output.splitlines():
+        parts = line.split("\t", 3)
+        if len(parts) == 4 and parts[0].strip().isdigit():
+            parent = int(parts[1]) if parts[1].strip().isdigit() else None
+            rows[int(parts[0])] = (parent, parts[2].strip(), parts[3].strip())
+    own = os.getpid() if own_pid is None else own_pid
+    excluded = {own}
+    if own in rows:
+        parent, _, own_line = rows[own]
+        launcher = rows.get(parent)
+        if (launcher and launcher[1] and os.path.normcase(os.path.abspath(launcher[1]))
+                == os.path.normcase(os.path.abspath(REPO / INTERPRETER))
+                and _arguments(launcher[2]) == _arguments(own_line)):
+            excluded.add(parent)
+    names = (*rc.EXPERIMENT_SCRIPTS, Path(rc.__file__).name)
+    return [line[:300] for pid, (_, _, line) in sorted(rows.items())
+            if pid not in excluded and any(name in line for name in names)]
+
+
 def steam_running() -> bool:
     output = rc._query(["tasklist", "/FI", "IMAGENAME eq steam.exe", "/FO", "CSV", "/NH"], "Steam process query")
     return any(line.strip().lower().startswith('"steam.exe"') for line in output.splitlines())
@@ -692,7 +733,7 @@ def launch_problems(plan: dict, item: dict, declaration: dict, preflight: bool =
     if Path(sys.executable).resolve() != (REPO / INTERPRETER).resolve():
         problems.append(f"running under {sys.executable}, not {REPO / INTERPRETER}")
     queries = (("steam_running", steam_running), ("game_processes", rc.all_game_processes),
-               ("other_experiments", lambda: rc.other_experiments(os.getpid())))
+               ("other_experiments", other_experiments))
     for key, query in queries:
         try:
             conditions[key] = query()

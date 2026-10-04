@@ -665,7 +665,7 @@ class LaunchTest(Temp):
             unittest.mock.patch.object(h.runtime, "refusal", return_value=None),
             unittest.mock.patch.object(h.sys, "executable", str(REPO / h.INTERPRETER)),
             unittest.mock.patch.object(rc, "all_game_processes", return_value=[]),
-            unittest.mock.patch.object(rc, "other_experiments", return_value=[]),
+            unittest.mock.patch.object(h, "other_experiments", return_value=[]),
             unittest.mock.patch.object(rc, "thread_probe", return_value={"torch_intra_op_threads": 10})]
 
     def launch(self, patches, item=None, dry_run=True):
@@ -713,7 +713,7 @@ class LaunchTest(Temp):
             with self.subTest(case=name):
                 self.assertEqual(self.launch(self.patches(**override)), "refused")
         for name, patch in (("game", unittest.mock.patch.object(rc, "all_game_processes", return_value=["Celeste"])),
-                            ("experiment", unittest.mock.patch.object(rc, "other_experiments", return_value=["x.py"]))):
+                            ("experiment", unittest.mock.patch.object(h, "other_experiments", return_value=["x.py"]))):
             with self.subTest(case=name):
                 self.assertEqual(self.launch(self.patches() + [patch]), "refused")
         (self.dir / "worktree" / "runs/train/confirm-donor-B-seed9").mkdir(parents=True)
@@ -837,6 +837,54 @@ class FinalizationTest(Temp):
         record = final_record(self.records)
         self.assertEqual((record["outcome"], record["problems"], record["copy"]), ("ok", [], {"verified": True}))
         self.assertEqual(h.entry_status(self.records, self.item), "ok")
+
+
+class ProcessQueryTest(unittest.TestCase):
+    """The alone check: this process and its own venv launcher are not 'another experiment'; anything else is.
+    The rows copy the shape seen on this machine: the launcher (.venv-rl's python.exe) is the parent of the real
+    interpreter, both with the same arguments."""
+
+    LAUNCHER = str(REPO / h.INTERPRETER)
+    BASE = r"C:\Users\x\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64-none\python.exe"
+    ARGS = "scripts/confirmation_historical_donors.py run"
+
+    def rows(self, *extra):
+        lines = [f"3228\t26684\t{self.LAUNCHER}\t{self.LAUNCHER} {self.ARGS}",
+                 f"31496\t3228\t{self.BASE}\t\"{self.BASE}\" {self.ARGS}", *extra, h.PROCESS_MARKER]
+        return "\n".join(lines) + "\n"
+
+    def test_own_process_and_its_launcher_are_excluded(self):
+        self.assertEqual(h.other_experiments(self.rows(), own_pid=31496), [])
+
+    def test_everything_else_is_reported(self):
+        cases = {
+            "second executor": (f"500\t26684\t{self.LAUNCHER}\t{self.LAUNCHER} {self.ARGS}",
+                                f"501\t500\t{self.BASE}\t\"{self.BASE}\" {self.ARGS}"),
+            "recipe check": (f"600\t1\t{self.BASE}\t\"{self.BASE}\" scripts/confirmation_recipe_check.py run",),
+            "campaign": (f"700\t1\t{self.BASE}\t\"{self.BASE}\" scripts/run_overnight.py --plan x",)}
+        for name, extra in cases.items():
+            with self.subTest(case=name):
+                self.assertEqual(len(h.other_experiments(self.rows(*extra), own_pid=31496)), len(extra))
+
+    def test_a_parent_that_is_not_our_launcher_is_reported(self):
+        """Started by another script (a campaign), or a launcher with other arguments: the parent counts."""
+        campaign_parent = "\n".join([f"3228\t1\t{self.BASE}\t\"{self.BASE}\" scripts/run_overnight.py --plan x",
+                                     f"31496\t3228\t{self.BASE}\t\"{self.BASE}\" {self.ARGS}", h.PROCESS_MARKER])
+        self.assertEqual(len(h.other_experiments(campaign_parent, own_pid=31496)), 1)
+        other_args = "\n".join([f"3228\t1\t{self.LAUNCHER}\t{self.LAUNCHER} scripts/train_room1.py --seed 9",
+                                f"31496\t3228\t{self.BASE}\t\"{self.BASE}\" {self.ARGS}", h.PROCESS_MARKER])
+        self.assertEqual(len(h.other_experiments(other_args, own_pid=31496)), 1)
+        elsewhere = "\n".join([f"3228\t1\tC:\\other\\venv\\Scripts\\python.exe\tC:\\other\\venv\\Scripts\\python.exe {self.ARGS}",
+                               f"31496\t3228\t{self.BASE}\t\"{self.BASE}\" {self.ARGS}", h.PROCESS_MARKER])
+        self.assertEqual(len(h.other_experiments(elsewhere, own_pid=31496)), 1)
+
+    def test_incomplete_query_raises(self):
+        with self.assertRaises(rc.ProcessEvidenceUnavailable):
+            h.other_experiments(self.rows().replace(h.PROCESS_MARKER, ""), own_pid=31496)
+        failed = subprocess.CompletedProcess([], 1, stdout="", stderr="access denied")
+        with unittest.mock.patch.object(rc.subprocess, "run", return_value=failed):
+            with self.assertRaises(rc.ProcessEvidenceUnavailable):
+                h.other_experiments()
 
 
 class ReadingRuleTest(Temp):
