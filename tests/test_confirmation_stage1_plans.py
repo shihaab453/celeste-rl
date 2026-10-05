@@ -39,6 +39,8 @@ COPY_INPUTS = {"room2_task": {"path": g.ROOM2_TASK, "text_sha256": "1" * 64, "id
                             "file_sha256": g.ROOM2_V2_FILE_SHA256, "role": "audit only"}}
 COMMIT = "c" * 40
 GAME = str(Path(g.GAME_COPIES[0][0]).resolve())
+REAL_ROUND_DONORS, REAL_DONOR_MANIFEST = g.round_donors, g.donor_manifest  # before any test patches them
+FRESH_NOTE = "see config/heldout_starts-room1-v2.json"
 
 
 def sha(path: Path) -> str:
@@ -398,6 +400,73 @@ class CopyOutcomeTest(Temp):
         with self.assertRaises(g.Refused):  # a fresh set outside its role stops for review; it is never rerun
             self.outcome("20261005-139998", edit=change("config/heldout_starts-room2-v2.json", "notes"))
 
+    def test_a_faulty_or_failed_copy_still_shows_its_hard_stops(self):
+        """Review round 3, F1: a readable copy result naming a fresh set stops for review even when the runner found
+        the artifact faulty or the child failed; without such evidence the same shapes are technical failures."""
+        plan = build("copy", [self.item])
+        for index, (name, status, problem) in enumerate((("artifact fault", "ok", "declared episode file does not exist"),
+                                                         ("failed child", "exit_1", None),
+                                                         ("both", "exit_1", "could not read announced result"))):
+            for fresh in (True, False):
+                with self.subTest(case=name, fresh=fresh):
+                    stamp = f"20261005-16{index}{int(fresh)}00"
+                    artifact = write_copy(self.root, stamp, self.item, self.entry,
+                                          edit=(lambda r: r.update(notes=FRESH_NOTE)) if fresh else None)
+                    if problem:
+                        artifact["problem"] = problem
+                    record = runner_record(self.entry, status=status, artifact=artifact)
+                    if fresh:
+                        with self.assertRaisesRegex(g.Refused, "notes names a fresh set outside its allowed role"):
+                            g.outcome_for("copy", record, self.entry, self.item, COMMIT, plan)
+                    else:
+                        self.assertIsNone(g.outcome_for("copy", record, self.entry, self.item, COMMIT, plan)[0])
+
+
+class FailedEvidenceUnitTest(Temp):
+    """Review round 3, F1: hard stops in every readable result, play and attempt, before a failure is classified."""
+
+    def setUp(self):
+        super().setUp()
+        self.item = donor(2, 9)
+        self.plan = {"inputs": {"v1": PINS},
+                     "runner": {"game_copies": [{"game_dir": g.GAME_COPIES[0][0], "ports": [1, 2]}]}}
+
+    def test_failed_evaluations(self):
+        entry = {"id": "x", "command": ["scripts/evaluate_heldout.py"]}
+        cases = {"stale starts": (dict(stale_starts=2, episodes=198), "2 stale starts"),
+                 "fresh mention": (dict(notes=FRESH_NOTE), "fresh set outside its allowed role")}
+        for index, (name, (changes, message)) in enumerate(cases.items()):
+            for status in ("exit_1", "timed_out"):
+                with self.subTest(case=name, status=status):
+                    artifact = write_evaluation(self.root, f"20261005-17{index}{len(status)}00", "a" * 64, **changes)
+                    with self.assertRaisesRegex(g.Refused, message):
+                        g.outcome_for("donor-v1", runner_record(entry, status=status, artifact=artifact), entry,
+                                      {**self.item, "sha256": "a" * 64}, COMMIT, self.plan)
+        artifact = write_evaluation(self.root, "20261005-179000", "a" * 64, stale_starts=2)
+        earlier = {"status": "exit_1", "artifact": artifact}  # an earlier runner attempt; the final one has no result
+        with self.assertRaisesRegex(g.Refused, "2 stale starts"):
+            g.outcome_for("donor-v1", runner_record(entry, status="exit_1", attempts=[earlier, {"status": "exit_1"}]),
+                          entry, self.item, COMMIT, self.plan)
+        clean = write_evaluation(self.root, "20261005-179100", "a" * 64)
+        outcome, problems = g.outcome_for("donor-v1", runner_record(entry, status="exit_1", artifact=clean), entry,
+                                          self.item, COMMIT, self.plan)
+        self.assertEqual((outcome, problems), (None, ["status exit_1"]))  # never a score from a failed child
+        unreadable = {"result_file": "runs/heldout-evaluation/20261005-179200/results.json", "problem": "missing"}
+        self.assertIsNone(g.outcome_for("donor-v1", runner_record(entry, status="exit_1", artifact=unreadable), entry,
+                                        self.item, COMMIT, self.plan)[0])
+
+    def test_failed_recordings(self):
+        entry = {"id": "x", "command": ["scripts/record_policy_play.py"]}
+        folder = write_recording(self.root, "20261005-180000", self.item, notes=FRESH_NOTE)
+        for status in ("exit_1", "ok"):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(g.Refused, "fresh set outside"):  # also with an invalid second announcement
+                    g.outcome_for("record", runner_record(entry, status=status, announced=[folder, folder]), entry,
+                                  self.item, COMMIT, self.plan)
+        clean = write_recording(self.root, "20261005-180100", self.item)
+        self.assertIsNone(g.outcome_for("record", runner_record(entry, status="exit_1", announced=[clean]), entry,
+                                        self.item, COMMIT, self.plan)[0])
+
 
 # ------------------------------------------------------------------------- campaigns, phases and recovery
 
@@ -632,6 +701,50 @@ class PhaseTest(Chain):
                     g.advance("donor-v1", 0)
                 self.assertFalse(g.plan_path("donor-v1", 0, 2).exists())
 
+    def test_failed_children_with_hard_stop_evidence_write_no_recovery_plan(self):
+        """Review round 3, F1: a failed status does not hide the hard stops its readable, runner-pinned result
+        shows (the review's probes), nor does an earlier runner attempt's result."""
+        g.advance("donor-v1", 0)
+        commit = self.commit()
+        plan_file = g.plan_path("donor-v1", 0, 1)
+
+        def failed_first(**changes):
+            def records_for(plan, commit_):
+                records = self.evaluations()(plan, commit_)
+                path = self.root / records[0]["artifact"]["result_file"]
+                result = json.loads(path.read_text(encoding="utf-8"))
+                result.update(changes)
+                path.write_text(json.dumps(result), encoding="utf-8")
+                records[0]["artifact"]["result_sha256"] = sha(path)
+                records[0]["status"] = "exit_1"
+                return records
+            return records_for
+
+        def earlier_attempt(plan, commit_):
+            records = failed_first(stale_starts=2, episodes=198)(plan, commit_)
+            first = records[0]
+            records[0] = {**{k: v for k, v in first.items() if k != "artifact"},
+                          "attempts": [{"status": "exit_1", "artifact": first["artifact"]}, {"status": "exit_1"}]}
+            return records
+        cases = {"stale starts": (failed_first(stale_starts=2, episodes=198), "2 stale starts"),
+                 "fresh notes": (failed_first(notes=FRESH_NOTE), "notes names a fresh set outside its allowed role"),
+                 "an earlier attempt's stale result": (earlier_attempt, "2 stale starts")}
+
+        def reset():
+            shutil.rmtree(g.CAMPAIGNS, ignore_errors=True)
+            shutil.rmtree(g.STAGE1, ignore_errors=True)
+            g.plan_path("donor-v1", 0, 2).unlink(missing_ok=True)
+        for name, (records_for, message) in cases.items():
+            with self.subTest(case=name):
+                reset()
+                self.run_campaign(plan_file, records_for, commit)
+                with self.assertRaisesRegex(g.Refused, message):
+                    g.advance("donor-v1", 0)
+                self.assertFalse(g.plan_path("donor-v1", 0, 2).exists())
+        reset()
+        self.run_campaign(plan_file, failed_first(), commit)  # the same failure with clean evidence is recovered
+        self.assertIn("written (1 entries)", g.advance("donor-v1", 0))
+
     def test_dry_runs_are_ignored_and_a_second_execution_stops(self):
         g.advance("donor-v1", 0)
         commit = self.commit()
@@ -699,6 +812,137 @@ class FullRoundTest(Chain):
         clone.write_bytes(b"a changed policy")  # review B2: a changed cloned.zip is caught before any use
         with self.assertRaises(g.Refused):
             g.inclusion(0)
+
+
+class LaterPhaseHardStopTest(Chain):
+    """Review round 3, F1, integrated: a failed recording and a faulty or failed copy that show a fresh set stop
+    the phase for review; no recovery version is written."""
+
+    def recordings(self, notes=None):
+        def records_for(plan, commit):
+            out = []
+            for index, entry in enumerate(plan["runs"]):
+                extra = {"notes": notes} if notes and index == 0 else {}
+                folder = write_recording(self.root, self.stamp(), self.donors[entry["j"]], commit=commit, **extra)
+                out.append(runner_record(entry, status="exit_1" if extra else "ok", announced=[folder]))
+            return out
+        return records_for
+
+    def test_a_failed_recording(self):
+        self.done_phase("donor-v1", self.evaluations())
+        g.advance("record", 0)
+        commit = self.commit()
+        self.run_campaign(g.plan_path("record", 0, 1), self.recordings(notes=FRESH_NOTE), commit)
+        with self.assertRaisesRegex(g.Refused, "play.json: notes names a fresh set outside its allowed role"):
+            g.advance("record", 0)
+        self.assertFalse(g.plan_path("record", 0, 2).exists())
+
+    def test_a_faulty_or_failed_copy(self):
+        self.done_phase("donor-v1", self.evaluations())
+        self.done_phase("record", self.recordings())
+        g.advance("copy", 0)
+        commit = self.commit()
+        plan_file = g.plan_path("copy", 0, 1)
+
+        def copies(status, problem):
+            def records_for(plan, commit_):
+                out = []
+                for index, (entry, item) in enumerate(zip(plan["runs"], plan["items"])):
+                    edit = (lambda r: r.update(notes=FRESH_NOTE)) if index == 0 else None
+                    artifact = write_copy(self.root, self.stamp(), item, entry, commit=commit_, edit=edit)
+                    if index == 0 and problem:
+                        artifact["problem"] = problem
+                    out.append(runner_record(entry, status=status if index == 0 else "ok", artifact=artifact))
+                return out
+            return records_for
+        for name, (status, problem) in {"artifact fault": ("ok", "declared episode file does not exist"),
+                                        "failed child": ("exit_1", None)}.items():
+            with self.subTest(case=name):
+                for folder in g.campaign_folders(g.plan_name("copy", 0, 1)):  # the earlier phases' campaigns stay
+                    shutil.rmtree(folder)
+                g.plan_path("copy", 0, 2).unlink(missing_ok=True)
+                self.run_campaign(plan_file, copies(status, problem), commit)
+                with self.assertRaisesRegex(g.Refused, "notes names a fresh set outside its allowed role"):
+                    g.advance("copy", 0)
+                self.assertFalse(g.plan_path("copy", 0, 2).exists())
+
+
+class DonorFilesChainTest(Chain):
+    """Review round 3, F2: the real donor pins and manifest reader. Seeds 9 to 14 come from historical evidence with
+    their copies' original policy and manifest pins; a manifest changed afterwards stops before any copy plan."""
+
+    def setUp(self):
+        super().setUp()
+        declaration = copy.deepcopy(DECLARATION)
+        self.evidence = {}
+        for d in self.donors:
+            run = self.root / Path(d["checkpoint"]).parent.parent
+            (run / "checkpoints").mkdir()
+            (run / "checkpoints" / "latest.zip").write_bytes(f"policy {d['seed']}".encode())
+            (run / "manifest.json").write_text(json.dumps({
+                "status": "finished", "accepted_steps": 501760, "config": {"disabled_inputs": ["S", "Q", "N"]},
+                "sessions": [{"provenance": {"commit": hx.HISTORICAL_COMMIT, "uncommitted_changes": False,
+                                             "runtime": {"schema": {"fingerprint": "b710a27fa4f1d96f"}}}}]}),
+                encoding="utf-8")
+            policy = sha(run / "checkpoints" / "latest.zip")
+            if d["seed"] in (7, 8):
+                declaration["donors"]["existing"][str(d["seed"])] = {"checkpoint": d["checkpoint"], "sha256": policy}
+            else:
+                self.evidence[d["seed"]] = {
+                    "checkpoint": d["checkpoint"], "sha256": policy, "plan_version_sha256": "1" * 64,
+                    "record": {"path": f"runs/confirmation/donors/attempt-{d['seed']}.json", "sha256": "2" * 64},
+                    "copied_files": {"checkpoints/latest.zip": policy, "manifest.json": sha(run / "manifest.json")}}
+        self.real = [unittest.mock.patch.object(hx, "historical_evidence", return_value=self.evidence),
+                     unittest.mock.patch.object(g, "round_donors",
+                                                side_effect=lambda d, r: REAL_ROUND_DONORS(declaration, r)),
+                     unittest.mock.patch.object(g, "donor_manifest", REAL_DONOR_MANIFEST)]
+        for p in self.real:
+            p.start()
+        self.donors = REAL_ROUND_DONORS(declaration, 0)
+
+    def tearDown(self):
+        for p in reversed(self.real):
+            p.stop()
+        super().tearDown()
+
+    def recordings(self, plan, commit):
+        return [runner_record(entry, announced=[write_recording(self.root, self.stamp(), self.donors[entry["j"]],
+                                                                commit=commit)]) for entry in plan["runs"]]
+
+    def test_the_copy_plan_keeps_the_original_pin(self):
+        self.done_phase("donor-v1", self.evaluations())
+        self.done_phase("record", self.recordings)
+        g.advance("copy", 0)
+        plan = json.loads(g.plan_path("copy", 0, 1).read_text(encoding="utf-8"))
+        for item in plan["items"]:
+            pinned = self.evidence.get(item["seed"], {}).get("copied_files", {}).get("manifest.json")
+            if pinned:
+                self.assertEqual(item["donor_manifest"]["sha256"], pinned)
+
+    def test_a_changed_manifest_stops_before_the_first_copy_plan(self):
+        self.done_phase("donor-v1", self.evaluations())
+        self.done_phase("record", self.recordings)
+        path = self.root / "runs/train/donor-9/manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        manifest["sessions"][0]["provenance"]["commit"] = "0" * 40  # the review's probe
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(g.Refused, "donor-9/manifest.json is not its copy's original pin"):
+            g.advance("copy", 0)
+        self.assertFalse(g.plan_path("copy", 0, 1).exists())
+        with self.assertRaisesRegex(g.Refused, "original pin"):  # the manifest reader itself refuses, never re-pins
+            REAL_DONOR_MANIFEST(next(d for d in self.donors if d["seed"] == 9))
+
+    def test_a_changed_historical_policy_or_manifest_stops_the_first_plan(self):
+        for name in ("checkpoints/latest.zip", "manifest.json"):
+            with self.subTest(file=name):
+                path = self.root / "runs/train/donor-11" / name
+                original = path.read_bytes()
+                path.write_bytes(original + b" ")
+                with self.assertRaisesRegex(g.Refused, "seed 11's runs/train/donor-11/"):
+                    g.advance("donor-v1", 0)
+                self.assertFalse(g.plan_path("donor-v1", 0, 1).exists())
+                path.write_bytes(original)
+        self.assertIn("written (8 entries)", g.advance("donor-v1", 0))
 
 
 # ------------------------------------------------------------------------------------------- inclusion

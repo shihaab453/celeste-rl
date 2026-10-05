@@ -42,9 +42,10 @@ planned entry once); its summary carries the plan's text hash, 10 threads and th
 declaration at the summary's commit are the pinned ones; and a preflight receipt for this plan, written before the
 campaign at that same commit, names an approved commit whose control code equals the campaign commit's. A campaign
 that is still running or was interrupted, an entry started without an outcome, stale starts, two executions of one
-version or an evidence conflict stop for review. Technical failures (a status other than ok, including a cutoff skip;
-missing, malformed or invalid artifacts; wrong counts; invalid provenance) are recovered; they never allocate a
-replacement. Recordings are bound by the single path their own successful runner attempt announced and validated by
+version or an evidence conflict stop for review; the readable results, plays and copy results of every entry and
+runner attempt are inspected for these hard stops before any failure is classified, whatever their status. Technical
+failures (a status other than ok, including a cutoff skip; missing, malformed or invalid artifacts; wrong counts;
+invalid provenance) are recovered; they never allocate a replacement. Recordings are bound by the single path their own successful runner attempt announced and validated by
 play.json and the full recorder array schema; copies by the runner's captured Results line and results.json, whose
 consumed-input audit must equal the pinned inputs.
 
@@ -307,7 +308,9 @@ def build(template: str, values: dict[str, str]) -> list[str]:
 
 def donor_pins(declaration: dict) -> dict[int, dict]:
     """Every trained donor: 7 and 8 by their declared pins; 9 to 16 only from the executor's validated historical
-    evidence (one verified ok attempt per seed, in the committed plan chain). Each checkpoint is rechecked on disk."""
+    evidence (one verified ok attempt per seed, in the committed plan chain), carrying that copy's original pins of
+    the policy and the training manifest. Each checkpoint, and each such copied file, is rechecked on disk against
+    its original pin: a change stops for review."""
     pins = {}
     for seed in (7, 8):
         pinned = declaration["donors"]["existing"][str(seed)]
@@ -316,10 +319,16 @@ def donor_pins(declaration: dict) -> dict[int, dict]:
     for seed, evidence in hx.historical_evidence().items():
         pins[seed] = {"seed": seed, "checkpoint": evidence["checkpoint"], "sha256": evidence["sha256"],
                       "source": {"attempt_record": evidence["record"],
-                                 "plan_version_sha256": evidence["plan_version_sha256"]}}
+                                 "plan_version_sha256": evidence["plan_version_sha256"],
+                                 "copied_files": evidence["copied_files"]}}
     for seed, item in pins.items():
         if guarded_hash(REPO / item["checkpoint"]) != item["sha256"]:
-            raise Refused(f"seed {seed}'s {item['checkpoint']} is not its pinned sha256")
+            raise Refused(f"seed {seed}'s {item['checkpoint']} is not its pinned sha256: stop for review")
+        run_dir = Path(item["checkpoint"]).parent.parent
+        for name, sha in item["source"].get("copied_files", {}).items():
+            if guarded_hash(REPO / run_dir / name) != sha:
+                raise Refused(f"seed {seed}'s {(run_dir / name).as_posix()} is not its copy's original pin: "
+                              f"stop for review")
     return pins
 
 
@@ -409,10 +418,20 @@ def copy_input_pins() -> dict:
 
 
 def donor_manifest(item: dict) -> dict:
-    """The donor's training manifest, which the copy's init_from provenance names."""
+    """The donor's training manifest, which the copy's init_from provenance names. A historical donor's manifest must
+    still be its verified copy's original pin, which is kept (never replaced by a fresh hash); the metadata is parsed
+    from the very bytes that were hashed. Seeds 7 and 8 have no declared manifest pin: their manifest is pinned here,
+    and every later plan version must derive the same pin."""
     path = REPO / Path(item["checkpoint"]).parent.parent / "manifest.json"
-    manifest = read_meta(path)
-    return {"path": rel(path), "sha256": guarded_hash(path), "status": manifest["status"],
+    _guard(path)
+    data = path.read_bytes()
+    sha = hashlib.sha256(data).hexdigest()
+    original = ((item.get("donor_source") or {}).get("copied_files") or {}).get("manifest.json")
+    if "copied_files" in (item.get("donor_source") or {}) and sha != original:
+        raise Refused(f"{rel(path)} is not seed {item['seed']}'s copy's original pin: stop for review")
+    manifest = json.loads(data.decode("utf-8"))
+    hard_stop(fresh_mentions(manifest, {}), rel(path))
+    return {"path": rel(path), "sha256": original or sha, "status": manifest["status"],
             "accepted_steps": manifest["accepted_steps"],
             "commits": sorted({s["provenance"]["commit"] for s in manifest["sessions"]}),
             "schema_fingerprint": manifest["sessions"][0]["provenance"]["runtime"]["schema"]["fingerprint"],
@@ -639,16 +658,84 @@ def _mismatches(checks: dict) -> list[str]:
     return [f"{key} is {got!r}, expected {want!r}" for key, (got, want) in checks.items() if not hx.same_json(got, want)]
 
 
+COPY_RESULT_ROLES = {("args", "heldout"): ROOM2_V2, ("manifests", "heldout"): ROOM2_V2}
+
+
+def _readable(path: Path):
+    """Parsed JSON evidence, or None if it cannot be read (an ordinary artifact fault is no evidence). The identity
+    check still runs first, and its refusal stops for review."""
+    try:
+        return hx.read_json(path)
+    except Refused:
+        raise
+    except ARTIFACT_ERRORS:
+        return None
+
+
+def _evaluation_hard_stops(artifact) -> None:
+    """A readable evaluation result in the declared folder: a fresh set named in it, or stale starts, stop."""
+    result_file = artifact.get("result_file") if isinstance(artifact, dict) else None
+    if not isinstance(result_file, str) or not norm(result_file).startswith(EVALUATION_FOLDER):
+        return
+    result = _readable(REPO / result_file)
+    if result is None:
+        return
+    hard_stop(fresh_mentions(result, {}), result_file)
+    if isinstance(result, dict) and result.get("stale_starts") != 0:
+        raise Refused(f"{result_file}: {result.get('stale_starts')!r} stale starts: stop for review")
+
+
+def _recording_hard_stops(announced) -> None:
+    """Every announced recording folder's readable play.json: a fresh set named in it stops."""
+    for path in announced if isinstance(announced, list) else []:
+        if not isinstance(path, str) or not path.strip():
+            continue
+        folder = Path(path.strip())
+        folder = folder if folder.is_absolute() else REPO / folder
+        if not re.fullmatch(re.escape(RECORDING_FOLDER) + r"\d{8}-\d{6}", rel(folder)):
+            continue
+        guard = fresh_sets.paths_problems([str(folder)], fresh=hx.FRESH)
+        if guard:
+            raise Refused("; ".join(guard))
+        play = _readable(folder / "play.json")
+        if play is not None:
+            hard_stop(fresh_mentions(play, {}), rel(folder / "play.json"))
+
+
+def _copy_hard_stops(artifact) -> None:
+    """A readable copy result in a copy folder: a fresh set outside its declared roles stops."""
+    result_file = artifact.get("result_file") if isinstance(artifact, dict) else None
+    if not isinstance(result_file, str) or not re.fullmatch(re.escape(CLONE_FOLDER) + r"\d{8}-\d{6}/results\.json",
+                                                            norm(result_file)):
+        return
+    result = _readable(REPO / result_file)
+    if result is not None:
+        hard_stop(fresh_mentions(result, COPY_RESULT_ROLES), result_file)
+
+
+def hard_stop_evidence(phase: str, record: dict) -> None:
+    """Inspect the readable evidence of the final outcome and of every runner attempt for hard stops, whatever their
+    status or artifact faults: a failed child can have written evidence that needs review. Nothing here accepts a
+    score or a fit."""
+    for outcome in [record, *(record.get("attempts") or [])]:
+        if not isinstance(outcome, dict):
+            continue
+        if phase in EVALUATION_PHASES:
+            _evaluation_hard_stops(outcome.get("artifact"))
+        elif phase == "record":
+            _recording_hard_stops(outcome.get("announced"))
+        else:
+            _copy_hard_stops(outcome.get("artifact"))
+
+
 def evaluation_outcome(record: dict, expected_sha: str, commit: str, pins: dict) -> tuple[dict | None, list[str]]:
     artifact = record.get("artifact") or {}
+    # Hard stops first, from the readable result itself, before any companion file or artifact fault is weighed.
+    _evaluation_hard_stops(artifact)
     if not artifact.get("result_file") or not norm(artifact["result_file"]).startswith(EVALUATION_FOLDER):
         return None, [f"no result in {EVALUATION_FOLDER}: {artifact.get('problem')}"]
     result_file = REPO / artifact["result_file"]
     result = hx.read_json(result_file)
-    # Hard stops first, from the readable result itself, before any companion file or artifact fault is weighed.
-    hard_stop(fresh_mentions(result, {}), artifact["result_file"])
-    if result.get("stale_starts") != 0:
-        raise Refused(f"{artifact['result_file']}: {result.get('stale_starts')!r} stale starts: stop for review")
     if artifact.get("problem"):
         return None, [f"the runner found the artifact faulty: {artifact['problem']}"]
     problems = []
@@ -730,14 +817,13 @@ def _mix_play_paths(text: str) -> list[str]:
 
 def copy_outcome(record: dict, item: dict, commit: str, plan_entry: dict, inputs: dict) -> tuple[dict | None, list[str]]:
     artifact = record.get("artifact") or {}
+    _copy_hard_stops(artifact)  # before the artifact fault is weighed
     if not artifact or artifact.get("problem"):
         return None, [f"no valid result artifact: {artifact.get('problem')}"]
     if not re.fullmatch(re.escape(CLONE_FOLDER) + r"\d{8}-\d{6}/results\.json", norm(artifact["result_file"])):
         return None, [f"result {artifact['result_file']!r} is not a copy folder"]
     result_file = REPO / artifact["result_file"]
     result = hx.read_json(result_file)
-    hard_stop(fresh_mentions(result, {("args", "heldout"): ROOM2_V2, ("manifests", "heldout"): ROOM2_V2}),
-              artifact["result_file"])
     problems = []
     if guarded_hash(result_file) != artifact.get("result_sha256"):
         problems.append("result file changed since the runner pinned it")
@@ -800,10 +886,12 @@ def copy_outcome(record: dict, item: dict, commit: str, plan_entry: dict, inputs
 
 def outcome_for(phase: str, record: dict, entry: dict, item: dict, commit: str, plan: dict) -> tuple[dict | None, list]:
     """One entry's outcome, or the technical failure. Ordinary artifact faults are failures to recover; fresh-set
-    refusals, stale starts and evidence conflicts (Refused) stop for review."""
+    refusals, stale starts and evidence conflicts (Refused) stop for review. The hard stops are looked for in all
+    readable evidence first, before a failed status or a faulty artifact is classified for recovery."""
     statuses = [record.get("status")] + [a.get("status") for a in record.get("attempts") or []]
     if "refused_fresh_set" in statuses:
         raise Refused(f"{entry['id']} was refused by the runner's fresh-set guard: stop for review")
+    hard_stop_evidence(phase, record)
     if record.get("status") != "ok":
         return None, [f"status {record.get('status')}"]
     problems = _command_problems(record, entry, plan)
