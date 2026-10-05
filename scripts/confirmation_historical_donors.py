@@ -120,6 +120,18 @@ GAME_FILES_READ = tuple(f"probe-profile/Saves/{name}" for name in (
     "Mods/SpeedrunTool.zip", "Mods/CelesteRLLockstep/CelesteRLLockstep.dll", "Mods/CelesteRLLockstep/everest.yaml")
 NO_BYTECODE = {"PYTHONDONTWRITEBYTECODE": "1"}
 STARTED = ".started.json"
+# The import closure of scripts/train_room1.py at the historical commit under the declared interpreter, as the source
+# check recorded it for all six donors of 2026-10-04 (the coverage reviewed in stage 1 code review round 3). A
+# recorded closure must be exactly these files, each with its blob at the historical commit.
+HISTORICAL_CLOSURE_FILES = tuple(f"celeste_rl/{name}.py" for name in (
+    "__init__", "actions", "bridge", "endings", "env", "game_process", "lockstep", "observation", "potential", "reward",
+    "runtime", "schema", "starts", "training/__init__", "training/game", "training/policy", "training/run",
+    "training/supervisor")) + ("scripts/train_room1.py",)
+# The started marker's fields: older markers (before the stage 1 review) carry only the first three.
+MARKER_FIELDS = ("entry", "started", "command")
+BOUND_MARKER_FIELDS = MARKER_FIELDS + ("plan", "declaration_text_sha256", "source", "executor")
+# The copied run files later steps read: the policy, and the training manifest the copy's init_from provenance names.
+COPIED_DEPENDENCIES = ("checkpoints/latest.zip", "manifest.json")
 
 
 class Refused(Exception):
@@ -624,8 +636,22 @@ def _command_problems(command, entry: dict, name: str) -> list[str]:
     return []
 
 
-def attempt_problems(record: dict, entry: dict, plan_hash: str, plan: dict, name: str) -> list[str]:
-    """A final attempt record's execution evidence, as the executor writes it."""
+def historical_closure() -> dict[str, str]:
+    """The reviewed closure's blob ids at the historical commit, read from this repository's git objects."""
+    listed = _git(REPO, "ls-tree", "-r", HISTORICAL_COMMIT, "--", *HISTORICAL_CLOSURE_FILES)
+    blobs = {}
+    for line in listed.splitlines():
+        meta, _, path = line.partition("\t")
+        if meta.split()[1:2] == ["blob"]:
+            blobs[path] = meta.split()[2]
+    if set(blobs) != set(HISTORICAL_CLOSURE_FILES):
+        raise Refused(f"the historical commit does not hold the reviewed closure: {sorted(blobs)}")
+    return blobs
+
+
+def attempt_problems(record: dict, entry: dict, plan_hash: str, plan: dict, name: str,
+                     closure: dict[str, str]) -> list[str]:
+    """A final attempt record's execution evidence, as the executor writes it. closure: historical_closure()."""
     problems = _executor_problems(record.get("executor"), name) + _command_problems(record.get("command"), entry, name)
     conditions = record.get("conditions") or {}
     source = conditions.get("source_check") or {}
@@ -642,8 +668,9 @@ def attempt_problems(record: dict, entry: dict, plan_hash: str, plan: dict, name
               "source check": ([source.get("head"), source.get("tree")], [HISTORICAL_COMMIT, HISTORICAL_TREE]),
               "init clone": ((conditions.get("init_clone_files") or {}).get("cloned.zip"), INIT_CLONE_SHA256)}
     problems += [f"{name}: {key} is {got!r}" for key, (got, want) in checks.items() if not same_json(got, want)]
-    if not isinstance(source.get("closure"), dict) or not source.get("closure"):
-        problems.append(f"{name}: no source closure")
+    if not same_json(source.get("closure"), closure):
+        problems.append(f"{name}: the recorded source closure is not the reviewed closure with its blobs at "
+                        f"{HISTORICAL_COMMIT[:7]}")
     if not isinstance(record.get("thread_variables_removed"), dict) or not all(
             type(threads.get(k)) is int and threads.get(k) > 0 for k in ("torch_intra_op_threads", "torch_inter_op_threads")):
         problems.append(f"{name}: no thread evidence")
@@ -652,8 +679,50 @@ def attempt_problems(record: dict, entry: dict, plan_hash: str, plan: dict, name
         files = copy.get("files") or {}
         if (record.get("exit_code") != 0 or record.get("problems") != [] or copy.get("verified") is not True
                 or copy.get("path") != entry["run_dir"] or not files.get("checkpoints/latest.zip")
-                or not same_json(files, record.get("run_files"))):
+                or not files.get("manifest.json") or not same_json(files, record.get("run_files"))):
             problems.append(f"{name}: ok without a clean exit and a verified copy of its own run files")
+    return problems
+
+
+def marker_problems(path: Path, marker, versions: dict[str, tuple[str, dict]]) -> list[str]:
+    """A started marker: exactly the older form (entry, started, command) or exactly the bound form start_attempt
+    writes. Every field present is checked: a planned entry and its command; in the bound form a committed plan
+    version (path, text hash and revision) holding the entry, that version's declaration, the historical source and
+    a clean executor commit whose file is the one hashed, each checked on its own. With a final record, every field
+    the marker shares with it must agree. Older markers are kept as they are; nothing missing is invented."""
+    name = path.name
+    fields = set(marker) if isinstance(marker, dict) else set()
+    if fields not in (set(MARKER_FIELDS), set(BOUND_MARKER_FIELDS)):
+        return [f"{name}: its fields {sorted(fields)} are neither the older marker's nor the bound marker's"]
+    entry = marker["entry"]
+    problems = [] if isinstance(marker["started"], str) else [f"{name}: no start time"]
+    if not any(same_json(entry, e) for _, plan in versions.values() for e in plan["entries"]):
+        return problems + [f"{name} names an entry that no committed plan version holds"]
+    problems += _command_problems(marker["command"], entry, name)
+    shared = MARKER_FIELDS
+    if fields == set(BOUND_MARKER_FIELDS):
+        shared = BOUND_MARKER_FIELDS
+        bound = marker["plan"].get("text_sha256") if isinstance(marker["plan"], dict) else None
+        plan = versions[bound][1] if bound in versions else None
+        if plan is None:
+            problems.append(f"{name}: its plan binding is not a committed version")
+        else:
+            if not same_json(marker["plan"], {"path": PLAN_RELATIVE, "text_sha256": bound,
+                                              "revision": plan["revision"]}):
+                problems.append(f"{name}: its plan path or revision is not that committed version's")
+            if not any(same_json(entry, e) for e in plan["entries"]):
+                problems.append(f"{name}: its entry is not in the plan version it names")
+            if marker["declaration_text_sha256"] != plan["declaration"]["text_sha256"]:
+                problems.append(f"{name}: its declaration binding is not that plan version's")
+        if not same_json(marker["source"], {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE}):
+            problems.append(f"{name}: its source binding is not the historical commit")
+        problems += _executor_problems(marker["executor"], name)
+    final = path.with_name(name[:-len(STARTED)] + ".json")
+    if final.exists():
+        done = read_json(final)
+        if not isinstance(done, dict) or any(not same_json(done.get(key), marker[key]) for key in shared
+                                             if key != "started"):
+            problems.append(f"{name} does not match its final record")
     return problems
 
 
@@ -665,11 +734,11 @@ def historical_evidence(history: list[tuple[str, str, dict]] | None = None) -> d
     as exactly the reviewed amendment 3 appended to the committed old text. Attempts: every final record names a
     committed version holding its full entry, with that version's declaration, the historical source, a clean
     executor commit whose file is the one hashed, the entry's command under the declared interpreter in the worktree,
-    the launch conditions and source check, and (if ok) a clean exit and a copy equal to its run files. Started
-    markers must name a planned entry and the same command; their binding fields, when present (markers written since
-    the stage 1 review), must agree with a committed version; older markers carry only entry and command and are
-    cross-checked with their final record. Sequence: a rerun only after a failed attempt, nothing after an ok one,
-    one ok attempt per seed."""
+    the launch conditions and the source check with exactly the reviewed closure at the historical commit's blobs,
+    and (if ok) a clean exit and a copy equal to its run files, policy and manifest included. Started markers:
+    marker_problems. Sequence: a rerun only after a failed attempt, nothing after an ok one, one ok attempt per seed.
+    Each donor carries its copy's original pins of the files later steps read (copied_files); this function does not
+    reread them, the stage 1 generator rechecks them before every use."""
     history = plan_history() if history is None else history
     problems = chain_problems(history)
     versions: dict[str, tuple[str, dict]] = {}
@@ -692,26 +761,12 @@ def historical_evidence(history: list[tuple[str, str, dict]] | None = None) -> d
             if plan_hash in texts and before in texts:
                 problems += [f"rebind: {p}" for p in rebind_problems(texts[before], texts[plan_hash])]
     statuses = attempt_statuses(RECORDS)  # also refuses conflicting or unreadable attempt files
-    donors = {}
+    donors, closure = {}, None
     for path in sorted(RECORDS.glob("attempt-*.json")):
         record = read_json(path)
         entry = record.get("entry") if isinstance(record, dict) else None
         if path.name.endswith(STARTED):
-            planned = [h for h, (_, plan) in versions.items() if any(same_json(entry, e) for e in plan["entries"])]
-            if not planned:
-                problems.append(f"{path.name} names an entry that no committed plan version holds")
-                continue
-            problems += _command_problems(record.get("command"), entry, path.name)
-            bound = (record.get("plan") or {}).get("text_sha256")
-            if "plan" in record and (bound not in planned or record.get("declaration_text_sha256")
-                                     != versions[bound][1]["declaration"]["text_sha256"]
-                                     or record.get("source") != {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE}):
-                problems.append(f"{path.name}: its plan, declaration or source binding is not a committed version's")
-            final = path.with_name(path.name[:-len(STARTED)] + ".json")
-            if final.exists():
-                done = read_json(final)
-                if not same_json(done.get("entry"), entry) or done.get("command") != record.get("command"):
-                    problems.append(f"{path.name} does not match its final record")
+            problems += marker_problems(path, record, versions)
             continue
         bound = (record.get("plan") or {}).get("text_sha256")
         if bound not in versions:
@@ -721,14 +776,19 @@ def historical_evidence(history: list[tuple[str, str, dict]] | None = None) -> d
         if not any(same_json(entry, e) for e in plan["entries"]):
             problems.append(f"{path.name}: its entry is not in the plan version it names")
             continue  # nothing else about an unplanned attempt can be trusted
-        problems += attempt_problems(record, entry, bound, plan, path.name)
+        if closure is None:
+            closure = historical_closure()
+        problems += attempt_problems(record, entry, bound, plan, path.name, closure)
         if record.get("outcome") == "ok":
             if entry["seed"] in donors:
                 problems.append(f"seed {entry['seed']} has more than one ok attempt")
+            files = (record.get("copy") or {}).get("files") or {}
             donors[entry["seed"]] = {"seed": entry["seed"], "j": entry["j"], "attempt": entry["attempt"],
                                      "checkpoint": f"{entry['run_dir']}/checkpoints/latest.zip",
-                                     "sha256": ((record.get("copy") or {}).get("files") or {}).get(
-                                         "checkpoints/latest.zip"),
+                                     "sha256": files.get("checkpoints/latest.zip"),
+                                     # the verified copy's original pins of what later steps read: the policy and
+                                     # the training manifest (the copy's init_from provenance)
+                                     "copied_files": {name: files.get(name) for name in COPIED_DEPENDENCIES},
                                      "record": {"path": _relative(path), "sha256": _sha256(path)},
                                      "plan_version_sha256": bound,
                                      "executor_commit": ((record.get("executor") or {}).get("git") or {}).get("commit")}
@@ -824,6 +884,9 @@ def source_problems(worktree: Path | None = None, commit: str = HISTORICAL_COMMI
         closure[relative] = blob
     if "scripts/train_room1.py" not in closure or not any(p.startswith("celeste_rl/") for p in closure):
         problems.append(f"the import closure is incomplete: {sorted(closure)}")
+    elif commit == HISTORICAL_COMMIT and set(closure) != set(HISTORICAL_CLOSURE_FILES):
+        differing = sorted(set(closure) ^ set(HISTORICAL_CLOSURE_FILES))
+        problems.append(f"the import closure is not the reviewed closure: {differing}")
     problems += worktree_problems(worktree, commit, tree)[0]  # the import wrote nothing
     evidence["closure"] = closure
     return problems, evidence

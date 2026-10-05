@@ -462,6 +462,17 @@ class SourceCheckTest(Temp):
         self.assertEqual(sorted(evidence["closure"]),
                          ["celeste_rl/__init__.py", "celeste_rl/reward.py", "scripts/train_room1.py"])
 
+    def test_the_historical_commit_needs_exactly_the_reviewed_closure(self):
+        """Review round 3, F3: at the historical commit the launch check also requires the reviewed coverage."""
+        repo, commit, tree = self.make_repo()
+        found = ("celeste_rl/__init__.py", "celeste_rl/reward.py", "scripts/train_room1.py")
+        with unittest.mock.patch.object(h, "HISTORICAL_COMMIT", commit):
+            for name, reviewed in (("the same files", found), ("one more reviewed file", found + ("celeste_rl/env.py",)),
+                                   ("one file fewer", found[1:])):
+                with self.subTest(case=name), unittest.mock.patch.object(h, "HISTORICAL_CLOSURE_FILES", reviewed):
+                    problems = self.problems(repo, commit, tree)[0]
+                    self.assertEqual(bool(problems), reviewed != found)
+
     def test_changes_strays_flags_and_wrong_commits_fail(self):
         repo, commit, tree = self.make_repo()
         reward = repo / "celeste_rl" / "reward.py"
@@ -1032,6 +1043,28 @@ class RebindRuleTest(unittest.TestCase):
         self.assertTrue(h.same_json({"a": [1, {"b": None}]}, {"a": [1, {"b": None}]}))
 
 
+CLOSURE = {name: hashlib.sha1(name.encode()).hexdigest() for name in h.HISTORICAL_CLOSURE_FILES}  # stand-in blobs
+
+
+class HistoricalClosureTest(unittest.TestCase):
+    """Review round 3, F3: the reviewed closure's blobs come from the historical commit's git objects."""
+
+    def test_this_repository_holds_the_reviewed_closure(self):
+        if not (REPO / ".git").exists():
+            self.skipTest("no git repository (an exported tree)")
+        blobs = h.historical_closure()
+        self.assertEqual(sorted(blobs), sorted(h.HISTORICAL_CLOSURE_FILES))
+        trainer = subprocess.run(["git", "-C", str(REPO), "rev-parse", f"{h.HISTORICAL_COMMIT}:scripts/train_room1.py"],
+                                 capture_output=True, text=True).stdout.strip()
+        self.assertEqual(blobs["scripts/train_room1.py"], trainer)
+
+    def test_a_repository_without_the_commit_refuses(self):
+        with tempfile.TemporaryDirectory() as folder:
+            git(Path(folder), "init", "-q", folder)
+            with unittest.mock.patch.object(h, "REPO", Path(folder)), self.assertRaises(h.Refused):
+                h.historical_closure()
+
+
 class RebindActionTest(Temp):
     """The one-time rebind in a stand-in repository: old declaration and plan committed, then amendment 3."""
 
@@ -1048,7 +1081,8 @@ class RebindActionTest(Temp):
                         unittest.mock.patch.object(h, "DECLARATION", self.declaration),
                         unittest.mock.patch.object(h, "PLAN", self.plan),
                         unittest.mock.patch.object(h, "RECORDS", self.records),
-                        unittest.mock.patch.object(h, "authorization", return_value=AUTH)]
+                        unittest.mock.patch.object(h, "authorization", return_value=AUTH),
+                        unittest.mock.patch.object(h, "historical_closure", return_value=dict(CLOSURE))]
         for p in self.patches:
             p.start()
         self.declaration.write_bytes(declaration_text(BEFORE_3))
@@ -1078,7 +1112,7 @@ class RebindActionTest(Temp):
                 "declaration_text_sha256": fresh_sets.text_sha256(self.declaration), "limit_minutes": h.LIMIT_MINUTES,
                 "conditions": {"fresh_set_check": "x", "source_check": {
                     "worktree": h.WORKTREE.as_posix(), "head": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE,
-                    "ignored_files": 4, "closure": {"scripts/train_room1.py": "c" * 40}},
+                    "ignored_files": 4, "closure": dict(CLOSURE)},
                     "init_clone_files": {"cloned.zip": h.INIT_CLONE_SHA256}, "steam_running": True,
                     "game_processes": [], "other_experiments": []},
                 "launch_problems": [], "dry_run": False, "thread_variables_removed": {},
@@ -1246,6 +1280,74 @@ class RebindActionTest(Temp):
                 write(self.records, "attempt-20261004-193850.started.json", marker)
                 with self.assertRaises(h.Refused):
                     h.historical_evidence()
+
+    def test_bound_markers_check_every_field(self):
+        """Review round 3, F3: every binding a new marker carries is checked on its own and against its final
+        record; a marker is exactly the older form or exactly the bound form."""
+        entry = self.entries[0]
+        record = self.ok_record(entry)
+        bound = {"entry": entry, "command": record["command"], "started": "2026-10-04T19:38:50",
+                 "plan": copy.deepcopy(record["plan"]), "declaration_text_sha256": record["declaration_text_sha256"],
+                 "source": copy.deepcopy(record["source"]), "executor": copy.deepcopy(record["executor"])}
+        name = "attempt-20261004-193850.started.json"
+        write(self.records, name, bound)
+        self.assertEqual(list(h.historical_evidence()), [9])
+        executor = self.repo / "scripts" / "confirmation_historical_donors.py"
+        crlf = hashlib.sha256(executor.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()
+        if crlf == self.executor["script_sha256"]:
+            crlf = hashlib.sha256(executor.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+        def without(key):
+            return lambda m: m.pop(key)
+        cases = {"other plan path": lambda m: m["plan"].update(path="config/other.json"),
+                 "other plan revision": lambda m: m["plan"].update(revision=999),
+                 "dirty marker executor": lambda m: m["executor"]["git"].update(uncommitted_changes=True),
+                 "unknown marker executor hash": lambda m: m["executor"].update(script_sha256="0" * 64),
+                 "source with no plan key": lambda m: (m.pop("plan"), m["source"].update(commit="0" * 40)),
+                 "declaration with no plan key": lambda m: (m.pop("plan"), m.update(declaration_text_sha256="0" * 64)),
+                 "no plan binding": without("plan"), "no executor": without("executor"),
+                 "no declaration": without("declaration_text_sha256"), "no start time": without("started"),
+                 "an extra field": lambda m: m.update(note="x"), "plan not an object": lambda m: m.update(plan="x"),
+                 # valid on its own (the same commit's file with other line endings), but not its final record's
+                 "executor differs from the final record": lambda m: m["executor"].update(script_sha256=crlf)}
+        for case, change in cases.items():
+            with self.subTest(case=case):
+                marker = copy.deepcopy(bound)
+                change(marker)
+                write(self.records, name, marker)
+                with self.assertRaisesRegex(h.Refused, "started.json"):
+                    h.historical_evidence()
+        write(self.records, name, {"entry": entry, "started": "t", "command": record["command"]})
+        self.assertEqual(list(h.historical_evidence()), [9])  # the older form stays valid as it is
+
+    def test_the_source_closure_is_the_reviewed_closure(self):
+        """Review round 3, F3: exactly the reviewed files, each with its blob at the historical commit."""
+        base = self.ok_record(self.entries[0])
+        extra = {**CLOSURE, "celeste_rl/extra.py": "0" * 40}
+        missing = {k: v for k, v in CLOSURE.items() if k != "celeste_rl/env.py"}
+        cases = {"wrong trainer blob": {**CLOSURE, "scripts/train_room1.py": "0" * 40},
+                 "unrelated closure only": {"unrelated.py": "0" * 40}, "one file missing": missing,
+                 "an extra file": extra, "no closure": None}
+        for case, closure in cases.items():
+            with self.subTest(case=case):
+                record = copy.deepcopy(base)
+                record["conditions"]["source_check"]["closure"] = closure
+                write(self.records, "attempt-20261004-193850.json", record)
+                with self.assertRaisesRegex(h.Refused, "source closure"):
+                    h.historical_evidence()
+        write(self.records, "attempt-20261004-193850.json", base)
+        self.assertEqual(list(h.historical_evidence()), [9])
+
+    def test_the_donor_carries_its_copys_original_pins(self):
+        """Review round 3, F2: the policy and manifest pins of the verified copy travel with the donor; an ok record
+        without a manifest pin is refused."""
+        evidence = h.historical_evidence()
+        self.assertEqual(evidence[9]["copied_files"], {"checkpoints/latest.zip": "a" * 64, "manifest.json": "b" * 64})
+        files = {"checkpoints/latest.zip": "a" * 64}
+        write(self.records, "attempt-20261004-193850.json", self.ok_record(
+            self.entries[0], run_files=files, copy={"path": self.entries[0]["run_dir"], "files": files, "verified": True}))
+        with self.assertRaisesRegex(h.Refused, "verified copy"):
+            h.historical_evidence()
 
     def test_a_committed_rebind_outside_amendment_3_is_refused(self):
         """Review round 2, R2: the rebind's committed declaration texts are re-verified, not only its metadata."""
