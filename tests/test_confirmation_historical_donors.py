@@ -1,6 +1,7 @@
 """The historical donor executor (scripts/confirmation_historical_donors.py): authorization, plan, source check,
 fresh-set checks, what counts as ok, and the run order. Nothing here starts the game or training."""
 import copy
+import hashlib
 import json
 import os
 import shutil
@@ -1052,18 +1053,39 @@ class RebindActionTest(Temp):
             p.start()
         self.declaration.write_bytes(declaration_text(BEFORE_3))
         self.plan.write_text(json.dumps(h.initial_plan(BEFORE_3, AUTH), indent=2) + "\n", encoding="utf-8")
+        (self.repo / "scripts").mkdir()
+        executor = self.repo / "scripts" / "confirmation_historical_donors.py"
+        shutil.copy(REPO / "scripts" / "confirmation_historical_donors.py", executor)
         self.commit("declaration and plan before amendment 3")
+        self.executor = {"script_sha256": hashlib.sha256(executor.read_bytes()).hexdigest(),
+                         "git": {"commit": self.head(), "uncommitted_changes": False, "changed_paths": [],
+                                 "git_error": None}}
         self.old_plan_hash = fresh_sets.text_sha256(self.plan)
         self.entries = json.loads(self.plan.read_text(encoding="utf-8"))["entries"]
         write(self.records, "attempt-20261004-193850.json", self.ok_record(self.entries[0]))
 
+    def head(self):
+        return subprocess.run(["git", "-C", str(self.repo), "rev-parse", "HEAD"], capture_output=True,
+                              text=True).stdout.strip()
+
     def ok_record(self, entry, **changes):
-        """A complete ok attempt record as the executor writes it."""
-        return {"entry": entry, "outcome": "ok", "problems": [], "plan": {"text_sha256": self.old_plan_hash},
-                "declaration_text_sha256": fresh_sets.text_sha256(self.declaration),
-                "source": {"commit": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE},
-                "copy": {"path": entry["run_dir"], "verified": True,
-                         "files": {"checkpoints/latest.zip": "a" * 64}}, **changes}
+        """A complete ok attempt record, field for field as the executor writes it."""
+        files = {"checkpoints/latest.zip": "a" * 64, "manifest.json": "b" * 64}
+        return {"executor": self.executor, "source": {"commit": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE},
+                "plan": {"path": h.PLAN_RELATIVE, "text_sha256": self.old_plan_hash, "revision": 0},
+                "entry": entry, "worktree": h.WORKTREE.as_posix(), "cwd": h.WORKTREE.as_posix(),
+                "command": [r"C:\Projects\celeste-rl\.venv-rl\Scripts\python.exe", *entry["command"]],
+                "declaration_text_sha256": fresh_sets.text_sha256(self.declaration), "limit_minutes": h.LIMIT_MINUTES,
+                "conditions": {"fresh_set_check": "x", "source_check": {
+                    "worktree": h.WORKTREE.as_posix(), "head": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE,
+                    "ignored_files": 4, "closure": {"scripts/train_room1.py": "c" * 40}},
+                    "init_clone_files": {"cloned.zip": h.INIT_CLONE_SHA256}, "steam_running": True,
+                    "game_processes": [], "other_experiments": []},
+                "launch_problems": [], "dry_run": False, "thread_variables_removed": {},
+                "threads": {"torch_intra_op_threads": 10, "torch_inter_op_threads": 10, "os_cpu_count": 16},
+                "environment_set": {"PYTHONDONTWRITEBYTECODE": "1"}, "problems": [], "exit_code": 0, "seconds": 1800,
+                "run_files": files, "copy": {"path": entry["run_dir"], "files": files, "verified": True},
+                "outcome": "ok", **changes}
 
     def tearDown(self):
         for p in reversed(self.patches):
@@ -1151,6 +1173,96 @@ class RebindActionTest(Temp):
                     extra.unlink()
                 (self.records / "attempt-20261004-193850.json").write_text(original, encoding="utf-8")
         self.assertEqual(list(h.historical_evidence()), [9])
+
+    def test_execution_evidence_one_field_at_a_time(self):
+        """Review round 2, R2: each recorded execution fact is checked, not only the commit string and copy flag."""
+        entry = self.entries[0]
+        base = self.ok_record(entry)
+        cases = {"source tree": {"source": {"commit": h.HISTORICAL_COMMIT, "tree": "0" * 40}},
+                 "dirty executor": {"executor": {**self.executor, "git": {**self.executor["git"], "uncommitted_changes": True}}},
+                 "unknown executor": {"executor": {**self.executor, "script_sha256": "0" * 64}},
+                 "other command": {"command": [base["command"][0], "other.py"]},
+                 "other interpreter": {"command": ["C:/python.exe", *entry["command"]]},
+                 "other folder": {"cwd": "C:/elsewhere"},
+                 "no thread evidence": {"threads": {}}, "bytecode allowed": {"environment_set": {}},
+                 "launch problems": {"launch_problems": ["x"]}, "not alone": {"conditions": {
+                     **base["conditions"], "other_experiments": ["python x.py"]}},
+                 "source check": {"conditions": {**base["conditions"], "source_check": {
+                     **base["conditions"]["source_check"], "head": "0" * 40}}},
+                 "copy differs from the run": {"run_files": {"checkpoints/latest.zip": "f" * 64}},
+                 "exit status": {"exit_code": 1}, "plan revision": {"plan": {**base["plan"], "revision": 1}}}
+        for name, changes in cases.items():
+            with self.subTest(case=name):
+                write(self.records, "attempt-20261004-193850.json", {**base, **changes})
+                with self.assertRaises(h.Refused):
+                    h.historical_evidence()
+        write(self.records, "attempt-20261004-193850.json", base)
+        self.assertEqual(list(h.historical_evidence()), [9])
+
+    def test_two_planned_ok_attempts_are_refused(self):
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        rerun = h.entry(BEFORE_3, 2, 9, 2, "rerun after a failed attempt")
+        revised = {**plan, "revision": 1, "previous_text_sha256": self.old_plan_hash,
+                   "entries": plan["entries"] + [rerun]}
+        self.plan.write_text(json.dumps(revised, indent=2) + "\n", encoding="utf-8")
+        self.commit("revision 1 plans a rerun of seed 9")
+        record = self.ok_record(rerun, plan={"path": h.PLAN_RELATIVE, "text_sha256": fresh_sets.text_sha256(self.plan),
+                                             "revision": 1})
+        write(self.records, "attempt-20261004-200000.json", record)
+        with self.assertRaises(h.Refused):  # attempt 1 was ok, so attempt 2 may not exist, and two ok attempts
+            h.historical_evidence()
+
+    def test_an_undeclared_recipe_in_revision_0_is_refused(self):
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        plan["entries"][0]["command"].append("--undeclared-option")
+        self.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
+        shutil.rmtree(self.repo / ".git", onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        git(self.dir, "init", "-q", str(self.repo))  # this plan is the one and only committed revision 0
+        self.commit("revision 0 with an undeclared option")
+        self.executor = {**self.executor, "git": {**self.executor["git"], "commit": self.head()}}
+        self.old_plan_hash = fresh_sets.text_sha256(self.plan)
+        # The attempt ran exactly that planned entry, so membership holds: only the declared recipe can refuse it.
+        write(self.records, "attempt-20261004-193850.json", self.ok_record(plan["entries"][0]))
+        with self.assertRaises(h.Refused) as refused:
+            h.historical_evidence()
+        self.assertIn("revision 0", str(refused.exception))
+
+    def test_started_markers(self):
+        entry = self.entries[0]
+        command = self.ok_record(entry)["command"]
+        good = {"entry": entry, "started": "t", "command": command}  # an older marker: entry and command only
+        write(self.records, "attempt-20261004-193850.started.json", good)
+        self.assertEqual(list(h.historical_evidence()), [9])
+        bound = {**good, "plan": {"path": h.PLAN_RELATIVE, "text_sha256": self.old_plan_hash, "revision": 0},
+                 "declaration_text_sha256": fresh_sets.text_sha256(self.declaration),
+                 "source": {"commit": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE}, "executor": self.executor}
+        write(self.records, "attempt-20261004-193850.started.json", bound)
+        self.assertEqual(list(h.historical_evidence()), [9])
+        for name, marker in {"other command": {**good, "command": [command[0], "other.py"]},
+                             "unknown plan binding": {**bound, "plan": {"text_sha256": "0" * 64}},
+                             "other declaration": {**bound, "declaration_text_sha256": "0" * 64},
+                             "wrong source": {**bound, "source": {"commit": "x", "tree": "y"}}}.items():
+            with self.subTest(case=name):
+                write(self.records, "attempt-20261004-193850.started.json", marker)
+                with self.assertRaises(h.Refused):
+                    h.historical_evidence()
+
+    def test_a_committed_rebind_outside_amendment_3_is_refused(self):
+        """Review round 2, R2: the rebind's committed declaration texts are re-verified, not only its metadata."""
+        plan = json.loads(self.plan.read_text(encoding="utf-8"))
+        changed = {**LIVE, "label": LIVE["label"] + " (changed)"}
+        self.declaration.write_bytes(declaration_text(changed))
+        new_hash = fresh_sets.text_sha256(self.declaration)
+        rebound = {**plan, "declaration": {"path": h.DECLARATION_RELATIVE, "text_sha256": new_hash}, "revision": 1,
+                   "previous_text_sha256": self.old_plan_hash,
+                   "rebind": {"amendment": 3, "from_declaration_sha256": plan["declaration"]["text_sha256"],
+                              "to_declaration_sha256": new_hash, "amendment_sha256": h.AMENDMENT_3_SHA256,
+                              "from_plan_commit": self.head(), "reason": "x"}}
+        self.plan.write_text(json.dumps(rebound, indent=2) + "\n", encoding="utf-8")
+        self.commit("a rebind whose declaration also changed the label")
+        with self.assertRaises(h.Refused):
+            h.historical_evidence()
+        self.assertEqual(h.rebind_action(), 1)  # the already-rebound path does not report success
 
     def test_already_rebound_verifies_its_evidence(self):
         self.amend()

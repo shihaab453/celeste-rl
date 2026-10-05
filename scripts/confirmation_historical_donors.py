@@ -602,49 +602,136 @@ def chain_problems(history: list[tuple[str, str, dict]]) -> list[str]:
     return problems
 
 
+def _executor_problems(executor, name: str) -> list[str]:
+    """The executor that wrote a record: a clean commit of this repository whose executor file is the one hashed."""
+    git = (executor or {}).get("git") or {}
+    commit = git.get("commit")
+    if (not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit)
+            or git.get("uncommitted_changes") is not False or git.get("git_error")):
+        return [f"{name}: the executor was not a clean commit"]
+    try:
+        blob = _git_bytes("show", f"{commit}:scripts/confirmation_historical_donors.py").replace(b"\r\n", b"\n")
+    except Refused:
+        return [f"{name}: executor commit {commit[:8]} has no executor"]
+    forms = {hashlib.sha256(blob).hexdigest(), hashlib.sha256(blob.replace(b"\n", b"\r\n")).hexdigest()}
+    return [] if (executor or {}).get("script_sha256") in forms else [f"{name}: executor hash is not that commit's"]
+
+
+def _command_problems(command, entry: dict, name: str) -> list[str]:
+    interpreter = os.path.normcase(str(command[0])).replace("\\", "/") if isinstance(command, list) and command else ""
+    if not interpreter.endswith(".venv-rl/scripts/python.exe") or command[1:] != entry["command"]:
+        return [f"{name}: the launched command is not its entry's command under the declared interpreter"]
+    return []
+
+
+def attempt_problems(record: dict, entry: dict, plan_hash: str, plan: dict, name: str) -> list[str]:
+    """A final attempt record's execution evidence, as the executor writes it."""
+    problems = _executor_problems(record.get("executor"), name) + _command_problems(record.get("command"), entry, name)
+    conditions = record.get("conditions") or {}
+    source = conditions.get("source_check") or {}
+    threads = record.get("threads") or {}
+    checks = {"plan": (record.get("plan"), {"path": PLAN_RELATIVE, "text_sha256": plan_hash,
+                                            "revision": plan["revision"]}),
+              "declaration": (record.get("declaration_text_sha256"), plan["declaration"]["text_sha256"]),
+              "source": (record.get("source"), {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE}),
+              "worktree": (record.get("worktree"), WORKTREE.as_posix()), "cwd": (record.get("cwd"), WORKTREE.as_posix()),
+              "limit": (record.get("limit_minutes"), LIMIT_MINUTES), "launch problems": (record.get("launch_problems"), []),
+              "dry run": (record.get("dry_run"), False), "environment": (record.get("environment_set"), NO_BYTECODE),
+              "steam": (conditions.get("steam_running"), True), "games": (conditions.get("game_processes"), []),
+              "experiments": (conditions.get("other_experiments"), []),
+              "source check": ([source.get("head"), source.get("tree")], [HISTORICAL_COMMIT, HISTORICAL_TREE]),
+              "init clone": ((conditions.get("init_clone_files") or {}).get("cloned.zip"), INIT_CLONE_SHA256)}
+    problems += [f"{name}: {key} is {got!r}" for key, (got, want) in checks.items() if not same_json(got, want)]
+    if not isinstance(source.get("closure"), dict) or not source.get("closure"):
+        problems.append(f"{name}: no source closure")
+    if not isinstance(record.get("thread_variables_removed"), dict) or not all(
+            type(threads.get(k)) is int and threads.get(k) > 0 for k in ("torch_intra_op_threads", "torch_inter_op_threads")):
+        problems.append(f"{name}: no thread evidence")
+    if record.get("outcome") == "ok":
+        copy = record.get("copy") or {}
+        files = copy.get("files") or {}
+        if (record.get("exit_code") != 0 or record.get("problems") != [] or copy.get("verified") is not True
+                or copy.get("path") != entry["run_dir"] or not files.get("checkpoints/latest.zip")
+                or not same_json(files, record.get("run_files"))):
+            problems.append(f"{name}: ok without a clean exit and a verified copy of its own run files")
+    return problems
+
+
 def historical_evidence(history: list[tuple[str, str, dict]] | None = None) -> dict[int, dict]:
-    """The validated historical donors, by seed, from the committed plan chain and the attempt records; Refused on
-    any inconsistency. Every final record and started marker must name a committed plan version that contains its
-    full entry and the declaration that version pinned, at the historical source; attempts follow the sequence (a
-    rerun only after a failed attempt, nothing after an ok one, one ok attempt per seed); an ok attempt needs its
-    verified copy with the checkpoint's hash."""
+    """The validated historical donors, by seed; Refused on any inconsistency.
+
+    Plan: every committed version passes plan_problems against the declaration text it pins (read at that version's
+    commit) and the genuine authorization; the chain links each version to its predecessor; a rebind is re-verified
+    as exactly the reviewed amendment 3 appended to the committed old text. Attempts: every final record names a
+    committed version holding its full entry, with that version's declaration, the historical source, a clean
+    executor commit whose file is the one hashed, the entry's command under the declared interpreter in the worktree,
+    the launch conditions and source check, and (if ok) a clean exit and a copy equal to its run files. Started
+    markers must name a planned entry and the same command; their binding fields, when present (markers written since
+    the stage 1 review), must agree with a committed version; older markers carry only entry and command and are
+    cross-checked with their final record. Sequence: a rerun only after a failed attempt, nothing after an ok one,
+    one ok attempt per seed."""
     history = plan_history() if history is None else history
     problems = chain_problems(history)
-    versions = {plan_hash: plan for _, plan_hash, plan in history}
+    versions: dict[str, tuple[str, dict]] = {}
+    for commit, plan_hash, plan in reversed(history):  # the oldest commit holding each version
+        versions.setdefault(plan_hash, (commit, plan))
+    auth = authorization()
+    texts: dict[str, bytes] = {}
+    for plan_hash, (commit, plan) in versions.items():
+        text = _git_bytes("show", f"{commit}:{DECLARATION_RELATIVE}")
+        if _text_sha256_of(text) != plan["declaration"]["text_sha256"]:
+            problems.append(f"revision {plan['revision']} is not committed with the declaration it pins")
+            continue
+        texts[plan_hash] = text
+        problems += [f"revision {plan['revision']}: {p}" for p in plan_problems(
+            plan, strict_json(text.decode("utf-8")), auth, declaration_sha256=plan["declaration"]["text_sha256"])]
+    by_revision = {plan["revision"]: plan_hash for plan_hash, (_, plan) in versions.items()}
+    for revision, plan_hash in by_revision.items():
+        before = by_revision.get(revision - 1)
+        if "rebind" in versions[plan_hash][1] and before and "rebind" not in versions[before][1]:
+            if plan_hash in texts and before in texts:
+                problems += [f"rebind: {p}" for p in rebind_problems(texts[before], texts[plan_hash])]
     statuses = attempt_statuses(RECORDS)  # also refuses conflicting or unreadable attempt files
     donors = {}
     for path in sorted(RECORDS.glob("attempt-*.json")):
         record = read_json(path)
-        marker = path.name.endswith(STARTED)
         entry = record.get("entry") if isinstance(record, dict) else None
-        if marker:
-            if not any(any(same_json(entry, e) for e in plan["entries"]) for plan in versions.values()):
+        if path.name.endswith(STARTED):
+            planned = [h for h, (_, plan) in versions.items() if any(same_json(entry, e) for e in plan["entries"])]
+            if not planned:
                 problems.append(f"{path.name} names an entry that no committed plan version holds")
+                continue
+            problems += _command_problems(record.get("command"), entry, path.name)
+            bound = (record.get("plan") or {}).get("text_sha256")
+            if "plan" in record and (bound not in planned or record.get("declaration_text_sha256")
+                                     != versions[bound][1]["declaration"]["text_sha256"]
+                                     or record.get("source") != {"commit": HISTORICAL_COMMIT, "tree": HISTORICAL_TREE}):
+                problems.append(f"{path.name}: its plan, declaration or source binding is not a committed version's")
+            final = path.with_name(path.name[:-len(STARTED)] + ".json")
+            if final.exists():
+                done = read_json(final)
+                if not same_json(done.get("entry"), entry) or done.get("command") != record.get("command"):
+                    problems.append(f"{path.name} does not match its final record")
             continue
-        bound = versions.get((record.get("plan") or {}).get("text_sha256"))
-        if bound is None:
+        bound = (record.get("plan") or {}).get("text_sha256")
+        if bound not in versions:
             problems.append(f"{path.name} names a plan version that is not committed")
             continue
-        if not any(same_json(entry, e) for e in bound["entries"]):
+        plan = versions[bound][1]
+        if not any(same_json(entry, e) for e in plan["entries"]):
             problems.append(f"{path.name}: its entry is not in the plan version it names")
             continue  # nothing else about an unplanned attempt can be trusted
-        if record.get("declaration_text_sha256") != bound["declaration"]["text_sha256"]:
-            problems.append(f"{path.name}: its declaration is not the one its plan version pinned")
-        if (record.get("source") or {}).get("commit") != HISTORICAL_COMMIT:
-            problems.append(f"{path.name}: not run at the historical source")
+        problems += attempt_problems(record, entry, bound, plan, path.name)
         if record.get("outcome") == "ok":
-            copy = record.get("copy") or {}
-            sha = (copy.get("files") or {}).get("checkpoints/latest.zip")
-            if copy.get("verified") is not True or copy.get("path") != entry["run_dir"] or not sha:
-                problems.append(f"{path.name}: ok without a verified copy of {entry['run_dir']}")
-            elif entry["seed"] in donors:
+            if entry["seed"] in donors:
                 problems.append(f"seed {entry['seed']} has more than one ok attempt")
-            else:
-                donors[entry["seed"]] = {"seed": entry["seed"], "j": entry["j"], "attempt": entry["attempt"],
-                                         "checkpoint": f"{entry['run_dir']}/checkpoints/latest.zip", "sha256": sha,
-                                         "record": {"path": _relative(path),
-                                                    "sha256": _sha256(path)},
-                                         "plan_version_sha256": record["plan"]["text_sha256"]}
+            donors[entry["seed"]] = {"seed": entry["seed"], "j": entry["j"], "attempt": entry["attempt"],
+                                     "checkpoint": f"{entry['run_dir']}/checkpoints/latest.zip",
+                                     "sha256": ((record.get("copy") or {}).get("files") or {}).get(
+                                         "checkpoints/latest.zip"),
+                                     "record": {"path": _relative(path), "sha256": _sha256(path)},
+                                     "plan_version_sha256": bound,
+                                     "executor_commit": ((record.get("executor") or {}).get("git") or {}).get("commit")}
     by_seed: dict[int, dict[int, str]] = {}
     for (seed, attempt), status in statuses.items():
         by_seed.setdefault(seed, {})[attempt] = status
@@ -1039,7 +1126,10 @@ def start_attempt(record: dict) -> Path:
         try:
             with open(f"{base}{STARTED}", "x", encoding="utf-8") as handle:
                 handle.write(json.dumps({"entry": record["entry"], "started": datetime.now().isoformat(),
-                                         "command": record["command"]}, indent=2) + "\n")
+                                         "command": record["command"], "plan": record["plan"],
+                                         "declaration_text_sha256": record["declaration_text_sha256"],
+                                         "source": record["source"], "executor": record["executor"]},
+                                        indent=2) + "\n")
             return base
         except FileExistsError:
             continue
