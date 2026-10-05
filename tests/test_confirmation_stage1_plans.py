@@ -390,12 +390,13 @@ class CopyOutcomeTest(Temp):
                  "newer donor commit": change(["0" * 40], "init_from", "provenance", "commits"),
                  "play mismatch": change("1" * 64, "provenance", 1, "dataset_sha256"),
                  "seed": change("13", "args", "seed"), "recorded at a timestamp": change("20261005-120000", "mix", "play", "recorded_at"),
-                 "dirty": change(True, "uncommitted_changes"), "task": change(ROOM1, "task"),
-                 "v2 elsewhere": change("config/heldout_starts-room2-v2.json", "notes")}
+                 "dirty": change(True, "uncommitted_changes"), "task": change(ROOM1, "task")}
         for index, (name, edit) in enumerate(cases.items()):
             with self.subTest(case=name):
                 self.assertIsNone(self.outcome(f"20261005-13{index + 1:04d}", edit=edit)[0])
         self.assertIsNone(self.outcome("20261005-139999", last_epoch=298)[0])
+        with self.assertRaises(g.Refused):  # a fresh set outside its role stops for review; it is never rerun
+            self.outcome("20261005-139998", edit=change("config/heldout_starts-room2-v2.json", "notes"))
 
 
 # ------------------------------------------------------------------------- campaigns, phases and recovery
@@ -406,13 +407,17 @@ class Chain(Temp):
     def setUp(self):
         super().setUp()
         (self.root / "config").mkdir()
+        (self.root / "scripts").mkdir()
         shutil.copy(REPO / "config" / "retention-confirmation.json", self.root / "config")
+        (self.root / "scripts" / "control.py").write_text("RULE = 1\n", encoding="utf-8")  # a stand-in control file
         git(self.root.parent, "init", "-q", str(self.root))
         self.donors = [donor(j, seed) for j, seed in enumerate(g.ORIGINAL_SEEDS)]
         for d in self.donors:
             (self.root / Path(d["checkpoint"]).parent.parent).mkdir(parents=True)
         self.clock = 0
         self.more = [unittest.mock.patch.object(hx, "REPO", self.root),
+                     unittest.mock.patch.object(g, "control_files",  # the independently derived manifest
+                                                return_value=["config/retention-confirmation.json", "scripts/control.py"]),
                      unittest.mock.patch.object(g, "round_donors", side_effect=lambda d, r: copy.deepcopy(self.donors)),
                      unittest.mock.patch.object(g, "v1_pins", return_value=PINS),
                      unittest.mock.patch.object(g, "copy_input_pins", return_value=COPY_INPUTS),
@@ -437,19 +442,32 @@ class Chain(Temp):
         return subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"], capture_output=True,
                               text=True).stdout.strip()
 
-    def receipt(self, plan_file: Path, plan: dict, commit: str, **changes):
-        blob = subprocess.run(["git", "-C", str(self.root), "rev-parse", f"{commit}:config/retention-confirmation.json"],
-                              capture_output=True, text=True).stdout.strip()
-        record = {"plan": {"path": g.rel(plan_file), "text_sha256": text_sha256(plan_file)}, "approved_commit": commit,
-                  "head": commit, "control_files": {"config/retention-confirmation.json": blob},
-                  "invocation": g.runner_invocation(plan_file, plan["phase"]), **changes}
-        g.write_new(g.STAGE1 / f"preflight-{plan['name']}-{self.stamp()}.json", record)
+    def blob(self, commit: str, name: str) -> str:
+        return subprocess.run(["git", "-C", str(self.root), "rev-parse", f"{commit}:{name}"], capture_output=True,
+                              text=True).stdout.strip()
+
+    def receipt(self, plan_file: Path, plan_doc: dict, commit: str, approved: str | None = None, **changes):
+        """A complete, successful receipt exactly as preflight writes it; changes alter one field."""
+        approved = approved or commit
+        git(self.root, "update-ref", "refs/remotes/origin/proposal/ppo-anchor", commit)
+        record = {"plan": {"path": g.rel(plan_file), "text_sha256": text_sha256(plan_file), "commit": commit},
+                  "approved_commit": approved, "remote": "origin/proposal/ppo-anchor", "head": commit,
+                  "control_files": {f: self.blob(approved, f) for f in g.control_files()},
+                  "code_checks": {name: {"command": command, "exit_code": 0, "stdout_tail": ["PASS"]}
+                                  for name, command in g.CODE_CHECKS.items()},
+                  "invocation": g.runner_invocation(plan_file, plan_doc["phase"]),
+                  "stop_time": plan_doc.get("stop_time"),
+                  "dry_run": {"exit_code": 0, "stdout_tail": ["dry run: nothing executed"]},
+                  "threads": {"torch_intra_op_threads": 10, "torch_inter_op_threads": 10, "os_cpu_count": 16},
+                  "audits": [], **changes}
+        g.write_new(g.STAGE1 / f"preflight-{plan_doc['name']}-{self.stamp()}.json", record)
 
     def run_campaign(self, plan_file: Path, records_for, commit: str, receipt: bool = True, threads: int = 10,
-                     finished: bool = True, extra_log: str = "", drop: int = 0, copies=None) -> Path:
+                     finished: bool = True, extra_log: str = "", drop: int = 0, copies=None, approved=None,
+                     receipt_changes=None) -> Path:
         plan = json.loads(plan_file.read_text(encoding="utf-8"))
         if receipt:
-            self.receipt(plan_file, plan, commit)
+            self.receipt(plan_file, plan, commit, approved=approved, **(receipt_changes or {}))
         folder = g.CAMPAIGNS / f"{self.stamp()}-{plan['name']}"
         folder.mkdir(parents=True)
         records = records_for(plan, commit)[:len(plan["runs"]) - drop]
@@ -538,23 +556,81 @@ class PhaseTest(Chain):
                 self.run_campaign(plan_file, self.evaluations(), commit, **options)
                 with self.assertRaises(g.Refused):
                     g.advance("donor-v1", 0)
-        shutil.rmtree(g.CAMPAIGNS)
-        shutil.rmtree(g.STAGE1)
-        self.receipt(plan_file, json.loads(plan_file.read_text(encoding="utf-8")), commit)
-        (self.root / "config" / "retention-confirmation.json").write_text("{}", encoding="utf-8")
-        later = self.commit()  # the campaign ran at a commit whose code is not the receipt's approved code
-        plan = json.loads(plan_file.read_text(encoding="utf-8"))
-        folder = g.CAMPAIGNS / f"{self.stamp()}-{plan['name']}"
-        folder.mkdir(parents=True)
-        (folder / "campaign.log").write_text(f"[t] campaign {plan['name']}, 8 runs\n[t] campaign finished: 8\n",
-                                             encoding="utf-8")
-        (folder / "summary.json").write_text(json.dumps({"plan": plan["name"], "plan_sha256": text_sha256(plan_file),
-                                                         "commit": later, "results": self.evaluations()(plan, later),
-                                                         "threads_per_job": 10,
-                                                         "parallel": {"copies": plan["runner"]["game_copies"]}}),
-                                             encoding="utf-8")
+
+    def test_a_changed_helper_behind_a_matching_receipt_stops(self):
+        """Review round 2: the receipt's head is the campaign commit, but a control file changed after approval."""
+        g.advance("donor-v1", 0)
+        approved = self.commit()
+        plan_file = g.plan_path("donor-v1", 0, 1)
+        (self.root / "scripts" / "control.py").write_text("RULE = 2\n", encoding="utf-8")
+        later = self.commit()
+        self.run_campaign(plan_file, self.evaluations(), later, approved=approved)
         with self.assertRaises(g.Refused):
             g.advance("donor-v1", 0)
+        self.assertFalse(g.completion_path("donor-v1", 0).exists())
+
+    def test_incomplete_or_failed_receipts_stop(self):
+        """Review round 2, R1: one receipt field at a time."""
+        g.advance("donor-v1", 0)
+        commit = self.commit()
+        plan_file = g.plan_path("donor-v1", 0, 1)
+        python = g.runner_invocation(plan_file, "donor-v1")
+        cases = {"control set incomplete": {"control_files": {"config/retention-confirmation.json": "x"}},
+                 "failed code check": {"code_checks": {name: {"command": command, "exit_code": 1}
+                                                       for name, command in g.CODE_CHECKS.items()}},
+                 "a check missing": {"code_checks": {}},
+                 "failed dry run": {"dry_run": {"exit_code": 1}}, "one thread": {"threads": {"torch_intra_op_threads": 1}},
+                 "other interpreter": {"invocation": ["C:/other/python.exe", *python[1:]]},
+                 "other stop time": {"stop_time": "2026-10-05T18:00:00"}, "extra field": {"note": "x"},
+                 "plan commit missing": {"plan": {"path": g.rel(plan_file), "text_sha256": text_sha256(plan_file),
+                                                  "commit": "0" * 40}}}
+        for name, changes in cases.items():
+            with self.subTest(case=name):
+                shutil.rmtree(g.CAMPAIGNS, ignore_errors=True)
+                shutil.rmtree(g.STAGE1, ignore_errors=True)
+                self.run_campaign(plan_file, self.evaluations(), commit, receipt_changes=changes)
+                with self.assertRaises(g.Refused):
+                    g.advance("donor-v1", 0)
+                self.assertFalse(g.completion_path("donor-v1", 0).exists())
+
+    def test_hard_stops_write_no_recovery_plan(self):
+        """Review round 2, R3: a fresh mention, a runner fresh-set refusal and stale starts stop for review even
+        when an artifact is also faulty."""
+        g.advance("donor-v1", 0)
+        commit = self.commit()
+        plan_file = g.plan_path("donor-v1", 0, 1)
+
+        def with_first(change):
+            def records_for(plan, commit_):
+                records = self.evaluations()(plan, commit_)
+                change(records[0])
+                return records
+            return records_for
+
+        def notes(record):
+            path = self.root / record["artifact"]["result_file"]
+            result = json.loads(path.read_text(encoding="utf-8"))
+            result["notes"] = "see config/heldout_starts-room1-v2.json"
+            path.write_text(json.dumps(result), encoding="utf-8")
+
+        def stale_and_missing_episodes(record):
+            path = self.root / record["artifact"]["result_file"]
+            result = json.loads(path.read_text(encoding="utf-8"))
+            result.update(stale_starts=2, episodes=198)
+            path.write_text(json.dumps(result), encoding="utf-8")
+            (self.root / record["artifact"]["episodes_file"]).unlink()
+            record["artifact"]["problem"] = "declared episode file does not exist"
+
+        cases = {"fresh mention": notes, "runner refusal": lambda r: r.update(status="refused_fresh_set"),
+                 "stale starts with a missing episode file": stale_and_missing_episodes}
+        for name, change in cases.items():
+            with self.subTest(case=name):
+                shutil.rmtree(g.CAMPAIGNS, ignore_errors=True)
+                shutil.rmtree(g.STAGE1, ignore_errors=True)
+                self.run_campaign(plan_file, with_first(change), commit)
+                with self.assertRaises(g.Refused):
+                    g.advance("donor-v1", 0)
+                self.assertFalse(g.plan_path("donor-v1", 0, 2).exists())
 
     def test_dry_runs_are_ignored_and_a_second_execution_stops(self):
         g.advance("donor-v1", 0)
@@ -727,17 +803,13 @@ class PreflightTest(Chain):
 
     def setUp(self):
         super().setUp()
-        (self.root / "scripts").mkdir()
-        (self.root / "scripts" / "control.py").write_text("RULE = 1\n", encoding="utf-8")
         self.approved = self.commit()
         g.advance("donor-v1", 0)
         self.plan_file = g.plan_path("donor-v1", 0, 1)
         self.plan_commit = self.commit()
         git(self.root, "update-ref", "refs/remotes/origin/proposal/ppo-anchor", self.plan_commit)
         invocation = [sys.executable, "-c", "print('dry')", "--copy", "C:/x:1:2"]
-        self.pre = [unittest.mock.patch.object(g, "control_files",
-                                               return_value=["config/retention-confirmation.json", "scripts/control.py"]),
-                    unittest.mock.patch.object(g, "runner_invocation", return_value=invocation),
+        self.pre = [unittest.mock.patch.object(g, "runner_invocation", return_value=invocation),
                     unittest.mock.patch.object(g.rc, "thread_probe", return_value={"torch_intra_op_threads": 10})]
         for p in self.pre:
             p.start()

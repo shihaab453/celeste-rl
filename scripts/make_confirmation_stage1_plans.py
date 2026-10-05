@@ -247,6 +247,12 @@ def room2_identity() -> dict:
     return task_identity(resolve_task_definition(task))
 
 
+def hard_stop(problems: list[str], where: str) -> None:
+    """A fresh set named outside its role is never a technical failure to rerun: stop for review."""
+    if problems:
+        raise Refused(f"{where}: " + "; ".join(problems) + ": stop for review")
+
+
 def margin(value: float) -> float:
     """route-macro minus the literal floor, from the unrounded aggregate, rounded to 6 decimals (amendment 3)."""
     return round(value - FLOOR, DECIMALS)
@@ -475,24 +481,81 @@ def campaign_folders(name: str) -> list[Path]:
                   if p.is_dir() and re.fullmatch(rf"\d{{8}}-\d{{6}}-{re.escape(name)}", p.name))
 
 
+RECEIPT_KEYS = {"plan", "approved_commit", "remote", "head", "control_files", "code_checks", "invocation", "stop_time",
+                "dry_run", "threads", "audits"}
+
+
+def _is_ancestor(commit: str, ref: str) -> bool:
+    return subprocess.run(["git", "-C", str(REPO), "merge-base", "--is-ancestor", str(commit), str(ref)],
+                          capture_output=True).returncode == 0
+
+
+def receipt_problems(receipt: dict, plan: dict, plan_hash: str, commit: str) -> list[str]:
+    """A complete, successful preflight receipt for this plan at this commit: its control-file set equals the
+    independently derived manifest and every blob equals the campaign commit's and the approved commit's; the three
+    declared code checks passed; the dry run passed; torch ran 10 threads; the full runner invocation and stop time
+    are the plan's; the plan commit, the approved commit and the campaign commit are bound on the named remote."""
+    if set(receipt) != RECEIPT_KEYS:
+        return [f"receipt fields {sorted(receipt)} are not the preflight schema"]
+    problems = []
+    approved = receipt.get("approved_commit")
+    plan_pin = receipt.get("plan") or {}
+    files = receipt.get("control_files") or {}
+    required = control_files()
+    if set(files) != set(required):
+        problems.append(f"control files {sorted(files)} are not the required manifest {required}")
+    for name in required:
+        try:
+            at_commit = hx._git(REPO, "rev-parse", f"{commit}:{name}").strip()
+            at_approved = hx._git(REPO, "rev-parse", f"{approved}:{name}").strip()
+        except Refused:
+            problems.append(f"{name} is missing at the campaign or approved commit")
+            continue
+        if not (at_commit == at_approved == files.get(name)):
+            problems.append(f"{name} at the campaign commit is not the approved version the receipt names")
+    checks = receipt.get("code_checks") or {}
+    if set(checks) != set(CODE_CHECKS) or any(
+            (checks.get(name) or {}).get("command") != command or (checks.get(name) or {}).get("exit_code") != 0
+            for name, command in CODE_CHECKS.items()):
+        problems.append("the receipt's code checks are not the three declared checks, all passing")
+    if (receipt.get("dry_run") or {}).get("exit_code") != 0:
+        problems.append("the receipt's dry run did not pass")
+    if (receipt.get("threads") or {}).get("torch_intra_op_threads") != THREADS:
+        problems.append(f"the receipt's thread probe is not {THREADS}")
+    if receipt.get("invocation") != runner_invocation(REPO / plan_rel(plan), plan["phase"]):
+        problems.append("the receipt's runner invocation is not the plan's")
+    if receipt.get("stop_time") != plan.get("stop_time"):
+        problems.append("the receipt's stop time is not the plan's")
+    if plan_pin.get("path") != plan_rel(plan) or plan_pin.get("text_sha256") != plan_hash:
+        problems.append("the receipt names another plan")
+    plan_commit, remote = plan_pin.get("commit"), receipt.get("remote")
+    try:
+        committed_plan = hx._git_bytes("show", f"{plan_commit}:{plan_rel(plan)}")
+        if hx._text_sha256_of(committed_plan) != plan_hash:
+            problems.append("the receipt's plan commit does not hold this plan")
+    except Refused:
+        problems.append("the receipt's plan commit does not hold this plan")
+    for what, older, newer in (("plan commit", plan_commit, commit), ("approved commit", approved, commit),
+                               ("approved commit", approved, remote), ("plan commit", plan_commit, remote)):
+        if not _is_ancestor(older, newer):
+            problems.append(f"the receipt's {what} {str(older)[:8]} is not on {str(newer)[:40]}")
+    return problems
+
+
 def preflight_receipt(plan: dict, plan_hash: str, commit: str, folder: Path) -> dict:
-    """The preflight receipt that authorized this campaign: same plan text, same commit, written before the campaign
-    started, naming an approved commit whose control files equal the campaign commit's."""
+    """The preflight receipt that authorized this campaign: for this plan text at this commit, written before the
+    campaign started, complete and successful (receipt_problems). An invalid matching receipt stops for review."""
     started = folder.name[:15]
     for path in sorted(STAGE1.glob(f"preflight-{plan['name']}-*.json")):
         stamp = path.name[len(f"preflight-{plan['name']}-"):][:15]
         receipt = read_meta(path)
-        if receipt.get("plan", {}).get("text_sha256") != plan_hash or receipt.get("head") != commit or stamp >= started:
+        if (receipt.get("plan") or {}).get("text_sha256") != plan_hash or receipt.get("head") != commit \
+                or stamp >= started:
             continue
-        approved = receipt.get("approved_commit")
-        files = receipt.get("control_files") or {}
-        if not files or any(hx._git(REPO, "rev-parse", f"{commit}:{f}").strip() != blob
-                            or hx._git(REPO, "rev-parse", f"{approved}:{f}").strip() != blob
-                            for f, blob in files.items()):
-            raise Refused(f"{rel(path)} does not tie the campaign commit's control code to its approved commit")
-        if receipt.get("invocation", [])[2:] != runner_invocation(REPO / plan_rel(plan), plan["phase"])[2:]:
-            raise Refused(f"{rel(path)} records a different runner command")
-        return {"path": rel(path), "sha256": guarded_hash(path), "approved_commit": approved}
+        problems = receipt_problems(receipt, plan, plan_hash, commit)
+        if problems:
+            raise Refused(f"{rel(path)}: " + "; ".join(problems))
+        return {"path": rel(path), "sha256": guarded_hash(path), "approved_commit": receipt["approved_commit"]}
     raise Refused(f"no preflight receipt before {rel(folder)} for this plan at {str(commit)[:8]}")
 
 
@@ -578,13 +641,17 @@ def _mismatches(checks: dict) -> list[str]:
 
 def evaluation_outcome(record: dict, expected_sha: str, commit: str, pins: dict) -> tuple[dict | None, list[str]]:
     artifact = record.get("artifact") or {}
-    if not artifact or artifact.get("problem"):
-        return None, [f"no valid result artifact: {artifact.get('problem')}"]
-    if not norm(artifact["result_file"]).startswith(EVALUATION_FOLDER):
-        return None, [f"result outside {EVALUATION_FOLDER}"]
+    if not artifact.get("result_file") or not norm(artifact["result_file"]).startswith(EVALUATION_FOLDER):
+        return None, [f"no result in {EVALUATION_FOLDER}: {artifact.get('problem')}"]
     result_file = REPO / artifact["result_file"]
     result = hx.read_json(result_file)
-    problems = fresh_mentions(result, {})
+    # Hard stops first, from the readable result itself, before any companion file or artifact fault is weighed.
+    hard_stop(fresh_mentions(result, {}), artifact["result_file"])
+    if result.get("stale_starts") != 0:
+        raise Refused(f"{artifact['result_file']}: {result.get('stale_starts')!r} stale starts: stop for review")
+    if artifact.get("problem"):
+        return None, [f"the runner found the artifact faulty: {artifact['problem']}"]
+    problems = []
     if guarded_hash(result_file) != artifact.get("result_sha256"):
         problems.append("result file changed since the runner pinned it")
     episodes = artifact.get("episodes_file")
@@ -597,8 +664,6 @@ def evaluation_outcome(record: dict, expected_sha: str, commit: str, pins: dict)
         "attempts": pins["states"], "episodes": pins["states"]}.items()})
     if norm(result.get("heldout_set")) != V1:
         problems.append(f"heldout_set is {result.get('heldout_set')!r}")
-    if result.get("stale_starts") != 0:
-        raise Refused(f"{artifact['result_file']}: {result.get('stale_starts')} stale starts: stop for review")
     problems += _clean(result, commit, "the evaluation")
     value = result.get("route_macro_success_rate")
     if type(value) is not float or not math.isfinite(value) or not 0.0 <= value <= 1.0:
@@ -624,7 +689,8 @@ def recording_outcome(record: dict, item: dict, commit: str) -> tuple[dict | Non
     if guard:
         raise Refused("; ".join(guard))
     play = hx.read_json(folder / "play.json")
-    problems = fresh_mentions(play, {})
+    hard_stop(fresh_mentions(play, {}), rel(folder / "play.json"))
+    problems = []
     problems += _mismatches({key: (play.get(key), value) for key, value in {
         "task": room1_identity(), "checkpoint_sha256": item["sha256"], "seed": RECORD_SEED, "episodes": EPISODES,
         "starts": STARTS, "dataset": "dataset.npz"}.items()})
@@ -670,7 +736,9 @@ def copy_outcome(record: dict, item: dict, commit: str, plan_entry: dict, inputs
         return None, [f"result {artifact['result_file']!r} is not a copy folder"]
     result_file = REPO / artifact["result_file"]
     result = hx.read_json(result_file)
-    problems = fresh_mentions(result, {("args", "heldout"): ROOM2_V2, ("manifests", "heldout"): ROOM2_V2})
+    hard_stop(fresh_mentions(result, {("args", "heldout"): ROOM2_V2, ("manifests", "heldout"): ROOM2_V2}),
+              artifact["result_file"])
+    problems = []
     if guarded_hash(result_file) != artifact.get("result_sha256"):
         problems.append("result file changed since the runner pinned it")
     problems += _clean(result, commit, "the copy", attributable=False)
@@ -733,6 +801,9 @@ def copy_outcome(record: dict, item: dict, commit: str, plan_entry: dict, inputs
 def outcome_for(phase: str, record: dict, entry: dict, item: dict, commit: str, plan: dict) -> tuple[dict | None, list]:
     """One entry's outcome, or the technical failure. Ordinary artifact faults are failures to recover; fresh-set
     refusals, stale starts and evidence conflicts (Refused) stop for review."""
+    statuses = [record.get("status")] + [a.get("status") for a in record.get("attempts") or []]
+    if "refused_fresh_set" in statuses:
+        raise Refused(f"{entry['id']} was refused by the runner's fresh-set guard: stop for review")
     if record.get("status") != "ok":
         return None, [f"status {record.get('status')}"]
     problems = _command_problems(record, entry, plan)
