@@ -2,7 +2,7 @@
   "name": "confirmation-donors-historical",
   "declaration": {
     "path": "config/retention-confirmation.json",
-    "text_sha256": "883fc5bd662a15da41058d90fc6cdab840ae47eed0fdaeddbf954bc3facab4ae"
+    "text_sha256": "f366f233c667320a6758c79cbdc4caa28614ea48aab72b3cc5b3164659bee74a"
   },
   "rules": "donors.historical_training (amendment 2)",
   "source": {
@@ -31,7 +31,7 @@
       "comparator_commit": "7987f04786622ab0ded60f2914b18243cb15d236"
     }
   },
-  "revision": 0,
+  "revision": 1,
   "entries": [
     {
       "j": 2,
@@ -213,5 +213,14 @@
         "C:/Projects/celeste-research-scratch/game-probe"
       ]
     }
-  ]
+  ],
+  "previous_text_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+  "rebind": {
+    "amendment": 3,
+    "from_declaration_sha256": "883fc5bd662a15da41058d90fc6cdab840ae47eed0fdaeddbf954bc3facab4ae",
+    "to_declaration_sha256": "f366f233c667320a6758c79cbdc4caa28614ea48aab72b3cc5b3164659bee74a",
+    "amendment_sha256": "96c5f7d54d2028fe031c4c54c575c2cd7ce7785393b3ae5367dca628484cec42",
+    "from_plan_commit": "85477d3d68e3a96e78211f43ba8876be9a32f6e7",
+    "reason": "amendment 3 appended to the declaration; entries and attempts unchanged"
+  }
 }
