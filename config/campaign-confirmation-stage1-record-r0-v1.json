@@ -1,0 +1,402 @@
+{
+  "name": "confirmation-stage1-record-r0-v1",
+  "phase": "record",
+  "round": 0,
+  "version": 1,
+  "rules": "config/retention-confirmation.json amendment 3 (stage 1)",
+  "declaration": {
+    "path": "config/retention-confirmation.json",
+    "text_sha256": "f366f233c667320a6758c79cbdc4caa28614ea48aab72b3cc5b3164659bee74a"
+  },
+  "fresh_set_stage": "stage1",
+  "runner": {
+    "game_copies": [
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-probe",
+        "ports": [
+          32279,
+          32280
+        ]
+      },
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-copy-2",
+        "ports": [
+          32289,
+          32290
+        ]
+      },
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-copy-3",
+        "ports": [
+          32299,
+          32300
+        ]
+      }
+    ],
+    "threads_per_job": 10,
+    "one_at_a_time": false
+  },
+  "predecessors": [
+    {
+      "path": "runs/confirmation/stage1/donor-v1-r0-complete.json",
+      "text_sha256": "99fab14b266974558afda83bd663992d0d073e91505a97c8164d191e39878b01"
+    }
+  ],
+  "accepted": [],
+  "items": [
+    {
+      "j": 0,
+      "seed": 7,
+      "checkpoint": "runs/train/overnight-B-seed7/checkpoints/latest.zip",
+      "sha256": "ab33ab3e68d7cc9cb24eb98c4646719b1756781f1c345a4c21e79dbb110ea262",
+      "donor_source": {
+        "declared pin": "donors.existing.7"
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171854/results.json",
+        "result_sha256": "edc2762a50ae3e20cc3f538722265d7ccdd49dc01623bee6db6c1456cb218c5c",
+        "episodes_file": "runs/heldout-evaluation/20261005-171854/episodes.jsonl",
+        "episodes_sha256": "a7019e951b0e48670a984e4f7242dd240a79ed958bf9eefab59551efeed6f6cc",
+        "route_macro_success_rate": 0.7880085600673836,
+        "margin": 0.646009,
+        "passes": true
+      }
+    },
+    {
+      "j": 1,
+      "seed": 8,
+      "checkpoint": "runs/train/overnight-B-seed8/checkpoints/latest.zip",
+      "sha256": "868cec75bac07f160f9dc55d1d35491555aab2078196f8c31fe8dcc7841b1776",
+      "donor_source": {
+        "declared pin": "donors.existing.8"
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171851/results.json",
+        "result_sha256": "abb967f5d3f932a5647c4aa0babad55d7455de737c4d381933288f53511d56e0",
+        "episodes_file": "runs/heldout-evaluation/20261005-171851/episodes.jsonl",
+        "episodes_sha256": "4f00d8412ffe8c0c6e87a5954b8da0aad8afaf47077b84ec449e57f1f9005a7d",
+        "route_macro_success_rate": 0.7326231774761187,
+        "margin": 0.590623,
+        "passes": true
+      }
+    },
+    {
+      "j": 2,
+      "seed": 9,
+      "checkpoint": "runs/train/confirm-donor-B-seed9/checkpoints/latest.zip",
+      "sha256": "855ff782396726599e76d9990d9ce82d9dbb1ac983dcffc570a5b97aa32306e4",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-193850.json",
+          "sha256": "5fcaaf4346cf738f66b95c45751d892da8fd5fb5d23ef7fd361278221ef06556"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "855ff782396726599e76d9990d9ce82d9dbb1ac983dcffc570a5b97aa32306e4",
+          "manifest.json": "ff28e3d72109938f6eb90e06415162bf199a994911a41b942af05f0d66ae4a5e"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171858/results.json",
+        "result_sha256": "14b19da4f9d3682100ba26f8e8649e2e732d10af7ca1c63d74b556e7c030467f",
+        "episodes_file": "runs/heldout-evaluation/20261005-171858/episodes.jsonl",
+        "episodes_sha256": "8b4bd2f99c4bb8029548435b39d5b19c6c0c39464c4f919fb21b4671c79cc092",
+        "route_macro_success_rate": 0.8228152566387861,
+        "margin": 0.680815,
+        "passes": true
+      }
+    },
+    {
+      "j": 3,
+      "seed": 10,
+      "checkpoint": "runs/train/confirm-donor-B-seed10/checkpoints/latest.zip",
+      "sha256": "d42b5547271fd39f32a760deb1462258624e1e9cbe2b1947404d12635a31c588",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-200901.json",
+          "sha256": "42de35c70827f7578d96be8555566d65bb8054475b931eb3a7e6ffd89bed605d"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "d42b5547271fd39f32a760deb1462258624e1e9cbe2b1947404d12635a31c588",
+          "manifest.json": "4cf05199ac611246077583fdc3f0ea2246f93aaa373f911fc1f184fbb0a384e5"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172308/results.json",
+        "result_sha256": "6094ccc8299ce92da8b2dffa4f9e0a3999b2dcde268f93933a3568646c01b568",
+        "episodes_file": "runs/heldout-evaluation/20261005-172308/episodes.jsonl",
+        "episodes_sha256": "dc1cd612a0ca484474dbafd1341781118b370720760f81f9ab44b2dd77ad4a43",
+        "route_macro_success_rate": 0.7635979216861569,
+        "margin": 0.621598,
+        "passes": true
+      }
+    },
+    {
+      "j": 4,
+      "seed": 11,
+      "checkpoint": "runs/train/confirm-donor-B-seed11/checkpoints/latest.zip",
+      "sha256": "ba7bc9d54a8332879b60ce9eb85476255cb119ed42d754c9bb6c0c13053c3601",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-203807.json",
+          "sha256": "5f9ebe7ff502e184a4439f19bd10b89f56fcdad1549ad7c4de9bd7c5d64bc881"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "ba7bc9d54a8332879b60ce9eb85476255cb119ed42d754c9bb6c0c13053c3601",
+          "manifest.json": "c869163028035003c3e79ac7795d7af3e389c706c39ead103fb5715f77054985"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172306/results.json",
+        "result_sha256": "f7566e6cf32a13c1fa0bfa76167b3ab9bfe59a6ab9bab3a6ace514756dcff200",
+        "episodes_file": "runs/heldout-evaluation/20261005-172306/episodes.jsonl",
+        "episodes_sha256": "c0d75ee84bf85e30dc2b1db34c45501d3b653d38a1c2b6cf69bf82d0e9a8ae5e",
+        "route_macro_success_rate": 0.7481285054814467,
+        "margin": 0.606129,
+        "passes": true
+      }
+    },
+    {
+      "j": 5,
+      "seed": 12,
+      "checkpoint": "runs/train/confirm-donor-B-seed12/checkpoints/latest.zip",
+      "sha256": "ab9e921de69ec8135a4941a465a67d6995a85328ea12c2f0a15b6a602a8e7a43",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-210639.json",
+          "sha256": "11240a2da74181ffde4995ab692eaccbd32f938c07025b120d717490cb547ce6"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "ab9e921de69ec8135a4941a465a67d6995a85328ea12c2f0a15b6a602a8e7a43",
+          "manifest.json": "7964a9d085b11f28d9898f4059c0ebe7cef32b8577c0f73c85ff5277fd948af6"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172311/results.json",
+        "result_sha256": "1d15190ea282c74fad31d41cdef5e8d101679c3ce3c7e4b83e06979dc7889e81",
+        "episodes_file": "runs/heldout-evaluation/20261005-172311/episodes.jsonl",
+        "episodes_sha256": "142f1310c42cbe35469e24df04b6083b57405440e6446b9d63a4857eb5041ef0",
+        "route_macro_success_rate": 0.6932365020600315,
+        "margin": 0.551237,
+        "passes": true
+      }
+    },
+    {
+      "j": 6,
+      "seed": 13,
+      "checkpoint": "runs/train/confirm-donor-B-seed13/checkpoints/latest.zip",
+      "sha256": "b65d601bc02b7bf8f2fa90f8c1b87cfc5a0d75860af1dfa0b6f11a1d5ed5b84d",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-213531.json",
+          "sha256": "dc019e55940c2585bc09a0cb8981ffc74053bb5fb5792bf2a75971bbff9a2f32"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "b65d601bc02b7bf8f2fa90f8c1b87cfc5a0d75860af1dfa0b6f11a1d5ed5b84d",
+          "manifest.json": "338651968c6189b14c48b2981f74b9fbeb19e57bbb3f3f6df3205fe9d196acb4"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172731/results.json",
+        "result_sha256": "a8b3773a53aa11d17d6b674b2ed9662e1ddf8520ffa9df2a417c8857d464de84",
+        "episodes_file": "runs/heldout-evaluation/20261005-172731/episodes.jsonl",
+        "episodes_sha256": "c63e3f6e3f6705e788b2de8729135183043c0a5f01a00f584865c6a65c74da45",
+        "route_macro_success_rate": 0.7258105456634868,
+        "margin": 0.583811,
+        "passes": true
+      }
+    },
+    {
+      "j": 7,
+      "seed": 14,
+      "checkpoint": "runs/train/confirm-donor-B-seed14/checkpoints/latest.zip",
+      "sha256": "4c465ef98d1afca4841708d83a385c041efdbb352c1821101fbce7090d25310b",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-220454.json",
+          "sha256": "d0134b36aa02f5a3bcf8adfe4693fd703ab40805030177ed4bbdba6c06696828"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "4c465ef98d1afca4841708d83a385c041efdbb352c1821101fbce7090d25310b",
+          "manifest.json": "c75b0102afe970920cf6f4f63aa71cf948b03df87c94ac06419090a1edf8d1b4"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172723/results.json",
+        "result_sha256": "89b5157f17a4faec56753e9284fb21357388b1e51681d3a09b814773eb8ec5ac",
+        "episodes_file": "runs/heldout-evaluation/20261005-172723/episodes.jsonl",
+        "episodes_sha256": "2bef53b12a714f492d307a101026ffd6be8c09d944de689ecc21ebe4d5f5a7d3",
+        "route_macro_success_rate": 0.6712091013561602,
+        "margin": 0.529209,
+        "passes": true
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "s1-r0-record-j0-seed7",
+      "stage": "confirmation-stage1-record",
+      "j": 0,
+      "seed": 7,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j0-seed7",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/overnight-B-seed7/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "ab33ab3e68d7cc9cb24eb98c4646719b1756781f1c345a4c21e79dbb110ea262",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j1-seed8",
+      "stage": "confirmation-stage1-record",
+      "j": 1,
+      "seed": 8,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j1-seed8",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/overnight-B-seed8/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "868cec75bac07f160f9dc55d1d35491555aab2078196f8c31fe8dcc7841b1776",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j2-seed9",
+      "stage": "confirmation-stage1-record",
+      "j": 2,
+      "seed": 9,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j2-seed9",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed9/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "855ff782396726599e76d9990d9ce82d9dbb1ac983dcffc570a5b97aa32306e4",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j3-seed10",
+      "stage": "confirmation-stage1-record",
+      "j": 3,
+      "seed": 10,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j3-seed10",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed10/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "d42b5547271fd39f32a760deb1462258624e1e9cbe2b1947404d12635a31c588",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j4-seed11",
+      "stage": "confirmation-stage1-record",
+      "j": 4,
+      "seed": 11,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j4-seed11",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed11/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "ba7bc9d54a8332879b60ce9eb85476255cb119ed42d754c9bb6c0c13053c3601",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j5-seed12",
+      "stage": "confirmation-stage1-record",
+      "j": 5,
+      "seed": 12,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j5-seed12",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed12/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "ab9e921de69ec8135a4941a465a67d6995a85328ea12c2f0a15b6a602a8e7a43",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j6-seed13",
+      "stage": "confirmation-stage1-record",
+      "j": 6,
+      "seed": 13,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j6-seed13",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed13/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "b65d601bc02b7bf8f2fa90f8c1b87cfc5a0d75860af1dfa0b6f11a1d5ed5b84d",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    },
+    {
+      "id": "s1-r0-record-j7-seed14",
+      "stage": "confirmation-stage1-record",
+      "j": 7,
+      "seed": 14,
+      "run_dir": "runs/evaluation/_planned-s1-r0-record-j7-seed14",
+      "resumable": false,
+      "limit_minutes": 60,
+      "command": [
+        "scripts/record_policy_play.py",
+        "--checkpoint",
+        "runs/train/confirm-donor-B-seed14/checkpoints/latest.zip",
+        "--checkpoint-sha256",
+        "4c465ef98d1afca4841708d83a385c041efdbb352c1821101fbce7090d25310b",
+        "--episodes",
+        "25",
+        "--seed",
+        "20260926"
+      ]
+    }
+  ]
+}
