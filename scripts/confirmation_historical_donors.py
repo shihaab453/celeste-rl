@@ -526,10 +526,14 @@ def rebind_action() -> int:
         new_hash = _text_sha256_of(new_text)
         rebind = current.get("rebind")
         if rebind is not None:
-            if rebind.get("amendment") == 3 and current["declaration"]["text_sha256"] == new_hash:
-                print("Already rebound to amendment 3; nothing to do.")
-                return 0
-            raise Refused("the plan was already rebound; another amendment 3 is not accepted")
+            if rebind.get("amendment") != 3 or current["declaration"]["text_sha256"] != new_hash:
+                raise Refused("the plan was already rebound; another amendment 3 is not accepted")
+            historical_evidence(history)  # the committed chain, the rebind revision and every attempt still hold
+            problems = plan_problems(current, load_declaration(), authorization())
+            if problems:
+                raise Refused("; ".join(problems))
+            print("Already rebound to amendment 3 (chain, attempts and plan verified); nothing to do.")
+            return 0
         old_hash = current["declaration"]["text_sha256"]
         # The declaration text the plan pins, from a commit holding exactly this plan version and that declaration
         # text (never HEAD by default: HEAD may already hold the amended declaration).
@@ -546,9 +550,9 @@ def rebind_action() -> int:
         problems = rebind_problems(old_text, new_text)
         old_declaration = strict_json(old_text.decode("utf-8"))
         problems += plan_problems(current, old_declaration, authorization(), declaration_sha256=old_hash)
-        problems += attempt_binding_problems(history)
         if problems:
             raise Refused("; ".join(problems))
+        historical_evidence(history)  # chain, membership, sequence and verified copies of every attempt
     except (Refused, OSError, ValueError) as error:
         print(f"Refused: {error}")
         return 1
@@ -562,21 +566,97 @@ def rebind_action() -> int:
     return 0
 
 
-def attempt_binding_problems(history: list[tuple[str, str, dict]]) -> list[str]:
-    """Every attempt record must name a committed plan version and the declaration that version pinned."""
-    versions = {plan_hash: plan["declaration"]["text_sha256"] for _, plan_hash, plan in history}
-    problems = []
-    for path in sorted(RECORDS.glob("attempt-*.json")):
-        if path.name.endswith(STARTED):
-            continue
-        record = read_json(path)
-        bound = (record.get("plan") or {}).get("text_sha256")
-        if bound not in versions:
-            problems.append(f"{path.name} names plan {str(bound)[:12]}, not a committed plan version")
-        elif record.get("declaration_text_sha256") != versions[bound]:
-            problems.append(f"{path.name} names declaration {str(record.get('declaration_text_sha256'))[:12]}, "
-                            f"not the one its plan version pinned")
+def chain_problems(history: list[tuple[str, str, dict]]) -> list[str]:
+    """The committed plan versions form one chain: revisions 0..n, each naming its predecessor's text hash, earlier
+    entries kept, fixed fields unchanged except one amendment 3 rebind of the declaration binding."""
+    by_revision: dict[int, tuple[str, dict]] = {}
+    for _, plan_hash, plan in history:
+        revision = plan.get("revision")
+        if type(revision) is not int or (revision in by_revision and by_revision[revision][0] != plan_hash):
+            return [f"plan revision {revision!r} is missing or appears with different contents"]
+        by_revision[revision] = (plan_hash, plan)
+    if sorted(by_revision) != list(range(len(by_revision))):
+        return [f"plan revisions are not 0..n: {sorted(by_revision)}"]
+    problems, rebinds = [], 0
+    for revision in range(1, len(by_revision)):
+        (before_hash, before), (_, after) = by_revision[revision - 1], by_revision[revision]
+        if after.get("previous_text_sha256") != before_hash:
+            problems.append(f"revision {revision} does not name revision {revision - 1}")
+        if not same_json(after["entries"][:len(before["entries"])], before["entries"]):
+            problems.append(f"revision {revision} changed earlier entries")
+        if "rebind" in after and "rebind" not in before:
+            rebinds += 1
+            rebind = after["rebind"]
+            if (rebind.get("amendment") != 3 or rebind.get("from_declaration_sha256") != before["declaration"]["text_sha256"]
+                    or rebind.get("to_declaration_sha256") != after["declaration"]["text_sha256"]
+                    or rebind.get("amendment_sha256") != AMENDMENT_3_SHA256 or after["entries"] != before["entries"]):
+                problems.append(f"revision {revision} is not the reviewed amendment 3 rebind")
+        elif after["declaration"] != before["declaration"]:
+            problems.append(f"revision {revision} changed the declaration binding outside a rebind")
+        ignore = {"entries", "revision", "previous_text_sha256", "rebind", "declaration"}
+        if not same_json({k: v for k, v in after.items() if k not in ignore},
+                         {k: v for k, v in before.items() if k not in ignore}):
+            problems.append(f"revision {revision} changed the plan's fixed fields")
+    if rebinds > 1:
+        problems.append("more than one rebind")
     return problems
+
+
+def historical_evidence(history: list[tuple[str, str, dict]] | None = None) -> dict[int, dict]:
+    """The validated historical donors, by seed, from the committed plan chain and the attempt records; Refused on
+    any inconsistency. Every final record and started marker must name a committed plan version that contains its
+    full entry and the declaration that version pinned, at the historical source; attempts follow the sequence (a
+    rerun only after a failed attempt, nothing after an ok one, one ok attempt per seed); an ok attempt needs its
+    verified copy with the checkpoint's hash."""
+    history = plan_history() if history is None else history
+    problems = chain_problems(history)
+    versions = {plan_hash: plan for _, plan_hash, plan in history}
+    statuses = attempt_statuses(RECORDS)  # also refuses conflicting or unreadable attempt files
+    donors = {}
+    for path in sorted(RECORDS.glob("attempt-*.json")):
+        record = read_json(path)
+        marker = path.name.endswith(STARTED)
+        entry = record.get("entry") if isinstance(record, dict) else None
+        if marker:
+            if not any(any(same_json(entry, e) for e in plan["entries"]) for plan in versions.values()):
+                problems.append(f"{path.name} names an entry that no committed plan version holds")
+            continue
+        bound = versions.get((record.get("plan") or {}).get("text_sha256"))
+        if bound is None:
+            problems.append(f"{path.name} names a plan version that is not committed")
+            continue
+        if not any(same_json(entry, e) for e in bound["entries"]):
+            problems.append(f"{path.name}: its entry is not in the plan version it names")
+            continue  # nothing else about an unplanned attempt can be trusted
+        if record.get("declaration_text_sha256") != bound["declaration"]["text_sha256"]:
+            problems.append(f"{path.name}: its declaration is not the one its plan version pinned")
+        if (record.get("source") or {}).get("commit") != HISTORICAL_COMMIT:
+            problems.append(f"{path.name}: not run at the historical source")
+        if record.get("outcome") == "ok":
+            copy = record.get("copy") or {}
+            sha = (copy.get("files") or {}).get("checkpoints/latest.zip")
+            if copy.get("verified") is not True or copy.get("path") != entry["run_dir"] or not sha:
+                problems.append(f"{path.name}: ok without a verified copy of {entry['run_dir']}")
+            elif entry["seed"] in donors:
+                problems.append(f"seed {entry['seed']} has more than one ok attempt")
+            else:
+                donors[entry["seed"]] = {"seed": entry["seed"], "j": entry["j"], "attempt": entry["attempt"],
+                                         "checkpoint": f"{entry['run_dir']}/checkpoints/latest.zip", "sha256": sha,
+                                         "record": {"path": _relative(path),
+                                                    "sha256": _sha256(path)},
+                                         "plan_version_sha256": record["plan"]["text_sha256"]}
+    by_seed: dict[int, dict[int, str]] = {}
+    for (seed, attempt), status in statuses.items():
+        by_seed.setdefault(seed, {})[attempt] = status
+    for seed, attempts in by_seed.items():
+        numbers = sorted(attempts)
+        if numbers != list(range(1, len(numbers) + 1)):
+            problems.append(f"seed {seed} attempts {numbers} are not 1..n")
+        if any(attempts[n] != "failed" for n in numbers[:-1]):
+            problems.append(f"seed {seed} has an attempt after an ok attempt")
+    if problems:
+        raise Refused("; ".join(problems))
+    return donors
 
 
 # ------------------------------------------------------------------------------------------------ the worktree source

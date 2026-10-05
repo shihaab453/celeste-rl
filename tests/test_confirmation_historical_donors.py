@@ -1054,10 +1054,16 @@ class RebindActionTest(Temp):
         self.plan.write_text(json.dumps(h.initial_plan(BEFORE_3, AUTH), indent=2) + "\n", encoding="utf-8")
         self.commit("declaration and plan before amendment 3")
         self.old_plan_hash = fresh_sets.text_sha256(self.plan)
-        record = {"entry": {"seed": 9, "attempt": 1}, "outcome": "ok",
-                  "plan": {"text_sha256": self.old_plan_hash},
-                  "declaration_text_sha256": fresh_sets.text_sha256(self.declaration)}
-        write(self.records, "attempt-20261004-193850.json", record)
+        self.entries = json.loads(self.plan.read_text(encoding="utf-8"))["entries"]
+        write(self.records, "attempt-20261004-193850.json", self.ok_record(self.entries[0]))
+
+    def ok_record(self, entry, **changes):
+        """A complete ok attempt record as the executor writes it."""
+        return {"entry": entry, "outcome": "ok", "problems": [], "plan": {"text_sha256": self.old_plan_hash},
+                "declaration_text_sha256": fresh_sets.text_sha256(self.declaration),
+                "source": {"commit": h.HISTORICAL_COMMIT, "tree": h.HISTORICAL_TREE},
+                "copy": {"path": entry["run_dir"], "verified": True,
+                         "files": {"checkpoints/latest.zip": "a" * 64}}, **changes}
 
     def tearDown(self):
         for p in reversed(self.patches):
@@ -1113,6 +1119,46 @@ class RebindActionTest(Temp):
         self.amend()
         self.plan.write_text(self.plan.read_text(encoding="utf-8") + " ", encoding="utf-8")
         self.refused()
+
+    def test_historical_evidence_rules(self):
+        """Review B4: membership, uniqueness, sequence and verified copies, from the committed plan chain."""
+        evidence = h.historical_evidence()
+        self.assertEqual(list(evidence), [9])
+        self.assertEqual(evidence[9]["sha256"], "a" * 64)
+        self.assertEqual(evidence[9]["record"]["path"].split("/")[-1], "attempt-20261004-193850.json")
+        rerun = h.entry(BEFORE_3, 2, 9, 2, "rerun after a failed attempt")
+        seed16 = {**self.entries[0], "seed": 16, "run_dir": "runs/train/confirm-donor-B-seed16"}
+        cases = {
+            "second ok attempt not in the plan": ("attempt-20261004-200000.json", self.ok_record(rerun)),
+            "seed absent from the plan": ("attempt-20261004-200000.json", self.ok_record(seed16)),
+            "unverified copy": ("attempt-20261004-193850.json",
+                                self.ok_record(self.entries[0], copy={"path": self.entries[0]["run_dir"],
+                                                                      "verified": False, "files": {}})),
+            "copy of another folder": ("attempt-20261004-193850.json",
+                                       self.ok_record(self.entries[0], copy={"path": "runs/train/x", "verified": True,
+                                                                             "files": {"checkpoints/latest.zip": "a"}})),
+            "other source": ("attempt-20261004-193850.json", self.ok_record(self.entries[0], source={"commit": "x"})),
+            "other declaration": ("attempt-20261004-193850.json",
+                                  self.ok_record(self.entries[0], declaration_text_sha256="0" * 64)),
+            "started marker not in the plan": ("attempt-20261004-200000.started.json", {"entry": seed16})}
+        original = (self.records / "attempt-20261004-193850.json").read_text(encoding="utf-8")
+        for name, (file, record) in cases.items():
+            with self.subTest(case=name):
+                write(self.records, file, record)
+                with self.assertRaises(h.Refused):
+                    h.historical_evidence()
+                for extra in self.records.glob("attempt-20261004-200000*"):
+                    extra.unlink()
+                (self.records / "attempt-20261004-193850.json").write_text(original, encoding="utf-8")
+        self.assertEqual(list(h.historical_evidence()), [9])
+
+    def test_already_rebound_verifies_its_evidence(self):
+        self.amend()
+        self.assertEqual(h.rebind_action(), 0)
+        self.commit("rebind")
+        write(self.records, "attempt-20261004-193850.json",
+              self.ok_record(self.entries[0], copy={"path": self.entries[0]["run_dir"], "verified": False, "files": {}}))
+        self.assertEqual(h.rebind_action(), 1)  # the fast path does not report success over broken evidence
 
     def test_attempt_bound_to_an_unknown_plan_is_refused(self):
         write(self.records, "attempt-20261004-200901.json", {
