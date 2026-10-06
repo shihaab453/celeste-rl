@@ -1,0 +1,634 @@
+{
+  "name": "confirmation-stage1-copy-v1-r0-v1",
+  "phase": "copy-v1",
+  "round": 0,
+  "version": 1,
+  "rules": "config/retention-confirmation.json amendment 3 (stage 1)",
+  "declaration": {
+    "path": "config/retention-confirmation.json",
+    "text_sha256": "f366f233c667320a6758c79cbdc4caa28614ea48aab72b3cc5b3164659bee74a"
+  },
+  "fresh_set_stage": "stage1",
+  "runner": {
+    "game_copies": [
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-probe",
+        "ports": [
+          32279,
+          32280
+        ]
+      },
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-copy-2",
+        "ports": [
+          32289,
+          32290
+        ]
+      },
+      {
+        "game_dir": "C:/Projects/celeste-research-scratch/game-copy-3",
+        "ports": [
+          32299,
+          32300
+        ]
+      }
+    ],
+    "threads_per_job": 10,
+    "one_at_a_time": false
+  },
+  "predecessors": [
+    {
+      "path": "runs/confirmation/stage1/copy-r0-complete.json",
+      "text_sha256": "de457b83e6399ae02f4beb39e5cdfa8aa3df4ff552ea7ddf763ac96fc9155ed2"
+    }
+  ],
+  "accepted": [],
+  "items": [
+    {
+      "j": 0,
+      "seed": 7,
+      "checkpoint": "runs/train/overnight-B-seed7/checkpoints/latest.zip",
+      "sha256": "ab33ab3e68d7cc9cb24eb98c4646719b1756781f1c345a4c21e79dbb110ea262",
+      "donor_source": {
+        "declared pin": "donors.existing.7"
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171854/results.json",
+        "result_sha256": "edc2762a50ae3e20cc3f538722265d7ccdd49dc01623bee6db6c1456cb218c5c",
+        "episodes_file": "runs/heldout-evaluation/20261005-171854/episodes.jsonl",
+        "episodes_sha256": "a7019e951b0e48670a984e4f7242dd240a79ed958bf9eefab59551efeed6f6cc",
+        "route_macro_success_rate": 0.7880085600673836,
+        "margin": 0.646009,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193215",
+        "play_sha256": "6b70ec9bfc356ad43024d5ee81061baa3944be500ae1afd554a40aae17bec4e2",
+        "dataset_sha256": "796b1f0c750e91c50427b405c769d33a53c2b25ea4ddc7be11e50c40fb51e9c3",
+        "frames": 4833,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/overnight-B-seed7/manifest.json",
+        "sha256": "7b4d43142338f50335ad98e39cb2d2a357edb24d0e53b43cbe30c4af25f6cdc3",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261005-230037",
+        "results_sha256": "f8e3a342cfd432b4fddfc5faaba16cffed5a146975d3e93c3b0720842c303975",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261005-230037/cloned.zip",
+        "sha256": "e910d63808d25461a74e5d9a0a537ee1069ba07be556ce99c70f0cd158e309b7"
+      }
+    },
+    {
+      "j": 1,
+      "seed": 8,
+      "checkpoint": "runs/train/overnight-B-seed8/checkpoints/latest.zip",
+      "sha256": "868cec75bac07f160f9dc55d1d35491555aab2078196f8c31fe8dcc7841b1776",
+      "donor_source": {
+        "declared pin": "donors.existing.8"
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171851/results.json",
+        "result_sha256": "abb967f5d3f932a5647c4aa0babad55d7455de737c4d381933288f53511d56e0",
+        "episodes_file": "runs/heldout-evaluation/20261005-171851/episodes.jsonl",
+        "episodes_sha256": "4f00d8412ffe8c0c6e87a5954b8da0aad8afaf47077b84ec449e57f1f9005a7d",
+        "route_macro_success_rate": 0.7326231774761187,
+        "margin": 0.590623,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193221",
+        "play_sha256": "ebc457c4db66923d2393233adac57ca063f1259501300a5a048113024177819e",
+        "dataset_sha256": "a9ec835fa62c1b490cba2a067f8cbbb1fc5bc62b437e3ef43c4aaa305c92fcdd",
+        "frames": 6123,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/overnight-B-seed8/manifest.json",
+        "sha256": "af46580b445ba086c3049c3bb2705653506c1dc2755c5d435ce086c2feb639c6",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261005-232153",
+        "results_sha256": "e0df389b1d13502bf7c94c0799d5d672538cc650935d863e4865a6eec376c24c",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261005-232153/cloned.zip",
+        "sha256": "a1b1f7676cca21fbef0ddd6e5d285a7621661dd91fbd8a079ccadb46c658da62"
+      }
+    },
+    {
+      "j": 2,
+      "seed": 9,
+      "checkpoint": "runs/train/confirm-donor-B-seed9/checkpoints/latest.zip",
+      "sha256": "855ff782396726599e76d9990d9ce82d9dbb1ac983dcffc570a5b97aa32306e4",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-193850.json",
+          "sha256": "5fcaaf4346cf738f66b95c45751d892da8fd5fb5d23ef7fd361278221ef06556"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "855ff782396726599e76d9990d9ce82d9dbb1ac983dcffc570a5b97aa32306e4",
+          "manifest.json": "ff28e3d72109938f6eb90e06415162bf199a994911a41b942af05f0d66ae4a5e"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-171858/results.json",
+        "result_sha256": "14b19da4f9d3682100ba26f8e8649e2e732d10af7ca1c63d74b556e7c030467f",
+        "episodes_file": "runs/heldout-evaluation/20261005-171858/episodes.jsonl",
+        "episodes_sha256": "8b4bd2f99c4bb8029548435b39d5b19c6c0c39464c4f919fb21b4671c79cc092",
+        "route_macro_success_rate": 0.8228152566387861,
+        "margin": 0.680815,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193218",
+        "play_sha256": "4e52d82e6fb8ed0192954e8101457dc882dc31c1f77523308404753dfdd84770",
+        "dataset_sha256": "e45d102bb33354e1d85a3b3bd3fbe659c86dd87ed2a1d75029d13c45f0b6dd67",
+        "frames": 7038,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed9/manifest.json",
+        "sha256": "ff28e3d72109938f6eb90e06415162bf199a994911a41b942af05f0d66ae4a5e",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261005-234535",
+        "results_sha256": "084e784e268fa62291fe8b42224de8680763dfd881b69e2ebbf4bd14f32dc54f",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261005-234535/cloned.zip",
+        "sha256": "5c53b75edd92be1d3740b415ee524f5d372b8db293f297974c9be6e8f7febe7e"
+      }
+    },
+    {
+      "j": 3,
+      "seed": 10,
+      "checkpoint": "runs/train/confirm-donor-B-seed10/checkpoints/latest.zip",
+      "sha256": "d42b5547271fd39f32a760deb1462258624e1e9cbe2b1947404d12635a31c588",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-200901.json",
+          "sha256": "42de35c70827f7578d96be8555566d65bb8054475b931eb3a7e6ffd89bed605d"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "d42b5547271fd39f32a760deb1462258624e1e9cbe2b1947404d12635a31c588",
+          "manifest.json": "4cf05199ac611246077583fdc3f0ea2246f93aaa373f911fc1f184fbb0a384e5"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172308/results.json",
+        "result_sha256": "6094ccc8299ce92da8b2dffa4f9e0a3999b2dcde268f93933a3568646c01b568",
+        "episodes_file": "runs/heldout-evaluation/20261005-172308/episodes.jsonl",
+        "episodes_sha256": "dc1cd612a0ca484474dbafd1341781118b370720760f81f9ab44b2dd77ad4a43",
+        "route_macro_success_rate": 0.7635979216861569,
+        "margin": 0.621598,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193252",
+        "play_sha256": "6cd6fd45edc155c29a387490fa395b65a63995fe9242ab451c754a70898ec034",
+        "dataset_sha256": "94255d3d4f20ba4c1e744a15c251fc1496ae39c20998208b7693cc70fe34901d",
+        "frames": 7091,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed10/manifest.json",
+        "sha256": "4cf05199ac611246077583fdc3f0ea2246f93aaa373f911fc1f184fbb0a384e5",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261006-002128",
+        "results_sha256": "f37f2346db813e60efa69e40789cdd13f820284d3adf53fb1d02b52b3bf0271c",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261006-002128/cloned.zip",
+        "sha256": "09a2fd26c79bab411d28715a785d7ee2d3271032fb3a10304f19a053fb6f3a0e"
+      }
+    },
+    {
+      "j": 4,
+      "seed": 11,
+      "checkpoint": "runs/train/confirm-donor-B-seed11/checkpoints/latest.zip",
+      "sha256": "ba7bc9d54a8332879b60ce9eb85476255cb119ed42d754c9bb6c0c13053c3601",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-203807.json",
+          "sha256": "5f9ebe7ff502e184a4439f19bd10b89f56fcdad1549ad7c4de9bd7c5d64bc881"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "ba7bc9d54a8332879b60ce9eb85476255cb119ed42d754c9bb6c0c13053c3601",
+          "manifest.json": "c869163028035003c3e79ac7795d7af3e389c706c39ead103fb5715f77054985"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172306/results.json",
+        "result_sha256": "f7566e6cf32a13c1fa0bfa76167b3ab9bfe59a6ab9bab3a6ace514756dcff200",
+        "episodes_file": "runs/heldout-evaluation/20261005-172306/episodes.jsonl",
+        "episodes_sha256": "c0d75ee84bf85e30dc2b1db34c45501d3b653d38a1c2b6cf69bf82d0e9a8ae5e",
+        "route_macro_success_rate": 0.7481285054814467,
+        "margin": 0.606129,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193259",
+        "play_sha256": "1238b1367b888739de752bbc36841a7f2b1cdcb0db1e27824916009742cdebba",
+        "dataset_sha256": "ef2fb6ed419f7323572b417c1168dd27e85a160558a81da9dc288fb6bfa02d3e",
+        "frames": 7634,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed11/manifest.json",
+        "sha256": "c869163028035003c3e79ac7795d7af3e389c706c39ead103fb5715f77054985",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261006-005603",
+        "results_sha256": "2f63420f79310412e77176d1db972ad9e04ca2d16806f168a364067f9ae2fe94",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261006-005603/cloned.zip",
+        "sha256": "0a13bf5eb888c98fc75245d50008dac5f99bd5ed0ca097ba432202d79127a3f1"
+      }
+    },
+    {
+      "j": 5,
+      "seed": 12,
+      "checkpoint": "runs/train/confirm-donor-B-seed12/checkpoints/latest.zip",
+      "sha256": "ab9e921de69ec8135a4941a465a67d6995a85328ea12c2f0a15b6a602a8e7a43",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-210639.json",
+          "sha256": "11240a2da74181ffde4995ab692eaccbd32f938c07025b120d717490cb547ce6"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "ab9e921de69ec8135a4941a465a67d6995a85328ea12c2f0a15b6a602a8e7a43",
+          "manifest.json": "7964a9d085b11f28d9898f4059c0ebe7cef32b8577c0f73c85ff5277fd948af6"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172311/results.json",
+        "result_sha256": "1d15190ea282c74fad31d41cdef5e8d101679c3ce3c7e4b83e06979dc7889e81",
+        "episodes_file": "runs/heldout-evaluation/20261005-172311/episodes.jsonl",
+        "episodes_sha256": "142f1310c42cbe35469e24df04b6083b57405440e6446b9d63a4857eb5041ef0",
+        "route_macro_success_rate": 0.6932365020600315,
+        "margin": 0.551237,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193302",
+        "play_sha256": "886361fa719d4f651e9de89bd4c1172c7acf7271d3031cd5d37b2e19c7fd7b15",
+        "dataset_sha256": "a81200a28fa5bac33a7d0bad76dc567f7aed8123fb442fb0f0da3c9f0e20a66f",
+        "frames": 4916,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed12/manifest.json",
+        "sha256": "7964a9d085b11f28d9898f4059c0ebe7cef32b8577c0f73c85ff5277fd948af6",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261006-012647",
+        "results_sha256": "f6c0a66475910e206e59c3873ff5ee1b0593c980b38907ce02bb059e2235fc4c",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261006-012647/cloned.zip",
+        "sha256": "a661ed5eea33163bdde171ad439f0c3b0f9383567d36b8d3eb2f12cd98e54907"
+      }
+    },
+    {
+      "j": 6,
+      "seed": 13,
+      "checkpoint": "runs/train/confirm-donor-B-seed13/checkpoints/latest.zip",
+      "sha256": "b65d601bc02b7bf8f2fa90f8c1b87cfc5a0d75860af1dfa0b6f11a1d5ed5b84d",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-213531.json",
+          "sha256": "dc019e55940c2585bc09a0cb8981ffc74053bb5fb5792bf2a75971bbff9a2f32"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "b65d601bc02b7bf8f2fa90f8c1b87cfc5a0d75860af1dfa0b6f11a1d5ed5b84d",
+          "manifest.json": "338651968c6189b14c48b2981f74b9fbeb19e57bbb3f3f6df3205fe9d196acb4"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172731/results.json",
+        "result_sha256": "a8b3773a53aa11d17d6b674b2ed9662e1ddf8520ffa9df2a417c8857d464de84",
+        "episodes_file": "runs/heldout-evaluation/20261005-172731/episodes.jsonl",
+        "episodes_sha256": "c63e3f6e3f6705e788b2de8729135183043c0a5f01a00f584865c6a65c74da45",
+        "route_macro_success_rate": 0.7258105456634868,
+        "margin": 0.583811,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193334",
+        "play_sha256": "f58c18bd75360e2bbc9368e270efde15d3cc11096cc2e8e96cd8b4205e44917b",
+        "dataset_sha256": "9828f5c4354dece8f2b862f38dd814cfe9cac1fa826ecb85b81456c4b0c14713",
+        "frames": 6297,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed13/manifest.json",
+        "sha256": "338651968c6189b14c48b2981f74b9fbeb19e57bbb3f3f6df3205fe9d196acb4",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261006-015147",
+        "results_sha256": "09063fd0cb3edc9317abfe06dfc9a6af54aaef6a22c104e9c0514e0f98eced7a",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261006-015147/cloned.zip",
+        "sha256": "a136795d6d472978f569dc60313720bec007866cb695de947c25e1a4eef929c8"
+      }
+    },
+    {
+      "j": 7,
+      "seed": 14,
+      "checkpoint": "runs/train/confirm-donor-B-seed14/checkpoints/latest.zip",
+      "sha256": "4c465ef98d1afca4841708d83a385c041efdbb352c1821101fbce7090d25310b",
+      "donor_source": {
+        "attempt_record": {
+          "path": "runs/confirmation/donors/attempt-20261004-220454.json",
+          "sha256": "d0134b36aa02f5a3bcf8adfe4693fd703ab40805030177ed4bbdba6c06696828"
+        },
+        "plan_version_sha256": "699ae58e6d2c0b6cdc902fb11bc034f6ad3a5b9657f9dafd13c594912d8ca018",
+        "copied_files": {
+          "checkpoints/latest.zip": "4c465ef98d1afca4841708d83a385c041efdbb352c1821101fbce7090d25310b",
+          "manifest.json": "c75b0102afe970920cf6f4f63aa71cf948b03df87c94ac06419090a1edf8d1b4"
+        }
+      },
+      "donor_v1": {
+        "result_file": "runs/heldout-evaluation/20261005-172723/results.json",
+        "result_sha256": "89b5157f17a4faec56753e9284fb21357388b1e51681d3a09b814773eb8ec5ac",
+        "episodes_file": "runs/heldout-evaluation/20261005-172723/episodes.jsonl",
+        "episodes_sha256": "2bef53b12a714f492d307a101026ffd6be8c09d944de689ecc21ebe4d5f5a7d3",
+        "route_macro_success_rate": 0.6712091013561602,
+        "margin": 0.529209,
+        "passes": true
+      },
+      "recording": {
+        "folder": "runs/policy-play/chapter-1-room-1/20261005-193338",
+        "play_sha256": "de3873e9b1130f4369690d7f7829d436b53aeb52a49ec26b4131ef95c47de320",
+        "dataset_sha256": "068eacfe48984ed38459d7dc8d1a42082fd0c5eef40e5f076e984fcdeea1fe37",
+        "frames": 5393,
+        "commit": "2a6b3750693700988ecc1fa9ed3831051e207ec6"
+      },
+      "donor_manifest": {
+        "path": "runs/train/confirm-donor-B-seed14/manifest.json",
+        "sha256": "c75b0102afe970920cf6f4f63aa71cf948b03df87c94ac06419090a1edf8d1b4",
+        "status": "finished",
+        "accepted_steps": 501760,
+        "commits": [
+          "842308100d8ee32e135e82d295860dab2acb11d2"
+        ],
+        "schema_fingerprint": "b710a27fa4f1d96f",
+        "disabled_inputs": [
+          "S",
+          "Q",
+          "N"
+        ]
+      },
+      "clone": {
+        "folder": "runs/clone/chapter-1-room-2/20261006-021802",
+        "results_sha256": "c532dcc145fef28a0ba39fa3a4475ce3f2faebc5ced9790afc4498b9852e6093",
+        "checkpoint": "runs/clone/chapter-1-room-2/20261006-021802/cloned.zip",
+        "sha256": "48c6c9ef92b4d33609c0c074de042760b94ed048b682586da61450b851782c71"
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "s1-r0-copy-v1-j0-seed7",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 0,
+      "seed": 7,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j0-seed7",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261005-230037/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j1-seed8",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 1,
+      "seed": 8,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j1-seed8",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261005-232153/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j2-seed9",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 2,
+      "seed": 9,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j2-seed9",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261005-234535/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j3-seed10",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 3,
+      "seed": 10,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j3-seed10",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261006-002128/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j4-seed11",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 4,
+      "seed": 11,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j4-seed11",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261006-005603/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j5-seed12",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 5,
+      "seed": 12,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j5-seed12",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261006-012647/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j6-seed13",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 6,
+      "seed": 13,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j6-seed13",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261006-015147/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    },
+    {
+      "id": "s1-r0-copy-v1-j7-seed14",
+      "stage": "confirmation-stage1-copy-v1",
+      "j": 7,
+      "seed": 14,
+      "run_dir": "runs/evaluation/_planned-s1-r0-copy-v1-j7-seed14",
+      "resumable": false,
+      "limit_minutes": 30,
+      "command": [
+        "scripts/evaluate_heldout.py",
+        "--checkpoint",
+        "runs/clone/chapter-1-room-2/20261006-021802/cloned.zip",
+        "--starts",
+        "config/heldout_starts.json",
+        "--repeats",
+        "1",
+        "--seed",
+        "20260920"
+      ]
+    }
+  ],
+  "inputs": {
+    "v1": {
+      "path": "config/heldout_starts.json",
+      "file_sha256": "9abc35b97460ff15e1d49bf669fd7840c01a5cb3b0e98c51195ed6f01eb1e650",
+      "manifest_sha256": "54d62e86ba698a810fb4437dc2fd4423d8466df0d42a157a9579297b20af0369",
+      "states": 200
+    }
+  }
+}
