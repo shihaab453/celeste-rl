@@ -99,7 +99,7 @@ Options, in order of preference:
 1. **Time cost zero during the reliability stage,** reintroduced later for speed. This matches "reliability first,
    then speed" and makes dying early no better than trying.
 2. **Shift the reward** so that progress pays and mere survival does not, the Trackmania fix, if a time cost has to
-   stay for the owner's constraint.
+   stay for the project constraint.
 
 Whichever is chosen, it is one change, applied at a stated point, with the baseline preserved.
 
@@ -136,7 +136,7 @@ Only if B, C and D leave the agent unable to perform a specific move (for exampl
    hand-made room knowledge, and how should either be disclosed?
 3. Does the potential-based form remove the farming risk in a platformer, where moving away from the exit is
    sometimes necessary, or does the potential itself need to encode that?
-4. Is removing the time cost during the reliability stage acceptable, given the owner's constraint that a small
+4. Is removing the time cost during the reliability stage acceptable, given the project constraint that a small
    time penalty exists from the start, or is the reward shift the better fit?
 5. Agent-reached start states risk a feedback loop: the agent practises where it already goes. Is an archive with
    coverage weighting needed from the start?

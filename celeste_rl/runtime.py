@@ -165,7 +165,7 @@ class GitUnavailable(RuntimeError):
 def git_state() -> dict:
     """The commit a run used and whether the working tree differed from it.
 
-    Fails closed (Codex J3). If git is missing, errors, or answers with something that is not a commit id, the
+    Fails closed. If git is missing, errors, or answers with something that is not a commit id, the
     state reports no commit, uncommitted changes and the error. A failure that looked clean would let a run
     claim a commit it was never built from, which is worse than refusing to start.
     """

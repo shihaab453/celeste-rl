@@ -54,3 +54,4 @@ mod/**/obj/
 
 # Private handoff notes
 handoff.md
+/CLAUDE.md

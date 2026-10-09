@@ -55,9 +55,9 @@ def decide_clone(sd_shares: list[float]) -> dict:
                 "next": "the PPO stage (declared fine-tuning), then K-hold, K-decay or K-cost on the one-unit drop"}
     if median >= 0.2:
         return {"branch": "Partial", "median_sd_retained_share": median,
-                "next": "no PPO stage; more Room 1 weight or fewer epochs, chosen by the owner and the orchestrator"}
+                "next": "no PPO stage; defer the choice of more Room 1 weight or fewer epochs to a later project decision"}
     return {"branch": "Lost", "median_sd_retained_share": median,
-            "next": "no PPO stage; a weight anchor or frozen layers, chosen by the owner and the orchestrator"}
+            "next": "no PPO stage; defer the choice of a weight anchor or frozen layers to a later project decision"}
 
 
 def main() -> int:

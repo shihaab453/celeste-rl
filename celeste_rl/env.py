@@ -135,7 +135,7 @@ class CelesteRoomEnv(gym.Env):
 
     @staticmethod
     def _player_facts(state: dict | None, extras: dict | None) -> dict | None:
-        """Raw position, speed and dashes for the run's records (Codex J9, K8).
+        """Raw position, speed and dashes for the run's records.
 
         These go in `info` and never in the observation: the encoder already sees position and speed as scaled
         features, and a run needs the unscaled values to say how far an episode actually got. None when there
@@ -158,7 +158,7 @@ class CelesteRoomEnv(gym.Env):
         These frames are not transitions: no reward is computed, nothing is returned to the learner, and the
         episode's step count begins at the end of them. They do go through the observation builder, so the
         history the policy sees at its first real step is the history it would have had if it had played here
-        itself (Codex K5).
+        itself.
         """
         observation, obs = None, None
         for index, line in enumerate(start.lines, start=1):
@@ -293,7 +293,7 @@ class CelesteRoomEnv(gym.Env):
     def _start_potential(self, state: dict | None) -> float:
         """Build the room's progress potential, reusing it while the room is unchanged.
 
-        Built under every reward version, because how far an episode got is a record every run wants (Codex K8)
+        Built under every reward version, because how far an episode got is a record every run wants
         and the two versions are only comparable if both report it. Under rew-v1 nothing is paid for it, so a
         potential that cannot be built there is recorded as absent rather than failing the episode; under
         rew-v2 the reward depends on it, so the same failure is a fault.

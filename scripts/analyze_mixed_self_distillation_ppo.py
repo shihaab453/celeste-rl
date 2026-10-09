@@ -48,7 +48,7 @@ def decide_ppo(drops: list[float], room2_final_clears: list[int]) -> dict:
     elif room2_ok >= 3:
         branch, next_step = "K-hold", "the fresh Room 1 v2 set before any claim"
     else:
-        branch, next_step = "K-cost", "a Room 2 cost; the owner and the orchestrator choose"
+        branch, next_step = "K-cost", "a Room 2 cost; defer to a later project decision"
     return {"branch": branch, "median_drop": median, "room2_finals_clearing_45_of_50": f"{room2_ok} of 4",
             "next": next_step}
 

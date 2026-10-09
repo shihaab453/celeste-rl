@@ -10,7 +10,7 @@ reproducible because the same inputs from the same savestate give the same state
 `scripts/transition_check.py`). Nothing here stores game memory, and nothing here can invent a state the agent
 did not reach.
 
-**Agent-reached only** (Codex K3). Entries come from the agent's own episodes. A prefix taken from the recorded
+**Agent-reached only**. Entries come from the agent's own episodes. A prefix taken from the recorded
 clear would put the agent next to the exit and would produce successes quickly, but it is derived from a
 demonstration and belongs to Phase 3B, not to the no-demonstration branch. Nothing in this module reads a route
 file, and `offer()` is the only way in.
@@ -18,7 +18,7 @@ file, and `offer()` is the only way in.
 Two ways to choose a cell, both without any distance-to-exit term, which would be a second unvalidated
 progress heuristic on top of the shaping potential:
 
-- **coverage** (Codex K10): weight `1 / (1 + times used)`, so rarely used cells come up more often. This
+- **coverage**: weight `1 / (1 + times used)`, so rarely used cells come up more often. This
   spreads starts evenly and is what the first varied-start runs used.
 - **success** (a reverse curriculum): weight `p * (1 - p)` where p is the cell's recent success rate, estimated
   as `(successes + 1) / (attempts + 2)`. Weight peaks where the agent succeeds about half the time, which is
