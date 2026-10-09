@@ -1,0 +1,343 @@
+{
+ "label": "descriptive tie-break between E0 and A1 to choose the arm for the confirmation; no confirmatory claim; the Room 1 set is a development set (aggregates only); the Room 1 v2 set and the Room 2 v2 set are never read",
+ "analysis_code_sha256": "b6608a880b512eff1e7e96a9ee0db24079609d59d65246c16fa4395b4494de4b",
+ "declaration_sha256": "f6472916143ebaff6aaf2834ca5431ae041fe025c3f7e00db94fff456237a728",
+ "pilot_result_sha256": "fbbf136858b4d6b7f198d705814dee7347c9bed5aa1f20c00a3ab8758c6911ea",
+ "evaluation_plan_sha256": "d31bc9a15814fb6d958348d7346e904b88346de18231b89c32c42adeb4d5869c",
+ "evaluation_commit": "d34ea6b3123017658c5f73f55249b6518ec22ebe",
+ "training_campaign_start_commit": "ae76141dc7cf5349859a35dcc9dd0bd5d48a15bb",
+ "training_session_commits": {
+  "ppo-tiebreak-A1-k0": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-E0-k0": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-A1-k1": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-E0-k1": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-A1-k2": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-E0-k2": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-A1-k3": [
+   "ae76141d"
+  ],
+  "ppo-tiebreak-E0-k3": [
+   "ae76141d"
+  ]
+ },
+ "clone_floor": 0.142,
+ "decision": {
+  "carry_forward": "A1",
+  "e0_runs_above_0.25": 3,
+  "a1_runs_above_0.25": 0,
+  "count_gap": 3,
+  "count_condition_met": true,
+  "median_drop": {
+   "E0": 0.1771,
+   "A1": 0.0617
+  },
+  "median_gap_e0_minus_a1": 0.1154,
+  "median_condition_met": true,
+  "why": "A1 only if E0 has at least 3 more runs above 0.25 AND a median more than 0.1 higher; here the count gap is 3 (met) and the median gap 0.1154 (met), so A1",
+  "room2_check_of_the_named_arm": {
+   "arm": "A1",
+   "v1_median": 0.8471,
+   "v1_threshold": 0.7676,
+   "v1_condition_met": true,
+   "canonical_finals_at_45_or_more": "7 of 8",
+   "finals_condition_met": true,
+   "passes": true,
+   "note": "the pilot's Room 2 conditions applied to whichever arm the rule names; a failure requires review and a recorded choice by the owner before the confirmation and does not change the rule's answer"
+  }
+ },
+ "pooled_drops": {
+  "A1": {
+   "pilot": [
+    0.1062,
+    0.0212,
+    0.0861,
+    0.0584
+   ],
+   "new": [
+    0.0529,
+    0.0651,
+    0.0266,
+    0.1104
+   ]
+  },
+  "E0": {
+   "pilot": [
+    0.1162,
+    0.3047,
+    0.01,
+    0.3625
+   ],
+   "new": [
+    0.1803,
+    0.2712,
+    0.0838,
+    0.174
+   ]
+  }
+ },
+ "new_runs": {
+  "A1-k0": {
+   "ppo_seed": 50,
+   "donor_before": 0.7643,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6447,
+    0.6672,
+    0.5976,
+    0.5255,
+    0.6111,
+    0.6118
+   ],
+   "drop_at_each_checkpoint": [
+    -0.0362,
+    0.0757,
+    0.1915,
+    0.054,
+    0.0529
+   ],
+   "drop_one_unit": 0.0529,
+   "room2_final_clears_of_50": 48,
+   "room2_v1_final": 0.8361
+  },
+  "A1-k1": {
+   "ppo_seed": 51,
+   "donor_before": 0.7691,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6265,
+    0.6532,
+    0.6192,
+    0.6098,
+    0.5528,
+    0.5857
+   ],
+   "drop_at_each_checkpoint": [
+    -0.0426,
+    0.0116,
+    0.0266,
+    0.1175,
+    0.0651
+   ],
+   "drop_one_unit": 0.0651,
+   "room2_final_clears_of_50": 50,
+   "room2_v1_final": 0.7622
+  },
+  "A1-k2": {
+   "ppo_seed": 52,
+   "donor_before": 0.7735,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6358,
+    0.6149,
+    0.6469,
+    0.5672,
+    0.6225,
+    0.619
+   ],
+   "drop_at_each_checkpoint": [
+    0.0331,
+    -0.0176,
+    0.1086,
+    0.0211,
+    0.0266
+   ],
+   "drop_one_unit": 0.0266,
+   "room2_final_clears_of_50": 47,
+   "room2_v1_final": 0.8744
+  },
+  "A1-k3": {
+   "ppo_seed": 53,
+   "donor_before": 0.6593,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.5161,
+    0.3763,
+    0.4549,
+    0.3921,
+    0.4718,
+    0.459
+   ],
+   "drop_at_each_checkpoint": [
+    0.2702,
+    0.1183,
+    0.2397,
+    0.0856,
+    0.1104
+   ],
+   "drop_one_unit": 0.1104,
+   "room2_final_clears_of_50": 45,
+   "room2_v1_final": 0.8491
+  },
+  "E0-k0": {
+   "ppo_seed": 50,
+   "donor_before": 0.7643,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6447,
+    0.6274,
+    0.5459,
+    0.5018,
+    0.5141,
+    0.5325
+   ],
+   "drop_at_each_checkpoint": [
+    0.0278,
+    0.1588,
+    0.2296,
+    0.2099,
+    0.1803
+   ],
+   "drop_one_unit": 0.1803,
+   "room2_final_clears_of_50": 48,
+   "room2_v1_final": 0.8639
+  },
+  "E0-k1": {
+   "ppo_seed": 51,
+   "donor_before": 0.7691,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6265,
+    0.5294,
+    0.5196,
+    0.4761,
+    0.4817,
+    0.4564
+   ],
+   "drop_at_each_checkpoint": [
+    0.1548,
+    0.1705,
+    0.2398,
+    0.2309,
+    0.2712
+   ],
+   "drop_one_unit": 0.2712,
+   "room2_final_clears_of_50": 49,
+   "room2_v1_final": 0.8606
+  },
+  "E0-k2": {
+   "ppo_seed": 52,
+   "donor_before": 0.7735,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.6358,
+    0.6253,
+    0.5271,
+    0.5929,
+    0.5545,
+    0.5829
+   ],
+   "drop_at_each_checkpoint": [
+    0.0166,
+    0.1721,
+    0.0679,
+    0.1287,
+    0.0838
+   ],
+   "drop_one_unit": 0.0838,
+   "room2_final_clears_of_50": 50,
+   "room2_v1_final": 0.798
+  },
+  "E0-k3": {
+   "ppo_seed": 53,
+   "donor_before": 0.6593,
+   "room1_route_macro_clone_then_checkpoints": [
+    0.5161,
+    0.5093,
+    0.4793,
+    0.4306,
+    0.5192,
+    0.4261
+   ],
+   "drop_at_each_checkpoint": [
+    0.0131,
+    0.0711,
+    0.1653,
+    -0.006,
+    0.174
+   ],
+   "drop_one_unit": 0.174,
+   "room2_final_clears_of_50": 50,
+   "room2_v1_final": 0.8791
+  }
+ },
+ "descriptive": {
+  "runs_with_a_drop_above_0.25_at_any_checkpoint_of_8": {
+   "A1": 1,
+   "E0": 3
+  },
+  "room2_v1_pooled_median_against_the_m_k_reference": {
+   "A1": {
+    "median": 0.8471,
+    "m_k_median": 0.8176,
+    "threshold": 0.7676,
+    "at_least_threshold": true
+   },
+   "E0": {
+    "median": 0.8622,
+    "m_k_median": 0.8176,
+    "threshold": 0.7676,
+    "at_least_threshold": true
+   }
+  },
+  "per_clone_drop": {
+   "k0": {
+    "E0_pilot": 0.1162,
+    "E0_new": 0.1803,
+    "A1_pilot": 0.1062,
+    "A1_new": 0.0529
+   },
+   "k1": {
+    "E0_pilot": 0.3047,
+    "E0_new": 0.2712,
+    "A1_pilot": 0.0212,
+    "A1_new": 0.0651
+   },
+   "k2": {
+    "E0_pilot": 0.01,
+    "E0_new": 0.0838,
+    "A1_pilot": 0.0861,
+    "A1_new": 0.0266
+   },
+   "k3": {
+    "E0_pilot": 0.3625,
+    "E0_new": 0.174,
+    "A1_pilot": 0.0584,
+    "A1_new": 0.1104
+   }
+  },
+  "median_drop_by_batch": {
+   "A1": {
+    "pilot": 0.0722,
+    "new": 0.059
+   },
+   "E0": {
+    "pilot": 0.2105,
+    "new": 0.1771
+   }
+  },
+  "mean_drop_200k_to_500k_median_of_runs": {
+   "A1": 0.0701,
+   "E0": 0.1569
+  },
+  "room2_pooled": {
+   "A1": {
+    "canonical_finals_median": 48.0,
+    "canonical_finals_at_45_or_more_of_8": 7,
+    "v1_median": 0.8471
+   },
+   "E0": {
+    "canonical_finals_median": 49.0,
+    "canonical_finals_at_45_or_more_of_8": 8,
+    "v1_median": 0.8622
+   }
+  },
+  "note": "descriptive only: none of this can move the declared decision"
+ },
+ "resumed_runs": "none",
+ "record_checks": "passed: plan hashes and the evaluation plan's pins, attributable results, 10 threads, E0 ent_coef 0, A1 anchor records and anchor.csv, no v2 set named"
+}

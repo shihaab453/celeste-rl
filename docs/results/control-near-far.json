@@ -1,0 +1,234 @@
+{
+  "label": "post hoc control near/far losses; success percentage points, aggregates only; no causal claim",
+  "analysis_code_sha256": "2ce56fb1912bed10e7abe1b0b27a5109b140fb28f52d2dee1132e445f024d424",
+  "inputs_sha256": {
+    "docs/results/clone-near-far.json": "08915f0879a9a9b38d2306dc6e8aa0e3807083c04df863f14b36b79396411def",
+    "scripts/describe_clone_near_far.py": "9d7f6cf1e89867b2be42cbbed88ad61b845f844c0607ae91b4876e720d30ec92",
+    "scripts/describe_tiebreak_near_far.py": "18b13febee4c33a68a0ff2b8e93ec5e05ff8a83f4926ce84130125313c5868a1",
+    "scripts/describe_coverage_ceiling.py": "81edce8e722ecdef9161e1afc901478aebc25bf52ce1fb84b9e96b4b153aa37f",
+    "celeste_rl/cloning.py": "1811845ecd6d5dfcd1ee05b6b6422f6c2574c61b9b61543ea692458bdce9f573",
+    "celeste_rl/schema.py": "32979487269fa143608eba5764fb426b70b74f4e8e0d83b762c12f45ab23a390",
+    "config/heldout_starts.json": "4585c9a542e22a86861c9253f9dd9bcbfbbd188312ddc0d58c36d026668f4584",
+    "config/ppo-anchor-pilot.json": "fe0f9c53cf0025a32d969424791e1445b8ad21b7ff14e0b2c30dc919adf446a3",
+    "docs/results/mixed-self-distillation-ppo.json": "6375fe199f1c7206f5aefcdc8f46b41fa05db2d707d815f12d4b90de09f6f552",
+    "config/campaign-mixed-self-distillation-clone-eval.json": "b269254df0598d2b73abf36a56b5e5bcecd6e4b6fe823697764f5108b68977fc",
+    "config/campaign-mixed-self-distillation-ppo-eval.json": "0e1bff42d4fa6ccb7bbe0a8356d632f436ee1f28e2267d95767b0d973cbb7408",
+    "runs/campaign/20260928-035401-mixed-self-distillation-ppo-eval-v1/summary.json": "01f163a50107de6f5d7476babd1eaccc1c558f94b81935f5b3165b0229dc3c76",
+    "runs/policy-play/chapter-1-room-1/20260926-164255/dataset.npz": "b0a723c2411a5d56b1e4a95cc2715cd98128a6587eebba61ea4158c4161be49e",
+    "runs/train/mixed-self-distillation-pilot-SD-k0/manifest.json": "926524ee6052fbb47147d1409c7688bfc6df9ff79944dcda87d5a7977b574ec5",
+    "runs/heldout-evaluation/20260928-040028/results.json": "c5b29c847d590178313573ab77554ffd0a1c17bba7d43b181a6792b4f62e4f31",
+    "runs/heldout-evaluation/20260928-040028/episodes.jsonl": "93968cf12261addc19fcfcceb4457e288f27e0d05e25305f2401357922399b9e",
+    "runs/policy-play/chapter-1-room-1/20260926-170822/dataset.npz": "8efdcc987cc6becd760a587bae13ff234e084a70351a7fa4dd1de777907cc615",
+    "runs/train/mixed-self-distillation-pilot-SD-k1/manifest.json": "53844e11acef72bf6b221f37d9840e43efe30ffb17bacb9f2c600ffa8341694f",
+    "runs/heldout-evaluation/20260928-041015/results.json": "a3763de998a523103f6052829895521eea9c49bdd9b35ed9e570ba453de2ee94",
+    "runs/heldout-evaluation/20260928-041015/episodes.jsonl": "ac56228ffead746832e9ba720d544c199ac01e16a0d78a9031630cf1c4dd93c9",
+    "runs/policy-play/chapter-1-room-1/20260926-165351/dataset.npz": "1583af09bc8543b5d3a12293ad7677043c47887aeaf29fa04f57ceb3f16793b0",
+    "runs/train/mixed-self-distillation-pilot-SD-k2/manifest.json": "9d3fd0b272e7bffc45e7ea0c57f0319b05638afbc0900a5fe33b65c9fb5160de",
+    "runs/heldout-evaluation/20260928-041846/results.json": "a5c1908ee7ef5234d186ffe86edc8b4c13fe0d60f8616c7b8e962c3c6178b2c8",
+    "runs/heldout-evaluation/20260928-041846/episodes.jsonl": "7c03515ffe88622c2807195e517e1ac9d5a5b5fba166bf6c6957b6bd242aa524",
+    "runs/policy-play/chapter-1-room-1/20260926-170623/dataset.npz": "6ff673757fa800c477d34a318ea2d82306280d890bde99dfcbe1b083d7358a2c",
+    "runs/train/mixed-self-distillation-pilot-SD-k3/manifest.json": "e7b59321fa781c4a44ecbe7192f298b4a8ee948c8f3981039336d847516de5f8",
+    "runs/heldout-evaluation/20260928-042718/results.json": "8299f04f265cccc8edb09b04da566ee5231ca7dabc54cadbca83e2696f8c776a",
+    "runs/heldout-evaluation/20260928-042718/episodes.jsonl": "c7d5738311ba157dba6ea303aada65529e936288b288568e66ce49895a32cc89"
+  },
+  "groups": {
+    "k0": {
+      "donor": 3,
+      "fitted_frames": 4472,
+      "near_starts": 118,
+      "far_starts": 82,
+      "same_dash_fallbacks": 0
+    },
+    "k1": {
+      "donor": 4,
+      "fitted_frames": 8619,
+      "near_starts": 152,
+      "far_starts": 48,
+      "same_dash_fallbacks": 0
+    },
+    "k2": {
+      "donor": 5,
+      "fitted_frames": 4307,
+      "near_starts": 121,
+      "far_starts": 79,
+      "same_dash_fallbacks": 0
+    },
+    "k3": {
+      "donor": 6,
+      "fitted_frames": 5863,
+      "near_starts": 146,
+      "far_starts": 54,
+      "same_dash_fallbacks": 0
+    }
+  },
+  "control_finals": {
+    "k0": {
+      "near": {
+        "successes": 9,
+        "episodes": 118,
+        "success_rate": 0.07627118644067797,
+        "represented_routes": 11,
+        "route_macro": 0.08006546882144969
+      },
+      "far": {
+        "successes": 8,
+        "episodes": 82,
+        "success_rate": 0.0975609756097561,
+        "represented_routes": 11,
+        "route_macro": 0.09632034632034632
+      }
+    },
+    "k1": {
+      "near": {
+        "successes": 40,
+        "episodes": 152,
+        "success_rate": 0.2631578947368421,
+        "represented_routes": 11,
+        "route_macro": 0.28471124286341676
+      },
+      "far": {
+        "successes": 11,
+        "episodes": 48,
+        "success_rate": 0.22916666666666666,
+        "represented_routes": 11,
+        "route_macro": 0.1678932178932179
+      }
+    },
+    "k2": {
+      "near": {
+        "successes": 15,
+        "episodes": 121,
+        "success_rate": 0.12396694214876033,
+        "represented_routes": 11,
+        "route_macro": 0.12128036105308833
+      },
+      "far": {
+        "successes": 0,
+        "episodes": 79,
+        "success_rate": 0.0,
+        "represented_routes": 11,
+        "route_macro": 0
+      }
+    },
+    "k3": {
+      "near": {
+        "successes": 14,
+        "episodes": 146,
+        "success_rate": 0.0958904109589041,
+        "represented_routes": 11,
+        "route_macro": 0.08746286393345216
+      },
+      "far": {
+        "successes": 2,
+        "episodes": 54,
+        "success_rate": 0.037037037037037035,
+        "represented_routes": 11,
+        "route_macro": 0.0303030303030303
+      }
+    }
+  },
+  "signed_losses": {
+    "k0": {
+      "near": {
+        "success_rate_loss_percentage_points": 58.47457627118644,
+        "route_macro_loss_percentage_points": 61.68861972689723
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 48.78048780487805,
+        "route_macro_loss_percentage_points": 48.46123573396301
+      }
+    },
+    "k1": {
+      "near": {
+        "success_rate_loss_percentage_points": 42.10526315789474,
+        "route_macro_loss_percentage_points": 39.64771943032813
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 27.083333333333336,
+        "route_macro_loss_percentage_points": 26.349206349206344
+      }
+    },
+    "k2": {
+      "near": {
+        "success_rate_loss_percentage_points": 56.19834710743802,
+        "route_macro_loss_percentage_points": 57.701086791995884
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 54.43037974683544,
+        "route_macro_loss_percentage_points": 53.65440115440116
+      }
+    },
+    "k3": {
+      "near": {
+        "success_rate_loss_percentage_points": 46.57534246575343,
+        "route_macro_loss_percentage_points": 47.67008318478907
+      },
+      "far": {
+        "success_rate_loss_percentage_points": 33.33333333333333,
+        "route_macro_loss_percentage_points": 32.323232323232325
+      }
+    }
+  },
+  "means": {
+    "near": {
+      "baseline_successes": 347,
+      "baseline_episodes": 537,
+      "baseline_success_rate": 0.6461824953445066,
+      "baseline_mean_clone_route_macro": 0.6601487570028776,
+      "control_successes": 78,
+      "control_episodes": 537,
+      "control_success_rate": 0.1452513966480447,
+      "control_mean_route_macro": 0.14337998416785175,
+      "control_state_weighted_loss_percentage_points": 50.09310986964619,
+      "control_mean_route_macro_loss_percentage_points": 51.676877283502584,
+      "a1_e0_context_two_batches": {
+        "A1": {
+          "final_success_rate": 0.6070763500931099,
+          "final_mean_run_route_macro": 0.6054379653329446,
+          "state_weighted_loss_percentage_points": 3.9106145251396662,
+          "mean_route_macro_loss_percentage_points": 5.471079166993298
+        },
+        "E0": {
+          "final_success_rate": 0.5111731843575419,
+          "final_mean_run_route_macro": 0.5126728191012124,
+          "state_weighted_loss_percentage_points": 13.500931098696467,
+          "mean_route_macro_loss_percentage_points": 14.747593790166514
+        }
+      }
+    },
+    "far": {
+      "baseline_successes": 135,
+      "baseline_episodes": 263,
+      "baseline_success_rate": 0.5133079847908745,
+      "baseline_mean_clone_route_macro": 0.4755993375311557,
+      "control_successes": 21,
+      "control_episodes": 263,
+      "control_success_rate": 0.07984790874524715,
+      "control_mean_route_macro": 0.07362914862914863,
+      "control_state_weighted_loss_percentage_points": 43.34600760456273,
+      "control_mean_route_macro_loss_percentage_points": 40.19701889020071,
+      "a1_e0_context_two_batches": {
+        "A1": {
+          "final_success_rate": 0.48859315589353614,
+          "final_mean_run_route_macro": 0.45147251738160826,
+          "state_weighted_loss_percentage_points": 2.4714828897338337,
+          "mean_route_macro_loss_percentage_points": 2.4126820149547425
+        },
+        "E0": {
+          "final_success_rate": 0.46387832699619774,
+          "final_mean_run_route_macro": 0.44326257706939526,
+          "state_weighted_loss_percentage_points": 4.942965779467673,
+          "mean_route_macro_loss_percentage_points": 3.2336760461760425
+        }
+      }
+    }
+  },
+  "record_checks": "passed: baseline inputs, shared clone/checkpoint pins, entropy .01/no anchor recipe, attributable evaluations, episode identities and full/split totals",
+  "limits": [
+    "One control PPO run versus two A1/E0 PPO runs per clone; historical campaigns differ in time/concurrency.",
+    "Four shared clone baselines, stochastic observations and clustered development starts.",
+    "Thin far routes, unequal clone composition and subsequent trajectory overlap remain.",
+    "Positive loss means observed decay in success points, not normalized donor-margin units.",
+    "Neither fresh v2 set read; selection stays A1; no significance/generalization claim."
+  ]
+}

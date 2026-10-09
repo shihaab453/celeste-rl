@@ -1,0 +1,590 @@
+{
+ "label": "descriptive pilot, training side for Room 2; no confirmatory claim; the Room 1 set is a development set (aggregates only); the Room 2 v2 held-out set is never read",
+ "analysis_code_sha256": "0d83ca3204b9bd76f19d703a25295e749d33de54bace73be60d3e64a6e7135d9",
+ "evaluation_plan_sha256": "2e7becfcd5a80d64e4fe05ce372519acc4c7663046a71877cc95bd8561d07b46",
+ "evaluation_commit": "8add862bf4a584abedd0336ee8e5c841b75b7107",
+ "training_campaign_start_commit": "9a3ee81f67d4970c519e04494eb951bc0242573a",
+ "training_session_commits": {
+  "ppo-anchor-pilot-A1-k0": [
+   "54c95569",
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A1-k1": [
+   "54c95569",
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A1-k2": [
+   "54c95569",
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A1-k3": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-E0-k0": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-E0-k1": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-E0-k2": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-E0-k3": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A10-k0": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A10-k1": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A10-k2": [
+   "9a3ee81f"
+  ],
+  "ppo-anchor-pilot-A10-k3": [
+   "9a3ee81f"
+  ]
+ },
+ "clone_floor": 0.142,
+ "final_floor": 0.2046,
+ "room2_v1_reference": {
+  "m_k_median": 0.8176,
+  "threshold": 0.7676
+ },
+ "runs": {
+  "A1-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6447
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6463,
+     "successes": 128
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6355,
+     "successes": 126
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.6078,
+     "successes": 121
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.5401,
+     "successes": 107
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.5786,
+     "successes": 114
+    }
+   ],
+   "drop_one_unit": 0.1062,
+   "room2_final_clears_of_50": 40,
+   "room2_v1_final": 0.8606
+  },
+  "A1-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6265
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.51,
+     "successes": 105
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6403,
+     "successes": 128
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.6194,
+     "successes": 124
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.5738,
+     "successes": 116
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.6132,
+     "successes": 123
+    }
+   ],
+   "drop_one_unit": 0.0212,
+   "room2_final_clears_of_50": 49,
+   "room2_v1_final": 0.8451
+  },
+  "A1-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6358
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.5846,
+     "successes": 115
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.5399,
+     "successes": 109
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.5815,
+     "successes": 115
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.6255,
+     "successes": 125
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.5814,
+     "successes": 119
+    }
+   ],
+   "drop_one_unit": 0.0861,
+   "room2_final_clears_of_50": 49,
+   "room2_v1_final": 0.8721
+  },
+  "A1-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.5161
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.5124,
+     "successes": 102
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.4732,
+     "successes": 97
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.5118,
+     "successes": 102
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.5493,
+     "successes": 109
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.4859,
+     "successes": 97
+    }
+   ],
+   "drop_one_unit": 0.0584,
+   "room2_final_clears_of_50": 48,
+   "room2_v1_final": 0.775
+  },
+  "A10-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6447
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6685,
+     "successes": 131
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6678,
+     "successes": 132
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.6596,
+     "successes": 130
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.6239,
+     "successes": 122
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.6071,
+     "successes": 118
+    }
+   ],
+   "drop_one_unit": 0.0604,
+   "room2_final_clears_of_50": 48,
+   "room2_v1_final": 0.8403
+  },
+  "A10-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6265
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6389,
+     "successes": 126
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6403,
+     "successes": 128
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.596,
+     "successes": 117
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.6822,
+     "successes": 139
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.6346,
+     "successes": 126
+    }
+   ],
+   "drop_one_unit": -0.0129,
+   "room2_final_clears_of_50": 44,
+   "room2_v1_final": 0.8072
+  },
+  "A10-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6358
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6186,
+     "successes": 122
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.636,
+     "successes": 126
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.7047,
+     "successes": 139
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.6718,
+     "successes": 134
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.5656,
+     "successes": 116
+    }
+   ],
+   "drop_one_unit": 0.1112,
+   "room2_final_clears_of_50": 43,
+   "room2_v1_final": 0.8466
+  },
+  "A10-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.5161
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.5451,
+     "successes": 109
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.561,
+     "successes": 113
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.5291,
+     "successes": 108
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.5748,
+     "successes": 114
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.5878,
+     "successes": 118
+    }
+   ],
+   "drop_one_unit": -0.1386,
+   "room2_final_clears_of_50": 47,
+   "room2_v1_final": 0.9029
+  },
+  "E0-k0": {
+   "donor_seed": 3,
+   "donor_before": 0.7643,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6447
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6431,
+     "successes": 129
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6245,
+     "successes": 125
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.5751,
+     "successes": 114
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.5056,
+     "successes": 100
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.5724,
+     "successes": 114
+    }
+   ],
+   "drop_one_unit": 0.1162,
+   "room2_final_clears_of_50": 49,
+   "room2_v1_final": 0.9167
+  },
+  "E0-k1": {
+   "donor_seed": 4,
+   "donor_before": 0.7691,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6265
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6462,
+     "successes": 129
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.4546,
+     "successes": 92
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.4982,
+     "successes": 99
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.3777,
+     "successes": 75
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.4354,
+     "successes": 88
+    }
+   ],
+   "drop_one_unit": 0.3047,
+   "room2_final_clears_of_50": 49,
+   "room2_v1_final": 0.8328
+  },
+  "E0-k2": {
+   "donor_seed": 5,
+   "donor_before": 0.7735,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.6358
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.6484,
+     "successes": 131
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.6546,
+     "successes": 131
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.6164,
+     "successes": 120
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.661,
+     "successes": 132
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.6295,
+     "successes": 127
+    }
+   ],
+   "drop_one_unit": 0.01,
+   "room2_final_clears_of_50": 50,
+   "room2_v1_final": 0.8716
+  },
+  "E0-k3": {
+   "donor_seed": 6,
+   "donor_before": 0.6593,
+   "room1_curve": [
+    {
+     "checkpoint": "clone",
+     "route_macro": 0.5161
+    },
+    {
+     "checkpoint": "step_000100352",
+     "route_macro": 0.4406,
+     "successes": 89
+    },
+    {
+     "checkpoint": "step_000200704",
+     "route_macro": 0.4642,
+     "successes": 92
+    },
+    {
+     "checkpoint": "step_000301056",
+     "route_macro": 0.4523,
+     "successes": 93
+    },
+    {
+     "checkpoint": "step_000401408",
+     "route_macro": 0.4201,
+     "successes": 83
+    },
+    {
+     "checkpoint": "step_000501760",
+     "route_macro": 0.3286,
+     "successes": 67
+    }
+   ],
+   "drop_one_unit": 0.3625,
+   "room2_final_clears_of_50": 47,
+   "room2_v1_final": 0.8419
+  }
+ },
+ "decisions": {
+  "A1": {
+   "branch": "Holds",
+   "median_drop": 0.0722,
+   "room2_v1_median": 0.8528,
+   "room2_v1_threshold": 0.7676,
+   "room2_finals_at_45_or_more": "3 of 4"
+  },
+  "A10": {
+   "branch": "Holds with a Room 2 cost",
+   "median_drop": 0.0238,
+   "room2_v1_median": 0.8435,
+   "room2_v1_threshold": 0.7676,
+   "room2_finals_at_45_or_more": "2 of 4"
+  },
+  "E0": {
+   "branch": "Holds",
+   "median_drop": 0.2105,
+   "room2_v1_median": 0.8568,
+   "room2_v1_threshold": 0.7676,
+   "room2_finals_at_45_or_more": "4 of 4"
+  }
+ },
+ "control": {
+  "median_drop": 0.8709,
+  "room2_v1_median": 0.8062,
+  "room2_finals": [
+   44,
+   46,
+   41,
+   35
+  ]
+ },
+ "reading": {
+  "lever": "tie",
+  "preferred_arm": null,
+  "tied": [
+   "E0",
+   "A1"
+  ],
+  "candidates": [
+   "E0",
+   "A1",
+   "A10"
+  ],
+  "tie": true,
+  "why": "E0 and A1 are within 0.15 on median drop and 0.05 on the Room 2 v1 median: noise with 4 runs per arm; the owner and the orchestrator choose, recorded as a choice"
+ },
+ "resumed_runs": {
+  "ppo-anchor-pilot-A1-k0": {
+   "sessions": 2,
+   "runner_attempts": 1,
+   "session_commits": [
+    "54c95569",
+    "9a3ee81f"
+   ],
+   "note": "valid, but not bit-identical to an uninterrupted run"
+  },
+  "ppo-anchor-pilot-A1-k1": {
+   "sessions": 2,
+   "runner_attempts": 1,
+   "session_commits": [
+    "54c95569",
+    "9a3ee81f"
+   ],
+   "note": "valid, but not bit-identical to an uninterrupted run"
+  },
+  "ppo-anchor-pilot-A1-k2": {
+   "sessions": 2,
+   "runner_attempts": 1,
+   "session_commits": [
+    "54c95569",
+    "9a3ee81f"
+   ],
+   "note": "valid, but not bit-identical to an uninterrupted run"
+  }
+ },
+ "record_checks": "passed: plan hashes, attributable results, 10 threads, E0 ent_coef 0, (b), (c) (one anchor.csv row per update, nonzero anchor gradient)"
+}

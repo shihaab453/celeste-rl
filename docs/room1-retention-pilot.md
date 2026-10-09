@@ -235,3 +235,476 @@ and [`docs/results/mixed-self-distillation-ppo.json`](results/mixed-self-distill
 confident-choice, output-size and ending figures are in
 [`docs/results/mixed-self-distillation-descriptive.json`](results/mixed-self-distillation-descriptive.json), written
 by `scripts/describe_mixed_self_distillation.py`.
+
+## Fifth pilot: keeping Room 1 with an anchor, or without the entropy bonus
+
+Also descriptive, four runs per arm, one recipe, declared before training
+(`config/ppo-anchor-pilot.json`). The Room 1 and Room 2 v1 sets are development sets;
+only aggregates are reported. Neither fresh v2 set was used.
+
+The fourth pilot kept the Room 1 skill through mixed copying, then lost most of it
+while learning Room 2. Its growing randomness suggested two remedies:
+
+- **E0:** turn off PPO's entropy bonus, the small reward for keeping button choices
+  random. Everything else in the Room 2 fine-tuning stays the same.
+- **A1 and A10:** keep that bonus, but add an anchor that penalizes departures from
+  the frozen original donor's Room 1 button probabilities, with weights of 1 and
+  10 respectively. It uses the donor's recorded Room 1 play: the same nineteen
+  episodes the mixed copy was fitted on, with six held back for descriptive
+  measurements.
+
+All three arms start from the same four mixed copies as the fourth pilot and learn
+Room 2 for 500,000 steps. The fourth pilot's unchanged fine-tuning runs serve as the
+control, with entropy coefficient 0.01 and no anchor. They were run earlier and
+sequentially; the remedy runs ran three at a time, with ten torch threads per job.
+
+The loss measure is the drop from the mixed copy to the final checkpoint, divided
+by the original donor's margin over the Room 1 floor of 14.2%. A loss of 0.25 means
+losing a quarter of that original margin, not 25 percentage points of success.
+The two floors remain those measured in the first pilot: 14.2% for a clone and
+20.46% for a final checkpoint. The same Room 1 test and route-macro measure are
+used throughout.
+
+**Historical v1 evaluation provenance.** In the control, anchor-pilot and tie-break
+campaigns, Room 1 v1 evaluation commands used the historical v1 Room 1 start set
+and seed 20260920; Room 2 v1 evaluation commands used the historical v1 Room 2
+start set and seed 20260922. The public historical control, anchor-pilot and
+tie-break v1 evaluation plans are hash-bound to their corresponding published
+result aggregates. These plans provide public methodological provenance; no
+protected or fresh-set content is needed for these claims.
+
+| Arm | Median loss of the original Room 1 margin | Room 2 v1 median | Room 2 finals at least 45 of 50 | Declared branch |
+|---|---:|---:|---:|---|
+| Control: bonus, no anchor | 0.871 | 80.6% | 1 of 4 | Reference |
+| E0: no bonus, no anchor | 0.210 | 85.7% | 4 of 4 | Holds |
+| A1: bonus, anchor weight 1 | 0.072 | 85.3% | 3 of 4 | Holds |
+| A10: bonus, anchor weight 10 | 0.024 | 84.3% | 2 of 4 | Holds with a Room 2 cost |
+
+The branch labels follow the declared screen. The Room 2 v1 threshold is 76.76%,
+five points below the earlier mixed-imitation recipe's median of 81.76%.
+Holds requires median loss at most 0.25, that Room 2 v1 threshold, and at least
+three of four canonical finals clearing 45 of 50 episodes. Holds with a Room 2
+cost meets the loss threshold but fails a Room 2 condition. Partial means median
+loss above 0.25 and at most 0.6; Does not hold means loss above 0.6.
+The canonical Room 2 measure uses 50 episodes from its normal start and is on the
+training side. Room 2 v1 is a reused development set, so neither measure supports
+a fresh generalization claim.
+
+**All twelve remedy runs lost less Room 1 skill than any control run.** The largest
+remedy loss was 0.362, against the smallest control loss of 0.586. Turning off the
+entropy bonus alone prevented most of the decay seen in the control. The anchor
+also held the skill under this screen, while keeping Room 1 randomness close to
+the donor's level. The anchor frames are near the Room 1 test paths: the earlier
+coverage measurement found 59% to 76% of test starts within four pixels of a fitted
+frame, comparing position only. E0 has no such rehearsal term.
+
+| Donor seed | Room 1 after mixed copying | Control final | E0 final | A1 final | A10 final |
+|---|---:|---:|---:|---:|---:|
+| 3 | 64% | 8% | 57% | 58% | 61% |
+| 4 | 63% | 26% | 44% | 61% | 63% |
+| 5 | 64% | 7% | 63% | 58% | 57% |
+| 6 | 52% | 7% | 33% | 49% | 59% |
+
+**The declared reading is a tie between E0 and A1.** Their median losses differ by
+0.138 and their Room 2 v1 medians by 0.004, inside the declared tie bands of 0.15
+and 0.05. E0's per-run losses were 0.116, 0.305, 0.010 and 0.362; A1's were 0.106,
+0.021, 0.086 and 0.058, in donor order. E0 therefore has two runs above 0.25 and
+A1 none, but four runs per arm do not establish an advantage between the arms
+(the exact two-sided test on those counts gives about 0.43). On donor 5's copy,
+E0 scored above A1 at every measured checkpoint. A1's smaller observed losses
+must also be read beside the anchor's rehearsal near the test paths, described
+above. This pilot does not show that either arm retains better than the other.
+
+The Room 2 screen also needs care. A1's run from donor 3 cleared 40 of 50 episodes,
+so there is no basis to claim no Room 2 cost for A1. A10's two finals below the
+45-clear cut scored 44 and 43; its branch label records that screen, rather than
+establishing a Room 2 cost from differences of one or two clears.
+
+The descriptive frame measurements support the randomness explanation without
+settling it. On the six held-back Room 1 episodes, seed 3's donor had 5.325 bits
+of button-choice randomness per frame, its mixed copy 4.840, and its control
+final 9.630. The remedy finals were E0 4.987, A1 5.261 and A10 5.103. Across the
+four donors, A1's final Room 1 randomness was within 0.25 bits of the donor's;
+E0 was less consistent. Of the choices the donor made confidently, A1 still
+made 92% to 99% confidently the same way, A10 93% to 99%, E0 86% to 96%, and
+the control 54% to 83%. These control shares are remeasured on this pilot's
+held-back frames, rather than the frame set used for section 4. Room 2 randomness
+rose from the mixed copy in every arm and every run, including E0. Removing the
+bonus does not remove all randomness drift.
+
+The owner provisionally chose E0 to carry forward, following the declared tie
+choice by simplicity and cost. That is a choice, not a result establishing E0
+as better. A small E0 versus A1 tie-break was then declared using new PPO seeds
+and the same four copies, before any confirmation on fresh donors and the fresh
+Room 1 v2 set. Its thresholds were chosen after seeing this pilot. That tie-break
+has since finished and selected A1 under its declared rule; see the
+[tie-break result](results/ppo-anchor-tiebreak.json). This section reports the
+pilot only.
+
+Sampling noise, the copied value estimate and the reused development sets remain
+limits, as in the earlier pilots. In addition:
+
+- Four donors from one recipe cannot establish generalization to new donors.
+- Each copy's Room 1 starting score is one shared 200-start evaluation. Its
+  measurement error moves every arm's loss on that copy together. As a rough
+  scale, binomial approximations put one evaluation's standard error at about
+  0.06 to 0.08 loss units per run. This is not a route-macro uncertainty estimate
+  or an uncertainty interval for the arm comparison.
+- Anchor rehearsal near test paths limits comparisons with E0, and the control
+  and remedy campaigns ran at different times and with different concurrency.
+- The critic is not anchored and shares features with the actor, so its updates
+  can also change the Room 1 policy.
+- A1-k0, A1-k1 and A1-k2 were stopped on purpose at 401,408 steps and resumed in
+  a second process. Weights, optimizer state, counters and the anchor batch
+  schedule carried over exactly. The resumed process restarted its random
+  streams from the run seed and began from a fresh episode; A1-k2 also
+  recollected one rollout, having been killed during the update after its saved
+  checkpoint. The 100k through 400k checkpoints are unaffected. Only these A1
+  runs were resumed, so interruption is a confound in the final-arm comparison.
+- The resume amendment was committed as `9a3ee81`, with the training code
+  identical to `54c9556`. The pilot declaration was already hash-pinned and
+  therefore could not record that amendment in place. Analyzer record checks
+  were tightened in `8add862` after all twelve training records existed,
+  including the anchor's per-update held-back Room 1 agreement, and before
+  evaluation results were read. They were refined in `90b9b47` to accept
+  replayed anchor rows explained by a resume, check additional pins and refuse
+  blank values. These changes are recorded separately in the tie-break
+  declaration and did not change the pilot's numerical results or reading.
+
+The numbers and input hashes are in
+[`docs/results/ppo-anchor-pilot.json`](results/ppo-anchor-pilot.json), written by
+`scripts/analyze_ppo_anchor_pilot.py`. The randomness and confident-choice
+measurements are in
+[`docs/results/ppo-anchor-pilot-descriptive.json`](results/ppo-anchor-pilot-descriptive.json),
+written by `scripts/describe_anchor_pilot.py`. The tie choice and subsequent
+tie-break declaration are in `config/ppo-anchor-tiebreak.json`.
+
+## Tie-break: choosing A1 for confirmation
+
+This is descriptive selection on development sets, using the same four mixed
+copies and original donors as the fifth pilot. It is not confirmation on fresh
+donors. The rule was declared after seeing the pilot, before the new runs.
+Neither fresh v2 set was read.
+
+E0 and A1 were each rerun with the same four new PPO seeds, 50 to 53, for
+500,000 steps on Room 2. Every new run completed uninterrupted at 501,760 accepted steps. The
+eight training runs and all 56 evaluations succeeded, with no retries. A1 used
+the same donor recordings, fitted episodes and anchor seeds as in the pilot.
+The two batches therefore give two PPO runs per arm on each of four clones,
+not eight independent donors.
+
+The declared rule switches the provisional choice from E0 to A1 when both
+conditions hold across the pooled pilot and new runs: at least three more of
+E0's pooled final losses than A1's are strictly above 0.25, and E0's median loss exceeds A1's by strictly
+more than 0.10. A separate screen checks whichever arm the rule names: Room 2
+v1 median at least 0.7676 and at least six of eight canonical finals at 45 or
+more of 50 (the pilot's three of four, over eight runs). Failure requires review and a recorded owner choice before
+confirmation planning; it does not change the rule's answer.
+
+| Pooled measure | E0 | A1 |
+|---|---:|---:|
+| Final losses strictly above 0.25 | 3 of 8 | 0 of 8 |
+| Median final loss | 0.1771 | 0.0617 |
+| Room 2 v1 median | 0.8622 | 0.8471 |
+| Canonical Room 2 finals at least 45 of 50 | 8 of 8 | 7 of 8 |
+| Median canonical Room 2 clears | 49 | 48 |
+
+**The declared rule selected A1.** The count gap is exactly three, the median
+gap is 0.1154, and A1 passes the Room 2 screen. This names the arm to take into
+confirmation. It does not establish that A1 is generally better.
+
+The decision is sensitive to small measurement changes. The third E0 loss above
+0.25 comes from the new run on donor 4's copy: loss 0.2712, with 91 of 200 Room 1
+successes and route-macro success 0.4564. A route-macro score around 0.4697,
+roughly three additional successes depending on their routes, would put it at
+the 0.25 line and reduce the count gap to two. The rule would then retain E0.
+The median gap is only 0.0154 above its threshold. The copy's shared starting
+measurement and the run's own final evaluation each carry roughly 0.055 loss
+units of standard error under a binomial approximation, about 0.08 combined,
+against this run's margin of 0.021 above the 0.25 line. That is a noise-scale illustration, not an uncertainty
+interval for the selection or a route-macro uncertainty calculation.
+
+The direction of the observed difference is more consistent than that narrow
+decision margin: A1 lost less Room 1 skill in seven of eight comparisons on the
+same clone and batch, including all four new comparisons. Both arms' final
+losses remained below the smallest control loss, 0.586. These are descriptive
+comparisons with only four clones; the pairs sharing a clone are correlated.
+There is no statistical significance claim.
+
+Only one of four new E0 runs crossed 0.25. The declaration's informal illustration
+said the switch would repeat the pilot's pattern of about half the E0 runs
+crossing that line. That illustration does not describe this outcome. The actual
+new E0 losses were 0.1803, 0.2712, 0.0838 and 0.1740, versus A1's 0.0529, 0.0651,
+0.0266 and 0.1104 (donors 3 to 6). Every new E0 run lost more than its A1
+counterpart, with new-batch medians of 0.177 against 0.059. The mechanical rule
+governs the selection; the pilot's pattern
+did not replicate in the sense described by the illustration.
+
+Room 2 favors E0 slightly in these pooled observations. A1's screen pass does
+not establish absence of a Room 2 cost: its new run on donor 6's copy cleared
+exactly 45, the new run on donor 4's copy scored 0.7622 on v1, and its pilot run
+on donor 3's copy cleared 40. The v1 screen applies to the arm median, not to
+each run individually. The evidence here is lower Room 1 loss for A1 on this
+development set, beside slightly higher Room 2 scores for E0.
+
+The anchor rehearses donor behavior on frames near many Room 1 test paths:
+59% to 76% of test starts are within four pixels of a fitted frame (fifth pilot).
+Nothing here separates retained skill from that rehearsal. The reused
+development sets, common clones, common anchor seeds, and resumed pilot A1
+runs also limit interpretation. A post hoc near/far descriptive split of the existing Room 1 evaluations is
+reported in the next section. Even that split does not establish a causal
+explanation.
+
+Two procedural disclosures accompany the pinned result. The owner cutoff was
+added by hand to both generated plans before their campaigns. The training plan
+retains its original generation timestamp; its change is covered by the
+declaration's pre-run amendment. The evaluation plan, generated from the training
+summary with the cutoff then added by hand, was committed alone as `d34ea6b`
+before any evaluation, and this edit is not listed in the declaration's
+amendments. No declaration or plan has changed since the data were seen; the
+only later code change is the analyzer note described below.
+
+The result was produced by the analyzer at `27a1d6d`, after an earlier analysis
+output had been seen. It differs from the predeclared version at `949e648`
+(code hash prefix `413a0b0d`) only in the wording of one note. The revised code
+hash prefix is `b6608a88`; the original analyzer gives identical numbers and
+selection. The wording edit changed no calculation or record check. A separate
+read-only review reproduced the result exactly and checked the training and
+evaluation records, checkpoint hashes and declaration pins.
+
+The rule and amendments are in `config/ppo-anchor-tiebreak.json`; the numbers
+and input hashes are in
+[`docs/results/ppo-anchor-tiebreak.json`](results/ppo-anchor-tiebreak.json),
+written by `scripts/analyze_ppo_tiebreak.py`. Confirmation has not started. Its
+plan needs to declare outcomes for generalization to fresh donors, Room 2 cost,
+and the distinction between retention and rehearsal, before using the fresh
+Room 1 v2 set.
+
+## Post hoc check: near and far from the anchor frames
+
+After the tie-break selected A1, the existing Room 1 development-set
+evaluations at 501,760 steps were split by distance from fitted donor frames. This was
+post hoc and cannot change the declared selection. No new play or training
+was run, and neither fresh v2 set was read.
+
+Near means within four pixels, inclusive, of a fitted frame with the same dash
+count; far means more than four pixels. This reuses the earlier coverage
+definition and the same nineteen fitted episodes for each clone. The distance
+and four-pixel threshold are the earlier published coverage definition; they
+were written into a private protocol before the final per-episode outcomes
+were read, and no other threshold was tried. It considers starting position and dashes, not velocity, timers or the
+rest of the trajectory. The split is identical for both arms and batches on
+each clone. Donors 3 to 6 have 118, 152, 121 and 146 near starts out of 200.
+
+| Group, both batches pooled | A1 successes | E0 successes | A1 rate | E0 rate | Difference |
+|---|---:|---:|---:|---:|---:|
+| Near | 652 / 1,074 | 549 / 1,074 | 60.7% | 51.1% | +9.6 points |
+| Far | 257 / 526 | 244 / 526 | 48.9% | 46.4% | +2.5 points |
+
+These denominators repeat starts across four clones and two PPO batches; they
+are not independent observations. They should not be used as independent
+binomial sample sizes. Pooled rates also mix clones: donors 4 and 6 contribute
+55% of near starts but 39% of far starts. The same-clone comparisons below
+avoid this mixture.
+
+Route weighting matters. Averaging success equally over represented routes
+within each subgroup, then averaging the eight runs equally, gives:
+
+| Batch | Near A1 | Near E0 | Near difference | Far A1 | Far E0 | Far difference |
+|---|---:|---:|---:|---:|---:|---:|
+| Pilot | 60.9% | 50.5% | +10.4 points | 44.3% | 44.9% | -0.6 points |
+| New | 60.2% | 52.0% | +8.2 points | 46.0% | 43.8% | +2.2 points |
+| Both | 60.5% | 51.3% | +9.3 points | 45.1% | 44.3% | +0.8 points |
+
+Every subgroup represents all eleven routes, but its number of starts per
+route differs. A1 has the higher route-balanced score in seven of eight
+same-clone comparisons on near starts and five of eight on far starts.
+On donors 4 and 6, some routes have a single far start, so one episode moves
+a run's route-balanced far score by about nine points.
+Near/far macro rates do not combine into the original full-set macro by
+weighting only their episode totals; their within-route weights differ.
+
+In both pooled measures A1's lead is larger on starts near the fitted frames
+than on far starts. The far comparison is much noisier: far groups are smaller,
+some routes have a single far start, and per-run far differences range from
+about -10 to +10 points. On donor 4's copy A1 led on far starts in both batches.
+This final-score split alone cannot distinguish rehearsal from decay that
+is itself concentrated near the fitted frames. The next section adds the
+clones' starting scores. The noisy far comparison neither establishes a lead
+nor rules one out.
+Near and far groups are not randomized or matched for difficulty, and a start
+far from a recorded frame can later reach recorded parts of a trajectory.
+The check cannot establish generalization with four shared clones and reused
+sets. No statistical significance or causal claim follows.
+
+The declared choice remains A1. Confirmation planning should address rehearsal
+explicitly, alongside fresh-donor generalization and Room 2 cost, before any
+fresh Room 1 v2 evaluation.
+
+The result is in
+[`docs/results/ppo-tiebreak-near-far.json`](results/ppo-tiebreak-near-far.json),
+written by `scripts/describe_tiebreak_near_far.py`. Input pins, episode identities,
+full-set and split totals, fitted-frame counts and earlier coverage fractions
+were checked. A separately written check script rebuilt grouping using squared
+integer distances and recomputed the subgroup totals and route weights.
+
+## Post hoc extension: near/far scores before fine-tuning
+
+The previous check compared final A1 and E0 scores without each group's
+starting score. This extension uses the four existing mixed-copy Room 1
+evaluations, with the identical near/far masks. It adds no game runs or fresh
+set evaluations. The extension is post hoc; A1 remains the declared choice.
+
+The clones scored 347 of 537 near evaluations (64.6%) and 135 of 263 far
+evaluations (51.3%). These are four evaluations on the same 200-start
+development set, one per clone. Each starting measurement is reused for both
+arms and both PPO batches. It is not a new independent baseline for each final.
+
+| Group, pooled state-weighted rates | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 64.6% | 60.7% | 3.9 points | 51.1% | 13.5 points |
+| Far | 51.3% | 48.9% | 2.5 points | 46.4% | 4.9 points |
+
+Route-balanced means weight each route equally within a subgroup and each
+clone/run equally. They differ from the pooled state-weighted rates:
+
+| Group, route-balanced means | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 66.0% | 60.5% | 5.5 points | 51.3% | 14.7 points |
+| Far | 47.6% | 45.1% | 2.4 points | 44.3% | 3.2 points |
+
+Loss is starting success minus final success in percentage points, computed
+before rounding. These are not the pilot's donor-margin loss units. No subgroup
+donor baseline or floor has been measured. A negative loss is an improvement
+in the observed score, not a claim that fine-tuning improved the underlying skill.
+
+The individual clones differ. This table uses route-balanced scores, with the
+two final PPO batches averaged for each clone and arm:
+
+| Donor | Group | Clone baseline | A1 final | A1 loss | E0 final | E0 loss |
+|---|---|---:|---:|---:|---:|---:|
+| 3 | Near | 69.7% | 64.6% | +5.1 | 55.0% | +14.6 |
+| 3 | Far | 58.1% | 53.1% | +4.9 | 55.6% | +2.5 |
+| 4 | Near | 68.1% | 61.6% | +6.5 | 45.9% | +22.2 |
+| 4 | Far | 43.1% | 44.1% | -1.0 | 36.2% | +6.9 |
+| 5 | Near | 69.8% | 65.4% | +4.4 | 63.9% | +6.0 |
+| 5 | Far | 53.7% | 52.7% | +1.0 | 54.8% | -1.1 |
+| 6 | Near | 56.4% | 50.5% | +5.9 | 40.2% | +16.2 |
+| 6 | Far | 35.4% | 30.7% | +4.7 | 30.7% | +4.7 |
+
+The loss columns in this table are percentage points. The nearly equal donor 6
+far means average opposing batch differences; they do not show both batches
+performed alike.
+
+**The smaller far-start gap sits beside smaller average far-start decay for
+both arms.** Most of E0's observed decay was on near starts, close to the frames
+the mixed copy was fitted on. On far starts E0 itself lost little on average,
+so there was little decay there for the anchor to prevent. This split cannot
+show whether A1's advantage over E0 extends beyond the fitted frames; the next
+section shows that the control, unlike E0, did decline on far starts.
+It cannot simply be read as A1 losing as much far-start skill as
+E0 while preserving near-start skill. In particular, donor 4's far baseline
+was already lower than its near baseline: A1's far mean is slightly above that
+starting observation, while E0's is below it. Donors 3 and 5 show lower far
+loss for E0, and donor 6's far averages are nearly equal.
+
+This adds starting levels but does not resolve the rehearsal question. Far
+groups remain sparse and noisy, including routes with a single start. Their
+starting scores also differ in difficulty and available room for decline.
+Each baseline is a single stochastic measurement; its error moves all losses
+for that clone/group together. The baseline cancels in A1-versus-E0 loss
+differences, so the earlier final-score comparisons are numerically unchanged.
+Under a binomial approximation, the pooled far starting rate (263 evaluations)
+carries roughly three percentage points of standard error, and each clone's
+far starting rate about five to seven points. The observed far-loss averages
+of 2.4 to 4.9 points are of a similar scale. The pooled near starting rate
+carries about two points. This is a noise-scale illustration, not an interval
+or a route-macro uncertainty estimate; it omits clustering within routes and
+dependence between reused starts.
+Historical baseline and final evaluations occurred at different times, and
+distance omits velocity, timers and later trajectory overlap. Four shared
+clones and reused development starts do not establish generalization, causality
+or statistical significance.
+
+Confirmation still needs declared starting measurements and a clear claim:
+A1 versus control alone cannot settle whether rehearsal explains an advantage
+over a comparator without an anchor. The arm choice remains A1; no confirmation
+has been started and neither fresh v2 set has been read.
+
+Numbers and input pins are in
+[`docs/results/clone-near-far.json`](results/clone-near-far.json), written by
+`scripts/describe_clone_near_far.py`. Eight focused tests pass (two for this
+extension, six for the preceding split). A separately written check script
+rebuilt integer-distance masks and verified
+46 subgroup, loss, pooling and baseline-cancellation checks.
+
+## Post hoc extension: the control also decayed on far starts
+
+The owner next requested the same split for the original control: the four
+mixed-copy policies fine-tuned on Room 2 with entropy coefficient 0.01 and no
+anchor. This adds only their existing 501,760-step Room 1 evaluations. The
+clone baselines and <=4-pixel same-dash masks are unchanged. Neither fresh v2
+set was read and no new game runs were performed.
+
+| Group, pooled state-weighted rates | Clone baseline | Control final | Control loss |
+|---|---:|---:|---:|
+| Near | 347 / 537 (64.6%) | 78 / 537 (14.5%) | 50.1 points |
+| Far | 135 / 263 (51.3%) | 21 / 263 (8.0%) | 43.3 points |
+
+These are correlated observations on four clones of the same 200 development
+starts. Donors with more near starts contribute more to the pooled near rate:
+donors 4 and 6 supply 55% of near starts but 39% of far starts. Equal-route,
+then equal-clone means provide a separate descriptive view:
+
+| Group, route-balanced means | Clone baseline | Control final | Control loss | A1 loss | E0 loss |
+|---|---:|---:|---:|---:|---:|
+| Near | 66.0% | 14.3% | 51.7 points | 5.5 points | 14.7 points |
+| Far | 47.6% | 7.4% | 40.2 points | 2.4 points | 3.2 points |
+
+A1 and E0 columns reuse the preceding extension's means over two PPO batches
+per clone. The control has one run per clone, from an earlier campaign with
+different concurrency. This is not a balanced confirmation experiment.
+
+Every control declined in both groups. Per-clone route-balanced control losses
+are below, measured in success percentage points:
+
+| Donor | Near loss | Far loss |
+|---|---:|---:|
+| 3 | 61.7 | 48.5 |
+| 4 | 39.6 | 26.3 |
+| 5 | 57.7 | 53.7 |
+| 6 | 47.7 | 32.3 |
+
+Control final route-balanced success was 14.3% near and 7.4% far at reset.
+Subgroup reference-policy scores were not measured, so these values cannot be
+compared with subgroup reference levels. The controls lost about four fifths of
+their starting success near and far at reset; donor 5's control cleared none of
+its 79 far starts. The smaller far loss in points sits beside a lower far-at-reset
+starting level and does not identify partial protection.
+
+**Far-at-reset decay is present in the control.** The small far-at-reset decay
+seen with E0 is not a property of all the fine-tuning recipes. In this descriptive,
+cross-campaign comparison on development starts, both A1 and E0 lost much less
+than the earlier control on far-at-reset starts as well as near starts.
+
+On these development starts A1 lost 2.4 points far at reset against the control's
+40.2 (route-balanced). This descriptive, cross-campaign difference does not
+identify trajectory-level protection beyond exposure. It also does not determine
+whether A1 has an advantage over a retaining method without rehearsal, such as
+E0. Distance is a property of the start at reset, not of the complete trajectory;
+a far-at-reset start can later reach recorded frames. These observations do not
+isolate rehearsal as a cause or prove a general retention benefit.
+
+The shared clone baselines, stochastic evaluation, reused routes, thin far
+groups and different campaign times/concurrency remain limitations. No
+uncertainty interval or statistical significance is claimed. Losses are
+signed success percentage points, not the pilot's normalized donor-margin
+measure. The declared A1 selection is unchanged; confirmation has not started.
+
+The aggregates and input hashes are in
+[`docs/results/control-near-far.json`](results/control-near-far.json), written
+by `scripts/describe_control_near_far.py`. Control recipe, clone/checkpoint pins,
+episode identities and full/split outcomes were checked. The eight focused
+tests of the reused near/far and signed-loss helpers pass. A separately written
+script rebuilt squared-integer-distance masks and verified twenty outcome,
+loss and pooling checks.
