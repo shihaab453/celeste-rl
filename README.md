@@ -36,6 +36,8 @@ Three experiment reports, and the negative one came first and matters as much:
 | [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points in Room 1** under the predeclared matched, route-cluster-aware analysis |
 | [Room 2: matched fine-tuning](docs/room2-matched-finetuning.md) | **No evidence of a varied-start benefit**: B minus A -5.8 points, 95% crossed seed-route interval -18.7 to +3.4, exact paired p = 0.50; one of six varied-start runs collapsed during training; canonical-start runs can collapse too ([training stability](docs/room2-training-stability.md)) |
 
+A technical report consolidating the retention and forgetting experiments is available in [docs/technical-report.md](docs/technical-report.md).
+
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
 explains what was measured to work out why: the policy never left near-uniform play, the critic learned the
