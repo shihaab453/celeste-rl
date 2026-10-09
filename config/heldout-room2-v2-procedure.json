@@ -1,7 +1,7 @@
 {
   "name": "heldout-room2-v2-procedure",
   "written": "2026-09-23",
-  "status": "Procedure only. Nothing generated. The guards G1 and G2 below are implemented and tested (commit f1a0135, amendment 1). The owner approved generation on 2026-09-23; attempt 1 produced no route and was stopped (amendment 2).",
+  "status": "Procedure only. Nothing generated. The guards G1 and G2 below are implemented and tested (commit f1a0135, amendment 1). Generation was approved on 2026-09-23; attempt 1 produced no route and was stopped (amendment 2).",
   "why": "The current Room 2 held-out set (config/heldout_starts-room2.json) has had its aggregate failure band seen, so any follow-up comparison (O1, O2, or an entropy or checkpoint-schedule experiment) needs a fresh set. The procedure is fixed now, before the noise-check results exist, so nothing learned from them can shape the new test set.",
   "task": {
     "name": "chapter-1-room-2",
@@ -30,12 +30,12 @@
       "G1": {
         "problem": "Nothing rejects a new route that repeats a route of the current held-out set. With the old namespace, existing_heldout_routes() would feed the 12 old routes straight back in; with a new namespace, see G2.",
         "proposed_change": "Add a repeatable --exclude-heldout <manifest> option to scripts/make_heldout_starts.py. For each given manifest: validate it with celeste_rl.heldout.validate_manifest against the task identity, collect only its entries' route_sha256 values, and refuse the build if any new complete-route hash is in that set, using the existing reject_heldout_overlap comparison. Hash comparison only; no state is read beyond the validation the existing guards already perform. Offline tests: overlap refused, no overlap accepted, a tampered manifest refused.",
-        "status": "implemented in commit f1a0135 (owner-approved 2026-09-23): --exclude-heldout, repeatable; the output manifest records each excluded manifest's path, sha256 and route count"
+        "status": "implemented in commit f1a0135 (approved 2026-09-23): --exclude-heldout, repeatable; the output manifest records each excluded manifest's path, sha256 and route count"
       },
       "G2": {
         "problem": "unused_search_seeds() starts at FIRST_SEED = 100 and skips only seeds recorded in the given namespace. In a fresh namespace it would search seeds 100 to 111 again (checked offline), and the seeded search would likely regenerate the old routes.",
         "proposed_change": "Add a --first-seed option to scripts/make_heldout_starts.py (default 100, the current behaviour), passed to unused_search_seeds().",
-        "status": "implemented in commit f1a0135 (owner-approved 2026-09-23): --first-seed, default 100; seeds already recorded in the namespace are still skipped"
+        "status": "implemented in commit f1a0135 (approved 2026-09-23): --first-seed, default 100; seeds already recorded in the namespace are still skipped"
       }
     }
   },
@@ -66,7 +66,7 @@
   ],
   "estimated_run_time": "About 20 to 40 minutes if every seed finds a route quickly: the original took about 12 minutes for 12 searches and about 5 minutes to validate 440 candidates. Up to about 2 hours 15 minutes if every search runs its full 10-minute budget.",
   "machinery": "Clean tracked tree, pinned runtime, Steam running, one live game script at a time, never alongside the noise-check campaign. The script's own clean-tree and runtime checks apply.",
-  "order": "After G1 and G2 are committed and reviewed, and after owner approval. Planned before the noise-check run, so the set is frozen before any noise-check result exists.",
+  "order": "After G1 and G2 are committed and reviewed, and after explicit approval. Planned before the noise-check run, so the set is frozen before any noise-check result exists.",
   "amendments": [
     {
       "date": "2026-09-23",
@@ -80,7 +80,7 @@
       "before_any_data": true,
       "number": 2,
       "change": "Seeds 112 to 115 are recorded as tried and will not be used again; the build restarts with --first-seed 116 --searches 12 (seeds 116 to 127, checked unused in every namespace), otherwise the same command. Rule for every seed from now on: a seed counts as tried as soon as its search process has been started, whatever happens next (launch failure, crash, interruption or no route). It is never reused, and a rerun always starts at the lowest seed never tried. Before any build, a launch-only readiness check must show the game copy answering on DebugRC, with no search run. The command, the seeds field, the example in seed_that_finds_no_route and the status text are updated to match.",
-      "reason": "Attempt 1 (2026-09-23 18:19) started before Steam was ready. Seeds 112 to 114 failed inside the game launch ('Steam not found!' in the game's errorLog.txt; no search step ran), and seed 115 launched and was stopped by the worker, possibly mid-search. No route was produced and no set was generated. Counting all four as tried keeps the rule simple and removes any choice about which seeds to reuse. The four empty route folders stay in runs/room2-heldout-v2-routes; the build ignores folders without route.json."
+      "reason": "Attempt 1 (2026-09-23 18:19) started before Steam was ready. Seeds 112 to 114 failed inside the game launch ('Steam not found!' in the game's errorLog.txt; no search step ran), and seed 115 launched and was stopped, possibly mid-search. No route was produced and no set was generated. Counting all four as tried keeps the rule simple and removes any choice about which seeds to reuse. The four empty route folders stay in runs/room2-heldout-v2-routes; the build ignores folders without route.json."
     }
   ]
 }

@@ -332,7 +332,7 @@ held-back frames, rather than the frame set used for section 4. Room 2 randomnes
 rose from the mixed copy in every arm and every run, including E0. Removing the
 bonus does not remove all randomness drift.
 
-The owner provisionally chose E0 to carry forward, following the declared tie
+E0 was provisionally chosen to carry forward, following the declared tie
 choice by simplicity and cost. That is a choice, not a result establishing E0
 as better. A small E0 versus A1 tie-break was then declared using new PPO seeds
 and the same four copies, before any confirmation on fresh donors and the fresh
@@ -398,7 +398,7 @@ conditions hold across the pooled pilot and new runs: at least three more of
 E0's pooled final losses than A1's are strictly above 0.25, and E0's median loss exceeds A1's by strictly
 more than 0.10. A separate screen checks whichever arm the rule names: Room 2
 v1 median at least 0.7676 and at least six of eight canonical finals at 45 or
-more of 50 (the pilot's three of four, over eight runs). Failure requires review and a recorded owner choice before
+more of 50 (the pilot's three of four, over eight runs). Failure requires review and a recorded explicit choice before
 confirmation planning; it does not change the rule's answer.
 
 | Pooled measure | E0 | A1 |
@@ -455,7 +455,7 @@ runs also limit interpretation. A post hoc near/far descriptive split of the exi
 reported in the next section. Even that split does not establish a causal
 explanation.
 
-Two procedural disclosures accompany the pinned result. The owner cutoff was
+Two procedural disclosures accompany the pinned result. The campaign start-time cutoff was
 added by hand to both generated plans before their campaigns. The training plan
 retains its original generation timestamp; its change is covered by the
 declaration's pre-run amendment. The evaluation plan, generated from the training
@@ -640,7 +640,7 @@ rebuilt integer-distance masks and verified
 
 ## Post hoc extension: the control also decayed on far starts
 
-The owner next requested the same split for the original control: the four
+The same split was then requested for the original control: the four
 mixed-copy policies fine-tuned on Room 2 with entropy coefficient 0.01 and no
 anchor. This adds only their existing 501,760-step Room 1 evaluations. The
 clone baselines and <=4-pixel same-dash masks are unchanged. Neither fresh v2

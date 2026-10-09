@@ -8,7 +8,7 @@
   Known trade-off (decision D5): a policy certain to fail scores about -1.00002 by failing at once and -1.03 by
   timing out, so it slightly prefers failing early.
 
-**rew-v2** (Codex finding K1), the shaped version. Two changes that only work together, so they ship together:
+**rew-v2**, the shaped version. Two changes that only work together, so they ship together:
 
   1. *The unspent-deadline charge.* A failure at frame t is also charged for the deadline it did not use,
      `-(1800 - t)/60,000`. With the per-step time cost that makes every failure total exactly -1.03 whenever it

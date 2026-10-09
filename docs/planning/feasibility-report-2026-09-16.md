@@ -4,7 +4,7 @@ Date: 16 September 2026. Scope: source inspection and throwaway measurements, wi
 
 ## What was tested
 
-An isolated copy of the user's Steam Celeste installation was created under `celeste-research-scratch/game-probe`. The official Everest installer was applied there. The original Steam installation was not modded. The scratch process used its own `EVEREST_SAVEPATH` and localhost DebugRC port 32279. No personal save files were copied into the probe.
+An isolated copy of the local Steam Celeste installation was created under `celeste-research-scratch/game-probe`. The official Everest installer was applied there. The original Steam installation was not modded. The scratch process used its own `EVEREST_SAVEPATH` and localhost DebugRC port 32279. No personal save files were copied into the probe.
 
 Versions exercised:
 

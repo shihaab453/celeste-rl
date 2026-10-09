@@ -1,6 +1,6 @@
 # Notes from Yosh's Trackmania reinforcement learning videos
 
-Source: five transcripts supplied by the owner (tactiq exports). Timestamps refer to each video. These are notes on
+Source: five supplied transcripts (tactiq exports). Timestamps refer to each video. These are notes on
 someone else's approach, taken as inspiration, not as instructions. Section 7 is the only part that proposes
 anything for this project, and every proposal is checked against our hard constraints.
 

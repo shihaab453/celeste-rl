@@ -26,7 +26,7 @@ Everything counts accepted transitions only (SupervisedPPO rolls the step counte
 episodes that finish inside a discarded rollout are never written, and checkpoints and evaluations are scheduled on
 the accepted step count after the update, not on SB3's callback call count.
 
-Progress records (Codex J9, K8) answer the question the unshaped campaign could not: not just that an episode
+Progress records answer the question the unshaped campaign could not: not just that an episode
 ended, but where. Each episode records the highest progress potential it reached, the furthest right and the
 highest it got, and where it was on its last frame with a player. The reward version does not matter: the
 potential is recorded even when nothing is paid for it, so an unshaped run and a shaped one can be compared.
@@ -86,10 +86,10 @@ class TrainConfig:
     max_grad_norm: float = 0.5
     device: str = "cpu"
     disabled_inputs: tuple[str, ...] = MENU_INPUTS  # decision D1
-    # rew-v1 is the unshaped baseline; rew-v2 adds the unspent-deadline charge and progress shaping (Codex K1).
+    # rew-v1 is the unshaped baseline; rew-v2 adds the unspent-deadline charge and progress shaping.
     reward_version: str = "rew-v1"
     shaping_scale: float = 0.2  # rew-v2 only
-    # starts-v1 (Codex K5, K10). Off by default, so the baseline and the shaped diagnostics stay reproducible.
+    # starts-v1. Off by default, so the baseline and the shaped diagnostics stay reproducible.
     # The initial bias on every action logit. 0.0 is probability 0.5 per input, which samples about twelve of
     # the 21 enabled inputs at once; -2.2 is 0.10 per input, about 2.3 at once, which is what real play looks
     # like. 0.0 reproduces every run before 2026-09-18.
@@ -106,7 +106,7 @@ class TrainConfig:
     max_consecutive_discards: int = 3
     checkpoint_every: int = 50_000  # accepted steps
     eval_every: int = 250_000  # accepted steps; 0 disables
-    # 50, not 20 (Codex K7): 20 episodes cannot show a success rate below 5%, and the rates worth catching
+    # 50, not 20: 20 episodes cannot show a success rate below 5%, and the rates worth catching
     # early are smaller than that.
     eval_episodes: int = 50
     # Training only, 0 (off) by default: end an episode as `stalled`, an ordinary failure, once its best progress
@@ -114,7 +114,7 @@ class TrainConfig:
     stall_frames: int = 0
 
     def __post_init__(self):
-        """Refuse a configuration that cannot run (Codex J10). A checkpoint interval of 0 never advances the
+        """Refuse a configuration that cannot run. A checkpoint interval of 0 never advances the
         scheduler and hangs the run; 0 evaluation episodes make every success rate 0 out of 0."""
         positive = {"total_timesteps": self.total_timesteps, "n_steps": self.n_steps,
                     "batch_size": self.batch_size, "n_epochs": self.n_epochs,
@@ -257,7 +257,7 @@ def roll_back_to_checkpoint(run_dir: Path, previous: dict, steps: int,
     }
 
 
-# How far an episode got, for the diagnostics the unshaped campaign lacked (Codex J9, K8). A field is None when
+# How far an episode got, for the diagnostics the unshaped campaign lacked. A field is None when
 # no step of the episode reported one, which keeps the records honest instead of inventing a zero.
 # The last two count frames since the potential last reached a strictly new best, the quantity the stall ending
 # uses: an episode would have ended as stalled with stall_frames N exactly when its longest stretch reached N.
@@ -429,7 +429,7 @@ class RunRecorder(BaseCallback):
             # From the reward version, so a version that adds a component records it instead of dropping it.
             **{f"component_{name}": sum(e["components"].get(name, 0.0) for e in episodes)
                for name in self.env.reward_config.components},
-            # How far the episodes got: the typical episode and the rollout's frontier. Codex K9's stop rules
+            # How far the episodes got: the typical episode and the rollout's frontier. The diagnostic stop rules
             # are read off these. Blank when a rollout finished no episodes.
             "median_max_potential": _median(episodes, "max_potential"),
             "best_max_potential": _best(episodes, "max_potential"),
@@ -496,7 +496,7 @@ class RunRecorder(BaseCallback):
 
     def _evaluate(self, steps: int) -> None:
         # The evaluated weights go on disk before the episodes run, and the record names their file and its
-        # hash (Codex J4), so an evaluation can always be tied to the checkpoint it measured.
+        # hash, so an evaluation can always be tied to the checkpoint it measured.
         checkpoint = self.checkpoints / f"step_{steps:09d}.zip"
         if not checkpoint.exists():
             _atomic_save(self.model, checkpoint)
@@ -522,8 +522,8 @@ class RunRecorder(BaseCallback):
         }
         with (self.run_dir / "evaluations.jsonl").open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
-        # Best: highest success rate, then the furthest typical episode, then the shortest successful clear
-        # (Codex K8). Before the first clear every evaluation ties at zero success, and the old two-part rule
+        # Best: highest success rate, then the furthest typical episode, then the shortest successful clear.
+        # Before the first clear every evaluation ties at zero success, and the old two-part rule
         # then kept the very first evaluation for the whole run; median maximum potential separates them.
         score = (record["stochastic_success_rate"],
                  median_potential if median_potential != "" else -1e9,
@@ -631,7 +631,7 @@ def train(config: TrainConfig, run_dir: Path, env: CelesteRoomEnv, provenance: d
         raise
     recorder._checkpoint(model.num_timesteps)
     # The policy a run ends with is the one that would be used, and until now it was never measured: the last
-    # scheduled evaluation ran before the final updates (Codex J4). Skipped only if one already ran at exactly
+    # scheduled evaluation ran before the final updates. Skipped only if one already ran at exactly
     # these steps, so a run that ends on an evaluation boundary is not evaluated twice.
     if config.eval_every > 0 and recorder.last_eval_steps != model.num_timesteps:
         recorder._evaluate(model.num_timesteps)

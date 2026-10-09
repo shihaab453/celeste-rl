@@ -228,7 +228,7 @@ reward = +1 on success                      (once)
 
 - **Decision D2:** gamma = 1.0 for this finite task, in both the learner and any shaping term. With 0.99, a success at frame 1,800 would score about the same as a timeout.
 - **Decision D3:** shaping is off for all Phase 2 validation and for an unshaped baseline. A bounded potential-based term `scale * (potential(next) - potential(current))` with terminal potential 0 may be added before the Phase 3 campaign as a separately versioned, disclosed component. At gamma 1 it sums to `-scale * potential(start)` over any complete episode, so it does not change which behaviour is best from a given start. A fault has no successor, so no shaping term is computed for it.
-- **Decision D5, the time cost stays from the start** (owner constraint). Known trade-off: failing immediately scores about -1.00002 and timing out scores -1.03, so a policy certain to fail slightly prefers dying early. Trying for the full 30 seconds is still better whenever its success chance exceeds about 1.5%. This is accepted and disclosed, not claimed to be absent.
+- **Decision D5, the time cost stays from the start** (project constraint). Known trade-off: failing immediately scores about -1.00002 and timing out scores -1.03, so a policy certain to fail slightly prefers dying early. Trying for the full 30 seconds is still better whenever its success chance exceeds about 1.5%. This is accepted and disclosed, not claimed to be absent.
 - Every component is reported separately in `info["reward_components"]`.
 
 ## 8.1 Reward (`rew-v2`), the shaped version

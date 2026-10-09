@@ -52,9 +52,9 @@ def decide(post_clone: list[float], post_clone_share: list[float], final_share: 
         return {"branch": "B", "next": "a recipe that targets the donor's own play (for example self-distillation)",
                 **facts}
     if median_clone < 0.2:
-        return {"branch": "C", "next": "owner and orchestrator choose: self-distillation or a different weight",
+        return {"branch": "C", "next": "defer to a later project decision: self-distillation or a different weight",
                 **facts}
-    return {"branch": "D", "next": "report descriptively; orchestrator and owner decide", **facts}
+    return {"branch": "D", "next": "report descriptively; defer to a later project decision", **facts}
 
 
 def main() -> int:

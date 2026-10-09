@@ -106,7 +106,7 @@ def tile_potential(geometry: dict, costs: dict):
 
 
 def route_potential(positions: list[tuple[float, float]], distance_weight: float = 0.01):
-    """Progress along a recorded route. Demonstration-derived: comparison only, never training (Codex K3)."""
+    """Progress along a recorded route. Demonstration-derived: comparison only, never training."""
 
     def potential(x: float, y: float) -> float:
         best, nearest = None, 0

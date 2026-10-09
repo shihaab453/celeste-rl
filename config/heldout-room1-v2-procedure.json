@@ -1,8 +1,8 @@
 {
   "name": "heldout-room1-v2-procedure",
   "written": "2026-09-26",
-  "status": "Procedure only; nothing generated. Reviewed by the orchestrator 2026-09-26 (sound, with the edits applied here). Generation needs the owner's approval.",
-  "why": "The Room 1 held-out set (config/heldout_starts.json, sha256 54d62e86...) carries the published Phase 3B result and has now been used for two descriptive retention pilots (aggregates only). The orchestrator asked for a fresh Room 1 set before any confirmatory retention experiment, so nothing the pilots saw can shape the confirmatory measure. The procedure is fixed before any such experiment is designed.",
+  "status": "Procedure only; nothing generated. Design reviewed 2026-09-26 (sound, with the edits applied here). Generation needs explicit approval.",
+  "why": "The Room 1 held-out set (config/heldout_starts.json, sha256 54d62e86...) carries the published Phase 3B result and has now been used for two descriptive retention pilots (aggregates only). The prior design review required a fresh Room 1 set before any confirmatory retention experiment, so nothing the pilots saw can shape the confirmatory measure. The procedure is fixed before any such experiment is designed.",
   "task": "chapter-1-room-1, the original Room 1 task (no --task-definition)",
   "original_set_as_found": {
     "output": "config/heldout_starts.json, generated 2026-09-20T00:32:09 at 235df9b, 200 states, 11 routes (runs/heldout-routes/20260920-001246 to -002044), task frames 20 to 404",
@@ -31,6 +31,6 @@
   ],
   "estimated_run_time": "About 20 to 40 minutes if every seed finds a route quickly (the original: 11 routes in about 20 minutes); up to about 2 hours if searches run their full 10-minute budget.",
   "remeasure_rule": "Every value a later experiment compares against (donor 'before' values, the floor, the imitation-only reference) must be re-measured on the new set before a confirmatory experiment; the pilot numbers measured on config/heldout_starts.json cannot be carried over.",
-  "route_count_decision": "11 routes and 200 states, matching the original set (orchestrator review 2026-09-26).",
+  "route_count_decision": "11 routes and 200 states, matching the original set (design review 2026-09-26).",
   "room2_routes": "Not excluded: a different task identity, so no Room 2 route can repeat a Room 1 route."
 }
