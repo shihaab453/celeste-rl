@@ -455,7 +455,7 @@ runs also limit interpretation. A post hoc near/far descriptive split of the exi
 reported in the next section. Even that split does not establish a causal
 explanation.
 
-Two procedural disclosures accompany the pinned result. The cutoff was
+Two procedural disclosures accompany the pinned result. The campaign start-time cutoff was
 added by hand to both generated plans before their campaigns. The training plan
 retains its original generation timestamp; its change is covered by the
 declaration's pre-run amendment. The evaluation plan, generated from the training

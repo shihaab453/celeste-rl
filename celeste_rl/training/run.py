@@ -522,7 +522,7 @@ class RunRecorder(BaseCallback):
         }
         with (self.run_dir / "evaluations.jsonl").open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record) + "\n")
-        # Best: highest success rate, then the furthest typical episode, then the shortest successful clear
+        # Best: highest success rate, then the furthest typical episode, then the shortest successful clear.
         # Before the first clear every evaluation ties at zero success, and the old two-part rule
         # then kept the very first evaluation for the whole run; median maximum potential separates them.
         score = (record["stochastic_success_rate"],

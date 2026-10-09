@@ -1,7 +1,7 @@
 {
   "name": "room2-noise-check-v1",
   "written": "2026-09-23",
-  "status": "diagnostic only; not run; needs design review and explicit approval before any live run",
+  "status": "diagnostic only; not run; needs orchestrator review and owner approval before any live run",
   "question": "For each of the 12 final Room 2 checkpoints, how much higher or lower is success when the policy takes its most likely action every frame (deterministic) than when it samples (stochastic), on training-side starts that are not in the held-out set?",
   "why": "Offline, fine-tuning raised the per-frame chance of sampling something other than the policy's own most likely action on demonstration crossing frames from 6.9% (clone) to 21.7% to 36.9% (checkpoints), and policy entropy rose in all 12 runs. This check measures what that noise costs in play before any observation change (options O1 or O2).",
   "task": {
@@ -99,7 +99,7 @@
   },
   "decision_rule": {
     "written_before_data": true,
-    "rule": "Applied to the primary (the 42 starts before x 460). If the primary deterministic-minus-stochastic difference is at least +10 points in at least 9 of the 12 checkpoints, recommend that the next experiment predeclares its evaluation mode and treats the fine-tuning entropy setting as a training-design question, ahead of O1. If it is below +3 points in at least 9 of the 12, noise is not the main cost: recommend O1 or O2. Otherwise the check is inconclusive and makes no recommendation. Deterministic play can also be worse, which is why the rule is two-sided. The clone never counts. The final choice requires an explicit project decision.",
+    "rule": "Applied to the primary (the 42 starts before x 460). If the primary deterministic-minus-stochastic difference is at least +10 points in at least 9 of the 12 checkpoints, recommend that the next experiment predeclares its evaluation mode and treats the fine-tuning entropy setting as a training-design question, ahead of O1. If it is below +3 points in at least 9 of the 12, noise is not the main cost: recommend O1 or O2. Otherwise the check is inconclusive and makes no recommendation. Deterministic play can also be worse, which is why the rule is two-sided. The clone never counts. The owner makes the final call.",
     "scope": "This check can support a recommendation about the evaluation mode. It cannot show that a lower entropy bonus during training would produce a better policy. That needs a new training experiment.",
     "no_retroactive_change": "Switching the published Room 2 metric to deterministic play after the fact is ruled out; any adoption goes into a new predeclared experiment.",
     "thresholds": {
@@ -114,7 +114,7 @@
       "inconclusive": "this check makes no recommendation"
     }
   },
-  "public_claims": "None without a separate explicit project decision.",
+  "public_claims": "None without a separate owner decision.",
   "budget": {
     "episodes": 7228,
     "estimate": "About 1 to 1.5 s per episode: the Room 2 held-out campaign took 166 to 297 s per 200 episodes including launch. Every episode here also replays a 326 to 886 frame start recipe, and canonical-start episodes play the whole room, up to 1,800 frames on a timeout. About 10 to 15 minutes per checkpoint, about 2 to 3 hours for all 13.",
