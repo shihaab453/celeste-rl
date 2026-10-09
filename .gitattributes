@@ -3,3 +3,4 @@
 *.jpg binary
 *.gif binary
 *.mp4 binary
+/docs/figures/technical-report/*.svg -text
