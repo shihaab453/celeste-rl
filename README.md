@@ -1,10 +1,88 @@
 # celeste-rl
 
-Building a reinforcement learning agent that learns to play [Celeste](https://www.celestegame.com/) (Steam version) from game state, on unmodified game physics.
+**Continual reinforcement learning research, using [Celeste](https://www.celestegame.com/) as the testbed.** When
+an agent that has learned one task is trained on a second, how much of the first does it lose, and how should that
+loss be measured? This project studies the question on the first two rooms of Chapter 1, with an agent that reads
+game state and plays on unmodified game physics.
 
-The long-term goal is an agent that clears the first room of Chapter 1 reliably, then every room, then a continuous Chapter 1 run, then the main story, and eventually plays at speedrun pace.
+<p align="center">
+  <img src="docs/figures/readme/celeste-rl-preview.gif" alt="The agent clearing Chapter 1, Room 1 of Celeste, with the game state it reads on the left and the buttons it presses below the game" width="800">
+</p>
 
-## Status
+*The agent clearing Chapter 1, Room 1 in 220 frames, at real speed and then replayed at one-third speed. Left: some
+of the game-state numbers it reads every frame. Below the game: a map of the nearby tiles and the buttons it presses.*
+
+## In short
+
+- **The problem.** Neural network policies tend to lose old skills when they are trained on new ones, which the
+  field calls catastrophic forgetting. Celeste's rooms make a clean test: each room is a distinct task with a clear
+  success criterion, the controls and observations are shared, and the game is deterministic, so old-room skill can
+  be scored on the same start states at every stage of training.
+- **The main finding.** A policy that had learned Room 1 was taught Room 2, first by imitation and then with PPO,
+  a standard reinforcement learning algorithm. The imitation step cost 12 to 14 percentage points of Room 1
+  success. Under the standard PPO recipe, Room 2 training then cut a further 37 to 56 points in all four lineages,
+  and three of the four finished slightly below the weakest measured policy that had never seen Room 1. Two
+  variants, one with PPO's entropy bonus switched off and one anchored to the original Room 1 behaviour, lost much
+  less: the largest loss in any of their 16 runs was smaller than the smallest loss under the standard recipe, and
+  their median Room 2 performance was not lower. These comparisons are descriptive (four lineages, with the standard
+  recipe from an earlier campaign), not a controlled effect.
+- **The measurement point.** How large forgetting looks depends on which checkpoint is the baseline, which start
+  states are scored and what the loss is divided by. The report works through cases where those choices change the
+  interpretation.
+- **The engineering underneath.** A frame-exact interface to the unmodified game that runs at about 2,600 frames
+  per second, checked frame by frame against the reference tooling and covered by 469 unit tests.
+
+## Technical report
+
+**[Measuring competence and forgetting across imitation and PPO adaptation: a Celeste case study](docs/technical-report.md)**
+<br>Muhammad Shihaab Alam. Version 1.0, 9 October 2026.
+
+[![Room 1 success during Room 2 PPO, one panel per lineage](docs/figures/technical-report/F2-room1-checkpoint-trajectories.png)](docs/figures/technical-report/F2-room1-checkpoint-trajectories.svg)
+
+*Room 1 success of each policy while it trains on Room 2, one panel per lineage. The standard recipe (black) loses
+most of its Room 1 skill; the no-entropy (E0, blue) and donor-anchor (A1, orange) variants lose much less. The
+dashed and dotted lines are the mean Room 1 scores of policies that never saw Room 1.*
+
+| Median across runs | Standard recipe (4 runs) | No entropy bonus, E0 (8 runs) | Anchor to Room 1 behaviour, A1 (8 runs) |
+|---|---:|---:|---:|
+| Share of Room 1 skill lost during Room 2 PPO | 0.87 | 0.18 | 0.06 |
+| Room 2 route-macro success on its start set | 0.806 | 0.862 | 0.847 |
+| Room 2 clears from the normal start, out of 50 | 42.5 | 49 | 48 |
+
+"Share of Room 1 skill lost" is the drop in Room 1 success during Room 2 PPO, divided by how far the Room 1 policy
+scored above policies that never saw Room 1. All 20 runs come from four lineages that share one starting network,
+so the independent sample size is four. Section 2.3 of the report explains what counts as an independent run.
+
+To cite the report:
+
+```bibtex
+@misc{alam2026celeste,
+  author = {Alam, Muhammad Shihaab},
+  title  = {Measuring competence and forgetting across imitation and {PPO} adaptation: a {Celeste} case study},
+  year   = {2026},
+  month  = oct,
+  note   = {Technical report, version 1.0},
+  url    = {https://github.com/shihaab453/celeste-rl/blob/technical-report-v1.0/docs/technical-report.md}
+}
+```
+
+## Key terms
+
+- **Route-macro success.** Each room's evaluation set holds frozen start states grouped into routes (Room 1: 200
+  starts on 11 routes). Route-macro success averages the success rate over routes with equal weight, so a heavily
+  sampled route cannot dominate the score. A start succeeds when the episode leaves the room.
+- **Canonical and varied starts.** The canonical start is the room's normal spawn point. Varied-start training
+  begins episodes from states sampled along routes through the room.
+- **Behaviour cloning.** Learning by imitating recorded demonstrations. Here the demonstrations come from an
+  automated search, not human play.
+- **Donor, copy and lineage.** A donor is a Room 1 policy before any Room 2 training. Its copy is a network fitted to
+  imitate both the donor's Room 1 behaviour and the Room 2 demonstrations, and Room 2 PPO starts from the copy. A
+  lineage is one donor and everything trained from it.
+
+## How the agent learned the rooms
+
+Before forgetting could be studied, the agent had to learn each room. These are the earlier experiments the
+retention work builds on.
 
 **Demonstration-assisted varied-start training improves Room 1 generalisation, but has not yet met the declared
 99% reliability target.** On a replacement frozen
@@ -28,15 +106,14 @@ The fixed canonical start remains a poor measure of generalisation: two policies
 there scored 59.7% and 84.6% on the earlier diagnostic state set. Chapter 1 has 20 rooms; Rooms 1 and 2 have
 been attempted so far.
 
-Three experiment reports, and the negative one came first and matters as much:
+The experiment reports, in order. The negative one came first and matters as much:
 
 | Report | Result |
 |---|---|
 | [Phase 3: without demonstrations](docs/phase3-unshaped-baseline.md) | **0 clears** in 50,369 episodes over three seeds and six million transitions, with the diagnosis of why |
 | [Phase 3B: with demonstrations](docs/phase3b-demonstration-comparison.md) | **Varied-start fine-tuning beats canonical-start fine-tuning by 22.6 points in Room 1** under the predeclared matched, route-cluster-aware analysis |
 | [Room 2: matched fine-tuning](docs/room2-matched-finetuning.md) | **No evidence of a varied-start benefit**: B minus A -5.8 points, 95% crossed seed-route interval -18.7 to +3.4, exact paired p = 0.50; one of six varied-start runs collapsed during training; canonical-start runs can collapse too ([training stability](docs/room2-training-stability.md)) |
-
-A technical report consolidating the retention and forgetting experiments is available in [docs/technical-report.md](docs/technical-report.md).
+| [Room 1 retention pilot](docs/room1-retention-pilot.md) | **Teaching a Room 1 policy Room 2 by imitation on Room 2 alone erased almost all of its Room 1 skill**, the first sign of the forgetting the technical report measures |
 
 The project committed in advance to attempting the room without demonstrations first, on a fixed budget, so
 that the result could be described honestly either way. That attempt failed, and the report says so and
@@ -91,6 +168,18 @@ The game runs with [Everest](https://everestapi.github.io/) (mod loader), [Celes
 - **State-based observations.** The agent reads game state (position, velocity, room geometry and so on), not pixels. This will be documented precisely alongside results.
 - **No game files** are included in this repository.
 
+## Open questions
+
+The report's conclusion lists what stronger identification of forgetting and its remedies would need:
+
+- independent lineages beyond one behaviour-cloning network;
+- more than one copy fit per donor;
+- an exposure measure defined along trajectories, with subgroup reference values;
+- standard-recipe and variant runs from the same campaign;
+- update-level records of PPO training.
+
+The earlier engineering plan, from the interface to two-room play, is in [`docs/planning/roadmap.md`](docs/planning/roadmap.md).
+
 ## Repository layout
 
 | Path | Contents |
@@ -99,7 +188,10 @@ The game runs with [Everest](https://everestapi.github.io/) (mod loader), [Celes
 | `mod/CelesteRLLockstep/` | The Everest mod (C#) |
 | `scripts/` | Environment check, live verification, fault, binding, soak and memory checks, route search |
 | `tests/` | Unit tests and fixed input traces |
-| `docs/planning/` | Phased roadmap and the first feasibility measurements |
+| `config/` | Campaign definitions for training and evaluation runs |
+| `docs/` | The technical report, experiment reports and figures |
+| `docs/results/` | Machine-readable result files behind the reports |
+| `docs/planning/` | Phased roadmap, environment spec and the first feasibility measurements |
 | `experiments/`, `results/` | Early PyTorch exercises (tensors, a hand-written training loop fitting `sin(x)`) |
 
 ## Setup
@@ -134,23 +226,8 @@ uv pip compile requirements-rl.in -o requirements-rl.lock --python-version 3.12 
 
 Do not use `uv sync` or `uv run` in this repository: uv's project mode manages a venv named `.venv` and would rebuild the separate Python 3.14 environment used by `experiments/`.
 
-## Next
+## License
 
-Phases 0 to 3B are done: the interface, a PPO implementation studied on CartPole, the environment, the
-no-demonstration attempt and the demonstration-assisted comparison. The Room 2 matched comparison is also done.
-
-1. **Room 2's shared failure section.** Both arms fail almost entirely in
-   [the same stretch of Room 2](docs/room2-matched-finetuning.md#where-training-episodes-fail), so the next change should follow from what that section demands of the player rather than from how starts are
-   sampled. The diagnosis uses training records and demonstrations, not the held-out states, and any
-   follow-up experiment will disclose that it was designed after seeing where held-out failures clustered.
-2. **Two-room retention.** Mix Rooms 1 and 2 during training and measure both separately, so learning Room 2
-   cannot silently destroy Room 1 competence. A first descriptive pilot found that teaching a Room 1 policy Room 2
-   by imitation on Room 2 alone erased almost all of its Room 1 skill
-   ([retention pilot](docs/room1-retention-pilot.md)).
-3. **How much of the demonstration set is needed.** The cloned Room 1 policy scores below a
-   repeat-your-last-action baseline on held-out routes. Reducing the route count is useful only once the full
-   method reaches the reliability bar in more than one room.
-4. **Natural two-room play.** Evaluate one frozen checkpoint across the Room 1 to Room 2 transition without an
-   artificial reset, as Phase 4 requires.
-
-The full plan is in [`docs/planning/roadmap.md`](docs/planning/roadmap.md).
+The code and documentation in this repository are released under the [MIT License](LICENSE). Celeste, its
+artwork and its game files belong to their respective owners and are not covered by this license; gameplay
+footage appears here for illustration only.
